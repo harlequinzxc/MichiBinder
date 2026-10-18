@@ -1,0 +1,233 @@
+@import "tailwindcss";
+
+/* 1. Viewport safety */
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+body {
+  position: fixed;
+  inset: 0;
+  background: #09090b;
+  color: #e4e4e7;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  touch-action: manipulation;
+}
+
+button,
+select,
+input {
+  font: inherit;
+}
+
+.app-shell {
+  width: 100vw;
+  height: 100dvh;
+  padding-top: env(safe-area-inset-top);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  user-select: none;
+}
+
+.scroll-area {
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.app-shell :is(input, select, textarea) {
+  user-select: text;
+}
+
+/* 2. Prevent native image and link drag previews. */
+img {
+  -webkit-user-drag: none;
+  user-drag: none;
+  -webkit-touch-callout: none;
+}
+
+.app-shell img {
+  pointer-events: none;
+}
+
+[draggable="true"] {
+  -webkit-user-drag: element;
+}
+
+/* 3. Compact dark scrollbars. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #3f3f46 transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: #3f3f46;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: #52525b;
+}
+
+/* 4. Physical-unit grid geometry. */
+.slot-area {
+  grid-column: var(--col-start) / span var(--col-span);
+  grid-row: var(--row-start) / span var(--row-span);
+  min-width: 0;
+  min-height: 0;
+}
+
+.sheet-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 3), calc(var(--card-w) * var(--u)));
+  grid-template-rows: repeat(var(--rows, 3), calc(var(--card-h) * var(--u)));
+  gap: calc(var(--gap) * var(--u));
+}
+
+.sheet-grid--animate,
+.sheet-frame {
+  transition:
+    width 240ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    height 240ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    transform 240ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    padding 240ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* 5. Sleeve finish and toasts. */
+.sleeve-sheen::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  pointer-events: none;
+  background: linear-gradient(132deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.025) 26%, transparent 44%, rgba(255, 255, 255, 0.045) 78%, transparent 100%);
+  mix-blend-mode: screen;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.animate-toast {
+  animation: toast-in 180ms ease-out both;
+}
+
+/* 6. Window Controls Overlay. */
+@media (display-mode: window-controls-overlay) {
+  .titlebar {
+    padding-left: max(1rem, env(titlebar-area-x));
+    padding-top: max(0.75rem, env(titlebar-area-y));
+    min-height: env(titlebar-area-height);
+    app-region: drag;
+    -webkit-app-region: drag;
+  }
+
+  .titlebar :is(button, select, input, a) {
+    app-region: no-drag;
+    -webkit-app-region: no-drag;
+  }
+}
+
+/* 7. Desktop app orientation guard. */
+.portrait-guard {
+  display: none;
+}
+
+@media screen and (orientation: portrait) and (max-width: 1024px) {
+  .portrait-guard {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 2rem;
+    background: #09090b;
+    color: #e4e4e7;
+    text-align: center;
+  }
+}
+
+/* 8. Print one exact physical sheet per binder page. */
+.print-root {
+  display: none;
+}
+
+@media print {
+  html,
+  body,
+  #root {
+    position: static !important;
+    width: auto !important;
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  .app-shell,
+  .no-print,
+  .portrait-guard {
+    display: none !important;
+  }
+
+  .print-root {
+    display: block !important;
+  }
+
+  .print-root * {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .print-page {
+    width: var(--paper-w);
+    height: calc(var(--paper-h) - 1mm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    break-inside: avoid;
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .print-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  .sheet-grid,
+  .sheet-frame {
+    transition: none !important;
+  }
+}
