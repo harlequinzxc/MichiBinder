@@ -899,6 +899,7 @@ export default function CardBinder() {
   const [installPrompt, setInstallPrompt] = useState(null);
   const [combineMode, setCombineModeState] = useState(false);
   const [selBox, setSelBox] = useState(null);
+  const [marqueeActive, setMarqueeActive] = useState(false);
   const [dragInfo, setDragInfo] = useState(null);
   const [dropPreview, setDropPreview] = useState([]);
   const [sidebarDropActive, setSidebarDropActive] = useState(false);
@@ -911,6 +912,7 @@ export default function CardBinder() {
   const dragRef = useRef(null);
   const marqueeRef = useRef(null);
   const suppressClickRef = useRef(false);
+  const slotActionGuardRef = useRef(0);
   const editingRef = useRef(null);
   const panRef = useRef(null);
   const dimensionsRef = useRef(null);
@@ -1383,6 +1385,34 @@ export default function CardBinder() {
   const exactMerge = useMemo(() => activeMerges(current, dims).some((merge) => sameBox(merge, selBox)), [current, dims, selBox]);
   const canMerge = Boolean(combineMode && selBox && selBox.rs * selBox.cs > 1 && !exactMerge);
 
+  const unmergeById = useCallback((mergeId) => {
+    const page = pagesRef.current[currentPageRef.current];
+    const merge = activeMerges(page, dimsRef.current).find((item) => item.id === mergeId);
+    if (!merge) return;
+    const pageId = page.id;
+    const mergeIndex = page.merges.findIndex((item) => item.id === mergeId);
+    const snapshot = { ...merge };
+
+    setPages((value) => value.map((item) => (
+      item.id === pageId
+        ? { ...item, merges: item.merges.filter((candidate) => candidate.id !== mergeId) }
+        : item
+    )));
+    setSelBox((value) => value && boxesIntersect(value, snapshot) ? null : value);
+    notify(`Split ${boxDims(snapshot)} frame into single slots.`, 'info', {
+      label: 'Undo',
+      onClick: () => {
+        slotActionGuardRef.current = 0;
+        setPages((value) => value.map((item) => {
+          if (item.id !== pageId || item.merges.some((candidate) => candidate.id === snapshot.id)) return item;
+          const merges = [...item.merges];
+          merges.splice(clamp(mergeIndex, 0, merges.length), 0, snapshot);
+          return { ...item, merges };
+        }));
+      },
+    });
+  }, [notify]);
+
   const unmergeBox = useCallback((box = selBox) => {
     if (!box) return;
     let count = 0;
@@ -1401,10 +1431,11 @@ export default function CardBinder() {
   }, [selBox, notify]);
 
   const beginMarquee = useCallback((event, slot, isEmpty) => {
-    if (event.button !== 0 || editingRef.current || dragRef.current) return;
+    if (event.button !== 0 || editingRef.current || dragRef.current || suppressClickRef.current || performance.now() < slotActionGuardRef.current) return;
     if (!combineMode && !isEmpty) return;
     const quick = !combineMode && isEmpty;
     marqueeRef.current = { start: slotBox(slot.r, slot.c), current: slotBox(slot.r, slot.c), box: slotBox(slot.r, slot.c), quick, moved: false, pointerId: event.pointerId };
+    setMarqueeActive(true);
     event.currentTarget.setPointerCapture?.(event.pointerId);
     if (combineMode) setSelBox(expandBox(slotBox(slot.r, slot.c), activeMerges(current, dims)));
   }, [combineMode, current, dims]);
@@ -1429,6 +1460,7 @@ export default function CardBinder() {
     const state = marqueeRef.current;
     if (!state) return;
     marqueeRef.current = null;
+    setMarqueeActive(false);
     if (state.moved) {
       suppressClickRef.current = true;
       window.setTimeout(() => { suppressClickRef.current = false; }, 0);
@@ -1664,7 +1696,7 @@ export default function CardBinder() {
       }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') { event.preventDefault(); selectAllVisible(); return; }
       if (event.key === 'Escape') {
-        if (marqueeRef.current) { marqueeRef.current = null; setSelBox(null); }
+        if (marqueeRef.current) { marqueeRef.current = null; setMarqueeActive(false); setSelBox(null); }
         else if (openPanel) setOpenPanel(null);
         else if (selBox) setSelBox(null);
         else if (combineMode) setCombineMode(false);
@@ -1722,23 +1754,66 @@ export default function CardBinder() {
       : Math.max(natural.w / (frameW * printFit), natural.h / (frameH * printFit))) : null;
     const dpiTone = dpi >= 300 ? 'bg-emerald-600/90 text-white' : dpi >= 200 ? 'bg-amber-500/90 text-black' : 'bg-red-600/90 text-white';
     const labelVisible = (frameW * gridPpi) >= 72;
+    const slotActionsAvailable = !combineMode && !dragInfo && !marqueeActive && !editing;
+    const stopSlotAction = (event) => event.stopPropagation();
+    const activateSlotAction = (event, action) => {
+      event.stopPropagation();
+      if (performance.now() < slotActionGuardRef.current) return;
+      slotActionGuardRef.current = performance.now() + 300;
+      action();
+    };
+    const slotActions = slotActionsAvailable && (slot.mergeId || imgId) && (
+      <div className="absolute right-1.5 top-1.5 z-40 flex gap-1 opacity-0 transition-opacity group-hover/slot:opacity-100 group-focus-within/slot:opacity-100">
+        {slot.mergeId && (
+          <button
+            type="button"
+            draggable={false}
+            aria-label={`Unmerge ${boxDims(slot)} frame`}
+            title={`Unmerge ${boxDims(slot)} frame`}
+            onPointerDown={stopSlotAction}
+            onClick={(event) => activateSlotAction(event, () => unmergeById(slot.mergeId))}
+            onDoubleClick={stopSlotAction}
+            className="grid size-6 place-items-center rounded-md bg-black/70 text-zinc-200 ring-1 ring-white/20 backdrop-blur transition-colors hover:bg-violet-500 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+          >
+            <Icon name="split" size="sm" />
+          </button>
+        )}
+        {imgId && (
+          <button
+            type="button"
+            draggable={false}
+            aria-label="Remove card"
+            title="Remove card"
+            onPointerDown={stopSlotAction}
+            onClick={(event) => activateSlotAction(event, () => removeSlotCard(current.id, slot.key))}
+            onDoubleClick={stopSlotAction}
+            className="grid size-6 place-items-center rounded-md bg-black/70 text-zinc-200 ring-1 ring-white/20 backdrop-blur transition-colors hover:bg-red-500 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+          >
+            <Icon name="x" size="sm" />
+          </button>
+        )}
+      </div>
+    );
 
     if (!imgId) {
       return (
-        <button
-          type="button"
-          onPointerDown={(event) => beginMarquee(event, slot, true)}
-          onClick={() => {
-            if (suppressClickRef.current) return;
-            if (combineMode) { setSelBox(expandBox(mergeBox(slot), currentMerges)); return; }
-            if (selectedOrdered.length) placeCards(selectedOrdered, currentPage, slot.key);
-          }}
-          className={`group grid size-full place-items-center overflow-hidden border border-dashed outline-none transition-colors focus-visible:ring-2 focus-visible:ring-indigo-400 ${settings.view === 'binder' ? 'border-zinc-600/80 bg-zinc-950/45 text-zinc-300 shadow-[inset_0_0_18px_rgba(0,0,0,0.45)] hover:border-indigo-400 hover:bg-indigo-500/[0.07] hover:text-indigo-100' : 'border-zinc-400 bg-white/30 text-zinc-600 hover:border-indigo-500 hover:text-indigo-700'} ${previewIndex >= 0 ? '!border-emerald-400 !shadow-[inset_0_0_0_2px_rgb(52_211_153)]' : ''}`}
-          style={{ borderRadius: radius }}
-        >
-          {labelVisible && <span className="flex flex-col items-center gap-1 text-[11px] font-semibold"><Icon name="plus" size="lg" /><span>{slot.cs * slot.rs > 1 ? `${boxDims(slot)} frame` : `Slot ${slotIndex + 1}`}</span></span>}
-          {previewIndex >= 0 && <span className="absolute left-1.5 top-1.5 grid size-5 place-items-center rounded-full bg-emerald-500 text-[10px] font-bold text-emerald-950">{previewIndex + 1}</span>}
-        </button>
+        <div className="group/slot relative size-full">
+          <button
+            type="button"
+            onPointerDown={(event) => beginMarquee(event, slot, true)}
+            onClick={() => {
+              if (suppressClickRef.current || performance.now() < slotActionGuardRef.current) return;
+              if (combineMode) { setSelBox(expandBox(mergeBox(slot), currentMerges)); return; }
+              if (selectedOrdered.length) placeCards(selectedOrdered, currentPage, slot.key);
+            }}
+            className={`group grid size-full place-items-center overflow-hidden border border-dashed outline-none transition-colors focus-visible:ring-2 focus-visible:ring-indigo-400 ${settings.view === 'binder' ? 'border-zinc-600/80 bg-zinc-950/45 text-zinc-300 shadow-[inset_0_0_18px_rgba(0,0,0,0.45)] hover:border-indigo-400 hover:bg-indigo-500/[0.07] hover:text-indigo-100' : 'border-zinc-400 bg-white/30 text-zinc-600 hover:border-indigo-500 hover:text-indigo-700'} ${previewIndex >= 0 ? '!border-emerald-400 !shadow-[inset_0_0_0_2px_rgb(52_211_153)]' : ''}`}
+            style={{ borderRadius: radius }}
+          >
+            {labelVisible && <span className="flex flex-col items-center gap-1 text-[11px] font-semibold"><Icon name="plus" size="lg" /><span>{slot.cs * slot.rs > 1 ? `${boxDims(slot)} frame` : `Slot ${slotIndex + 1}`}</span></span>}
+            {previewIndex >= 0 && <span className="absolute left-1.5 top-1.5 grid size-5 place-items-center rounded-full bg-emerald-500 text-[10px] font-bold text-emerald-950">{previewIndex + 1}</span>}
+          </button>
+          {slotActions}
+        </div>
       );
     }
 
@@ -1752,12 +1827,15 @@ export default function CardBinder() {
         onPointerMove={isEditing ? movePan : undefined}
         onPointerUp={isEditing ? endPan : undefined}
         onPointerCancel={isEditing ? endPan : undefined}
-        onDoubleClick={(event) => startReposition(event, current, slot, imgId)}
+        onDoubleClick={(event) => {
+          if (performance.now() < slotActionGuardRef.current) { event.stopPropagation(); return; }
+          startReposition(event, current, slot, imgId);
+        }}
         onClick={() => {
-          if (suppressClickRef.current) return;
+          if (suppressClickRef.current || performance.now() < slotActionGuardRef.current) return;
           if (combineMode) setSelBox(expandBox(mergeBox(slot), currentMerges));
         }}
-        className={`group relative size-full ${!combineMode && !editing ? 'cursor-grab active:cursor-grabbing' : ''}`}
+        className={`group group/slot relative size-full ${!combineMode && !editing ? 'cursor-grab active:cursor-grabbing' : ''}`}
       >
         {isEditing && editing.geometry && (
           <img
@@ -1785,10 +1863,7 @@ export default function CardBinder() {
             style={{ objectFit: settings.fit, objectPosition: `${isEditing ? editing.x : crop.x}% ${isEditing ? editing.y : crop.y}%` }}
           /> : <span className="absolute inset-0 grid place-items-center bg-zinc-800 text-zinc-500"><Icon name="image" size="xl" /></span>}
         </div>
-        {!dragInfo && !combineMode && !editing && <div className="absolute right-1.5 top-1.5 z-40 hidden items-center gap-1 group-hover:flex">
-          {slot.mergeId && <button type="button" title="Unmerge frame" aria-label="Unmerge frame" onClick={(event) => { event.stopPropagation(); unmergeBox(mergeBox(slot)); }} className="grid size-6 place-items-center rounded-md bg-black/75 text-white shadow hover:bg-violet-600"><Icon name="split" size="sm" /></button>}
-          <button type="button" title="Remove card" aria-label="Remove card" onClick={(event) => { event.stopPropagation(); removeSlotCard(current.id, slot.key); }} className="grid size-6 place-items-center rounded-md bg-black/75 text-white shadow hover:bg-red-600"><Icon name="x" size="sm" /></button>
-        </div>}
+        {slotActions}
         {!dragInfo && !combineMode && !editing && dpi && <span title={`${dpi} effective DPI at print size`} className={`absolute bottom-1.5 right-1.5 z-40 hidden rounded-full px-1.5 py-0.5 text-[9px] font-bold shadow group-hover:block ${dpiTone}`}>{dpi} DPI</span>}
         {slot.mergeId && <span className="absolute bottom-1.5 left-1.5 z-40 rounded-full bg-violet-600/90 px-1.5 py-0.5 text-[9px] font-bold text-white shadow">{boxDims(slot)}</span>}
         {isEditing && <span className="absolute left-1/2 top-2 z-50 -translate-x-1/2 rounded-full bg-amber-500 px-2 py-0.5 text-[9px] font-bold text-amber-950 shadow">Drag to reposition</span>}
