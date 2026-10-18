@@ -63,6 +63,7 @@ const DRAG_MIME = 'application/x-card-binder';
 const IDB_NAME = 'digital-card-binder';
 const IDB_STORE = 'images';
 const IDB_VERSION = 1;
+const HISTORY_LIMIT = 30;
 const SHEET_PAD = { top: 0.3, right: 0.3, bottom: 0.3, left: 0.62 };
 const THUMB_BOX = { w: 56, h: 56 * 1.414, pad: 4 };
 const PAPER_SIZES = {
@@ -100,6 +101,14 @@ const keyOf = (row, col) => `${row}-${col}`;
 const isEditableTarget = (element) => Boolean(element?.matches?.('input, textarea, select, [contenteditable="true"]'));
 const hasFiles = (dataTransfer) => Array.from(dataTransfer?.types || []).includes('Files');
 const emptyPage = () => ({ id: uid('page'), merges: [], slots: {}, crops: {} });
+const clonePages = (pages) => pages.map((page) => ({
+  ...page,
+  merges: (page.merges || []).map((merge) => ({ ...merge })),
+  slots: { ...page.slots },
+  crops: Object.fromEntries(Object.entries(page.crops || {}).map(([key, crop]) => [key, { ...crop }])),
+}));
+const makeCanvasSnapshot = (pages, currentPage, layout) => ({ pages: clonePages(pages), currentPage, layout });
+const sameCanvasPages = (first, second) => JSON.stringify(first) === JSON.stringify(second);
 
 function sanitizeCardSize(value = {}) {
   const legacyW = Number(value.customW) * 25.4;
@@ -664,6 +673,7 @@ function PrintSetupPopover({ settings, setSettings, fitInfo, suggestedPaper, pri
 
 function ShortcutsPopover() {
   const rows = [
+    ['Ctrl/⌘ + Z', 'Undo canvas change'], ['Ctrl + Y / Ctrl/⌘ + Shift + Z', 'Redo canvas change'],
     ['Ctrl/⌘ + A', 'Select visible cards'], ['Esc', 'Cancel or clear'], ['Delete', 'Delete selected cards'],
     ['M', 'Toggle Combine mode'], ['Enter', 'Merge / confirm'], ['U', 'Unmerge selection'],
     ['← / →', 'Previous / next page'], ['PageUp / PageDown', 'Previous / next page'], ['F', 'Fill page'],
@@ -696,8 +706,8 @@ function SetupToolbar({ settings, setSettings, fitInfo, suggestedPaper, onChoose
   const custom = cleanSize.preset === 'custom';
   const setCardSize = (patch) => setSettings((value) => ({ ...value, cardSize: sanitizeCardSize({ ...value.cardSize, ...patch }) }));
   return (
-    <div role="toolbar" aria-label="Card sizing" className="no-print flex shrink-0 items-center justify-between gap-4 overflow-x-auto border-b border-zinc-800 bg-[#121214] px-4 py-2">
-      <div className={`flex shrink-0 items-center ${custom ? 'gap-3 min-[1600px]:gap-4' : 'gap-3 min-[1600px]:gap-4'}`}>
+    <div role="toolbar" aria-label="Card sizing" className="no-print flex w-full shrink-0 items-center justify-between gap-4 overflow-x-auto border-b border-zinc-800 bg-[#121214] px-4 py-2">
+      <div className="flex shrink-0 items-center gap-3">
         <div className="flex shrink-0 items-center gap-2">
           <Icon name="ruler" className="text-red-400" />
           <span className={`${custom ? 'hidden min-[1600px]:inline' : 'hidden xl:inline'} shrink-0 text-[12px] font-medium text-zinc-300`}>Card size</span>
@@ -747,7 +757,7 @@ function SetupToolbar({ settings, setSettings, fitInfo, suggestedPaper, onChoose
           />
         </div>
       </div>
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="ml-auto flex shrink-0 items-center gap-2">
         <span className="hidden shrink-0 text-[12px] font-medium text-zinc-300 min-[1380px]:inline">Preview</span>
         <SegmentedControl ariaLabel="Preview" value={settings.view} onChange={onViewChange} options={[{ value: 'binder', label: 'Binder' }, { value: 'paper', label: 'Paper' }]} dense={custom} appearance="preview" />
         <PrintFitBadge fitInfo={fitInfo} paperKey={settings.paper} suggestedPaper={suggestedPaper} onUsePaper={(paper) => setSettings((value) => ({ ...value, paper }))} />
@@ -787,7 +797,7 @@ function PoolCard({ item, index, selectionIndex, placed, src, onClick, onDoubleC
       onDoubleClick={() => onDoubleClick(item.id)}
       onDragStart={(event) => onDragStart(event, item.id)}
       onDragEnd={onDragEnd}
-      className={`group relative aspect-[5/7] min-w-0 overflow-hidden rounded-lg bg-[#121214] text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-red-500 ${selected ? 'ring-2 ring-red-600 ring-offset-2 ring-offset-zinc-950' : 'ring-1 ring-inset ring-zinc-800 hover:ring-zinc-600'} ${selected ? 'bg-red-950/60' : ''}`}
+      className={`group relative aspect-[5/7] min-w-0 cursor-grab overflow-hidden rounded-lg bg-[#121214] text-left outline-none transition-all duration-200 ease-out hover:-translate-y-1 hover:scale-[1.03] hover:shadow-lg hover:shadow-black/50 active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-red-500 ${selected ? 'ring-2 ring-red-600 ring-offset-2 ring-offset-zinc-950' : 'ring-1 ring-inset ring-zinc-800 hover:ring-zinc-600'} ${selected ? 'bg-red-950/60' : ''}`}
     >
       {src ? <img src={src} alt="" className={`absolute inset-0 size-full object-cover transition-[filter,opacity] ${placed ? 'grayscale opacity-35 group-hover:opacity-60' : ''} ${selected ? '!opacity-100' : ''}`} /> : <span className="absolute inset-0 grid place-items-center text-zinc-600"><Icon name="image" size="xl" /></span>}
       <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent px-1.5 pb-1 pt-4 text-[10px] font-medium text-white"><span className="block overflow-hidden text-ellipsis whitespace-nowrap">{item.name}</span></span>
@@ -834,11 +844,11 @@ function CardPool({
       </div>
       <div className="px-4 pb-3"><UploadZone empty={!pool.length} active={sidebarDropActive && !slotDropActive} inputRef={inputRef} onFiles={onFiles} /></div>
       {pool.length > 0 && (
-        <div role="toolbar" aria-label="Pool actions" className="grid grid-cols-4 gap-1 px-4 pb-3">
-          <ToolButton icon="selectAll" label="All" dense onClick={onSelectAll} disabled={!visiblePool.length} disabledReason="No visible cards" className="w-full px-1" />
-          <ToolButton icon="x" label="None" dense onClick={onClearSelection} disabled={!selected.length} disabledReason="No cards selected" className="w-full px-1" />
-          <ToolButton icon="wand" label="Fill" dense onClick={onFill} disabled={!selected.length} disabledReason="Select cards to fill the page" className="w-full px-1" />
-          <ToolButton icon="trash" label="Delete" dense variant="danger" onClick={onDeleteSelected} disabled={!selected.length} disabledReason="Select cards to delete" className="w-full px-1" />
+        <div role="toolbar" aria-label="Pool actions" className="grid grid-cols-[0.6fr_1.1fr_1fr_1.2fr] gap-1 px-4 pb-3">
+          <ToolButton icon="selectAll" label="All" dense onClick={onSelectAll} disabled={!visiblePool.length} disabledReason="No visible cards" className="w-full px-1 text-[11px]" />
+          <ToolButton icon="x" label={selected.length ? `None (${selected.length})` : 'None'} dense onClick={onClearSelection} disabled={!selected.length} className={`w-full px-1 text-[11px] ${selected.length ? 'text-zinc-200' : 'pointer-events-none opacity-40'}`} />
+          <ToolButton icon="wand" label={selected.length ? `Fill (${selected.length})` : 'Fill'} dense variant={selected.length ? 'primary' : 'ghost'} onClick={onFill} disabled={!selected.length} className={`w-full px-1 text-[11px] ${selected.length ? '' : 'pointer-events-none opacity-40'}`} />
+          <ToolButton icon="trash" label={selected.length ? `Delete (${selected.length})` : 'Delete'} dense variant="danger" onClick={onDeleteSelected} disabled={!selected.length} className={`w-full px-1 text-[11px] ${selected.length ? '' : 'pointer-events-none opacity-40'}`} />
         </div>
       )}
       <div role="listbox" aria-multiselectable="true" className="scroll-area grid flex-1 auto-rows-max grid-cols-3 content-start gap-2 px-4 pb-4" onClick={(event) => { if (event.target === event.currentTarget) onClearSelection(); }}>
@@ -920,6 +930,8 @@ export default function CardBinder() {
   const [sidebarDropActive, setSidebarDropActive] = useState(false);
   const [editing, setEditing] = useState(null);
   const [stageSize, setStageSize] = useState({ w: 1000, h: 620 });
+  const [past, setPast] = useState([]);
+  const [future, setFuture] = useState([]);
 
   const stageRef = useRef(null);
   const inputRef = useRef(null);
@@ -936,6 +948,9 @@ export default function CardBinder() {
   const persistedRef = useRef(false);
   const pagesRef = useRef(pages);
   const currentPageRef = useRef(currentPage);
+  const layoutIdRef = useRef(settings.layout);
+  const pastRef = useRef(past);
+  const futureRef = useRef(future);
 
   const layout = getLayout(settings.layout);
   const dims = useMemo(() => ({ rows: layout.rows, cols: layout.cols }), [layout.rows, layout.cols]);
@@ -959,6 +974,7 @@ export default function CardBinder() {
 
   useEffect(() => { pagesRef.current = pages; }, [pages]);
   useEffect(() => { currentPageRef.current = currentPage; }, [currentPage]);
+  useEffect(() => { layoutIdRef.current = settings.layout; }, [settings.layout]);
   useEffect(() => { dimsRef.current = dims; }, [dims]);
   useEffect(() => { editingRef.current = editing; }, [editing]);
 
@@ -1111,10 +1127,68 @@ export default function CardBinder() {
     return () => { live = false; };
   }, [addFiles]);
 
+  const clearHistory = useCallback(() => {
+    pastRef.current = [];
+    futureRef.current = [];
+    setPast([]);
+    setFuture([]);
+  }, []);
+
+  const restoreCanvasSnapshot = useCallback((snapshot) => {
+    if (!snapshot?.pages?.length) return;
+    const nextPages = clonePages(snapshot.pages);
+    const nextPage = clamp(snapshot.currentPage, 0, nextPages.length - 1);
+    const nextLayout = getLayout(snapshot.layout).id;
+    pagesRef.current = nextPages;
+    currentPageRef.current = nextPage;
+    layoutIdRef.current = nextLayout;
+    dimsRef.current = { rows: getLayout(nextLayout).rows, cols: getLayout(nextLayout).cols };
+    setPages(nextPages);
+    setCurrentPage(nextPage);
+    setSettings((value) => value.layout === nextLayout ? value : { ...value, layout: nextLayout });
+    setSelBox(null);
+    setMarqueeActive(false);
+    marqueeRef.current = null;
+    setDropPreview([]);
+    setEditing(null);
+    editingRef.current = null;
+  }, []);
+
+  const applyCanvasChange = useCallback((updater, options = {}) => {
+    const previousPages = pagesRef.current;
+    const previousPage = currentPageRef.current;
+    const previousLayout = layoutIdRef.current;
+    const nextPages = typeof updater === 'function' ? updater(previousPages) : updater;
+    if (!Array.isArray(nextPages) || !nextPages.length) return { pages: previousPages, changed: false };
+    const requestedPage = options.currentPage === undefined ? previousPage : options.currentPage;
+    const nextPage = clamp(typeof requestedPage === 'function' ? requestedPage(previousPage) : requestedPage, 0, nextPages.length - 1);
+    const nextLayout = options.layout ? getLayout(options.layout).id : previousLayout;
+    const changed = !sameCanvasPages(previousPages, nextPages) || nextPage !== previousPage || nextLayout !== previousLayout;
+    if (!changed) return { pages: previousPages, changed: false };
+
+    const nextPast = [...pastRef.current, makeCanvasSnapshot(previousPages, previousPage, previousLayout)].slice(-HISTORY_LIMIT);
+    pastRef.current = nextPast;
+    futureRef.current = [];
+    setPast(nextPast);
+    setFuture([]);
+
+    pagesRef.current = nextPages;
+    currentPageRef.current = nextPage;
+    setPages(nextPages);
+    if (nextPage !== previousPage) setCurrentPage(nextPage);
+    if (nextLayout !== previousLayout) {
+      const nextLayoutValue = getLayout(nextLayout);
+      layoutIdRef.current = nextLayout;
+      dimsRef.current = { rows: nextLayoutValue.rows, cols: nextLayoutValue.cols };
+      setSettings((value) => ({ ...value, layout: nextLayout }));
+    }
+    return { pages: nextPages, changed: true };
+  }, []);
+
   const commitEditing = useCallback(() => {
     const value = editingRef.current;
     if (!value) return;
-    setPages((allPages) => allPages.map((page) => {
+    applyCanvasChange((allPages) => allPages.map((page) => {
       if (page.id !== value.pageId || page.slots[value.key] !== value.imgId) return page;
       const crops = { ...page.crops };
       const x = round1(value.x);
@@ -1125,12 +1199,40 @@ export default function CardBinder() {
     }));
     setEditing(null);
     editingRef.current = null;
-  }, []);
+  }, [applyCanvasChange]);
 
   const cancelEditing = useCallback(() => {
     setEditing(null);
     editingRef.current = null;
   }, []);
+
+  const undoAction = useCallback(() => {
+    commitEditing();
+    const previous = pastRef.current[pastRef.current.length - 1];
+    if (!previous) return false;
+    const nextPast = pastRef.current.slice(0, -1);
+    const nextFuture = [...futureRef.current, makeCanvasSnapshot(pagesRef.current, currentPageRef.current, layoutIdRef.current)].slice(-HISTORY_LIMIT);
+    pastRef.current = nextPast;
+    futureRef.current = nextFuture;
+    setPast(nextPast);
+    setFuture(nextFuture);
+    restoreCanvasSnapshot(previous);
+    return true;
+  }, [commitEditing, restoreCanvasSnapshot]);
+
+  const redoAction = useCallback(() => {
+    commitEditing();
+    const next = futureRef.current[futureRef.current.length - 1];
+    if (!next) return false;
+    const nextFuture = futureRef.current.slice(0, -1);
+    const nextPast = [...pastRef.current, makeCanvasSnapshot(pagesRef.current, currentPageRef.current, layoutIdRef.current)].slice(-HISTORY_LIMIT);
+    pastRef.current = nextPast;
+    futureRef.current = nextFuture;
+    setPast(nextPast);
+    setFuture(nextFuture);
+    restoreCanvasSnapshot(next);
+    return true;
+  }, [commitEditing, restoreCanvasSnapshot]);
 
   const setCombineMode = useCallback((next) => {
     commitEditing();
@@ -1151,7 +1253,7 @@ export default function CardBinder() {
     if (!ids?.length) return;
     commitEditing();
     let result;
-    setPages((value) => {
+    applyCanvasChange((value) => {
       result = applyPlacement(value, ids, pageIndex, startKey, dimsRef.current);
       return result.pages;
     });
@@ -1165,7 +1267,7 @@ export default function CardBinder() {
       if (result.created) message += ` (${plural(result.created, 'new page')})`;
       notify(message, 'success');
     });
-  }, [commitEditing, notify]);
+  }, [commitEditing, applyCanvasChange, notify]);
 
   const fillSelection = useCallback(() => {
     const ids = selectedOrdered;
@@ -1177,7 +1279,7 @@ export default function CardBinder() {
 
   const removeSlotCard = useCallback((pageId, key) => {
     commitEditing();
-    setPages((value) => value.map((page) => {
+    applyCanvasChange((value) => value.map((page) => {
       if (page.id !== pageId) return page;
       const slots = { ...page.slots };
       const crops = { ...page.crops };
@@ -1185,11 +1287,11 @@ export default function CardBinder() {
       delete crops[key];
       return { ...page, slots, crops };
     }));
-  }, [commitEditing]);
+  }, [commitEditing, applyCanvasChange]);
 
   const moveSlotCard = useCallback((payload, targetPageIndex, targetKey = null) => {
     commitEditing();
-    setPages((value) => {
+    applyCanvasChange((value) => {
       const sourceIndex = value.findIndex((page) => page.id === payload.pageId);
       if (sourceIndex < 0) return value;
       const sourcePage = value[sourceIndex];
@@ -1215,7 +1317,7 @@ export default function CardBinder() {
       else next[targetPageIndex].crops[destinationKey] = { img: payload.imgId, ...sourceCrop };
       return next;
     });
-  }, [commitEditing, notify]);
+  }, [commitEditing, applyCanvasChange, notify]);
 
   const makeDragGhost = useCallback((event, ids) => {
     try {
@@ -1364,11 +1466,9 @@ export default function CardBinder() {
     if (!box || box.rs * box.cs <= 1) return;
     const pageId = pagesRef.current[currentPageRef.current]?.id;
     if (!pageId) return;
-    let snapshot;
     let unassigned = 0;
-    setPages((value) => value.map((page) => {
+    applyCanvasChange((value) => value.map((page) => {
       if (page.id !== pageId) return page;
-      snapshot = { merges: page.merges, slots: page.slots, crops: page.crops };
       const insideKeys = [];
       for (let row = box.r; row < box.r + box.rs; row += 1) for (let col = box.c; col < box.c + box.cs; col += 1) insideKeys.push(keyOf(row, col));
       const occupied = insideKeys.filter((key) => page.slots[key]).map((key) => ({ key, id: page.slots[key], crop: getCrop(page, key, page.slots[key]) }));
@@ -1389,12 +1489,9 @@ export default function CardBinder() {
     setSelBox(box);
     notify(`Combined ${boxDims(box)} slots${unassigned ? ` · ${plural(unassigned, 'card')} returned to the pool` : ''}.`, 'success', {
       label: 'Undo',
-      onClick: () => {
-        setPages((value) => value.map((page) => page.id === pageId ? { ...page, ...snapshot } : page));
-        setSelBox(null);
-      },
+      onClick: undoAction,
     });
-  }, [notify]);
+  }, [applyCanvasChange, notify, undoAction]);
 
   const selectedMerges = useMemo(() => selBox ? activeMerges(current, dims).filter((merge) => boxesIntersect(merge, selBox)) : [], [selBox, current, dims]);
   const exactMerge = useMemo(() => activeMerges(current, dims).some((merge) => sameBox(merge, selBox)), [current, dims, selBox]);
@@ -1405,10 +1502,9 @@ export default function CardBinder() {
     const merge = activeMerges(page, dimsRef.current).find((item) => item.id === mergeId);
     if (!merge) return;
     const pageId = page.id;
-    const mergeIndex = page.merges.findIndex((item) => item.id === mergeId);
     const snapshot = { ...merge };
 
-    setPages((value) => value.map((item) => (
+    applyCanvasChange((value) => value.map((item) => (
       item.id === pageId
         ? { ...item, merges: item.merges.filter((candidate) => candidate.id !== mergeId) }
         : item
@@ -1418,21 +1514,16 @@ export default function CardBinder() {
       label: 'Undo',
       onClick: () => {
         slotActionGuardRef.current = 0;
-        setPages((value) => value.map((item) => {
-          if (item.id !== pageId || item.merges.some((candidate) => candidate.id === snapshot.id)) return item;
-          const merges = [...item.merges];
-          merges.splice(clamp(mergeIndex, 0, merges.length), 0, snapshot);
-          return { ...item, merges };
-        }));
+        undoAction();
       },
     });
-  }, [notify]);
+  }, [applyCanvasChange, notify, undoAction]);
 
   const unmergeBox = useCallback((box = selBox) => {
     if (!box) return;
     let count = 0;
     const pageId = pagesRef.current[currentPageRef.current]?.id;
-    setPages((value) => value.map((page) => {
+    applyCanvasChange((value) => value.map((page) => {
       if (page.id !== pageId) return page;
       const merges = page.merges.filter((merge) => {
         const hit = boxesIntersect(merge, box);
@@ -1443,7 +1534,7 @@ export default function CardBinder() {
     }));
     setSelBox(null);
     requestAnimationFrame(() => { if (count) notify(`${plural(count, 'frame')} split into slots.`, 'info'); });
-  }, [selBox, notify]);
+  }, [selBox, applyCanvasChange, notify]);
 
   const beginMarquee = useCallback((event, slot, isEmpty) => {
     if (event.button !== 0 || editingRef.current || dragRef.current || suppressClickRef.current || performance.now() < slotActionGuardRef.current) return;
@@ -1550,8 +1641,12 @@ export default function CardBinder() {
     const placedCount = visible.filter((assignment) => ids.includes(assignment.id)).length;
     if (!window.confirm(`Delete ${plural(ids.length, 'card')} from the pool${placedCount ? `, including ${plural(placedCount, 'placed copy')}` : ''}?`)) return;
     const set = new Set(ids);
+    const validIds = new Set(pool.filter((item) => !set.has(item.id)).map((item) => item.id));
+    const nextPages = pruneMissingImages(pagesRef.current, validIds);
     setPool((value) => value.filter((item) => !set.has(item.id)));
-    setPages((value) => pruneMissingImages(value, new Set(pool.filter((item) => !set.has(item.id)).map((item) => item.id))));
+    pagesRef.current = nextPages;
+    setPages(nextPages);
+    clearHistory();
     setSelected([]);
     setImages((value) => {
       const next = { ...value };
@@ -1564,7 +1659,7 @@ export default function CardBinder() {
     });
     if (storageMode === 'indexeddb') idbDeleteMany(ids).catch(() => notify('Images were removed, but storage cleanup failed.', 'warn'));
     notify(`${plural(ids.length, 'card')} deleted.`, 'info');
-  }, [visible, pool, storageMode, notify]);
+  }, [visible, pool, storageMode, clearHistory, notify]);
 
   const chooseLayout = useCallback((layoutId) => {
     if (layoutId === settings.layout) return;
@@ -1572,13 +1667,13 @@ export default function CardBinder() {
     setSelBox(null);
     const nextLayout = getLayout(layoutId);
     const nextDims = { rows: nextLayout.rows, cols: nextLayout.cols };
-    setSettings((value) => ({ ...value, layout: layoutId }));
+    applyCanvasChange((value) => value, { layout: layoutId });
     const hiddenNow = hiddenAssignments(pagesRef.current, nextDims);
     if (hiddenNow.length) {
       notify(`${nextLayout.label}: ${plural(hiddenNow.length, 'card')} hidden outside the grid — kept, not deleted.`, 'warn', {
         label: 'Reflow',
         onClick: () => {
-          setPages((allPages) => {
+          applyCanvasChange((allPages) => {
             const concealed = hiddenAssignments(allPages, nextDims);
             const ids = concealed.map((item) => item.id);
             const first = concealed.length ? Math.min(...concealed.map((item) => item.pageIndex)) : 0;
@@ -1592,7 +1687,7 @@ export default function CardBinder() {
         },
       });
     }
-  }, [settings.layout, commitEditing, notify]);
+  }, [settings.layout, commitEditing, applyCanvasChange, notify]);
 
   useEffect(() => {
     if (settings.fit !== 'cover' && editingRef.current) commitEditing();
@@ -1612,7 +1707,12 @@ export default function CardBinder() {
     localStorage.removeItem(STORAGE_KEY);
     objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
     objectUrlsRef.current.clear();
-    setPages([emptyPage()]);
+    const nextPages = [emptyPage()];
+    pagesRef.current = nextPages;
+    currentPageRef.current = 0;
+    layoutIdRef.current = DEFAULT_LAYOUT;
+    setPages(nextPages);
+    clearHistory();
     setPool([]);
     setImages({});
     setSelected([]);
@@ -1620,50 +1720,50 @@ export default function CardBinder() {
     setCurrentPage(0);
     setOpenPanel(null);
     notify('Binder reset.', 'info');
-  }, [commitEditing, storageMode, notify]);
+  }, [commitEditing, storageMode, clearHistory, notify]);
 
   const addPage = useCallback(() => {
     commitEditing();
-    setPages((value) => { const next = [...value, emptyPage()]; window.setTimeout(() => setCurrentPage(next.length - 1), 0); return next; });
+    applyCanvasChange((value) => [...value, emptyPage()], { currentPage: pagesRef.current.length });
     setSelBox(null);
-  }, [commitEditing]);
+  }, [commitEditing, applyCanvasChange]);
 
   const duplicatePage = useCallback(() => {
     commitEditing();
-    setPages((value) => {
-      const source = value[currentPageRef.current];
+    const sourceIndex = currentPageRef.current;
+    applyCanvasChange((value) => {
+      const source = value[sourceIndex];
       const copy = { id: uid('page'), merges: source.merges.map((merge) => ({ ...merge, id: uid('merge') })), slots: { ...source.slots }, crops: Object.fromEntries(Object.entries(source.crops).map(([key, crop]) => [key, { ...crop }])) };
-      const next = [...value.slice(0, currentPageRef.current + 1), copy, ...value.slice(currentPageRef.current + 1)];
-      window.setTimeout(() => setCurrentPage(currentPageRef.current + 1), 0);
-      return next;
-    });
+      return [...value.slice(0, sourceIndex + 1), copy, ...value.slice(sourceIndex + 1)];
+    }, { currentPage: sourceIndex + 1 });
     notify('Page duplicated.', 'success');
-  }, [commitEditing, notify]);
+  }, [commitEditing, applyCanvasChange, notify]);
 
   const deletePage = useCallback(() => {
     if (pagesRef.current.length <= 1) return;
     if (Object.keys(pagesRef.current[currentPageRef.current].slots).length && !window.confirm(`Delete page ${currentPageRef.current + 1}? Cards remain in the pool.`)) return;
     commitEditing();
-    setPages((value) => value.filter((_, index) => index !== currentPageRef.current));
-    setCurrentPage((value) => Math.max(0, Math.min(value, pagesRef.current.length - 2)));
+    const pageIndex = currentPageRef.current;
+    const nextPage = Math.max(0, Math.min(pageIndex, pagesRef.current.length - 2));
+    applyCanvasChange((value) => value.filter((_, index) => index !== pageIndex), { currentPage: nextPage });
     setSelBox(null);
-  }, [commitEditing]);
+  }, [commitEditing, applyCanvasChange]);
 
   const clearPage = useCallback(() => {
     const page = pagesRef.current[currentPageRef.current];
     if (!Object.keys(page.slots).length) return;
     if (!window.confirm(`Clear every card from page ${currentPageRef.current + 1}? Cards remain in the pool.`)) return;
     commitEditing();
-    setPages((value) => value.map((item) => item.id === page.id ? { ...item, slots: {}, crops: {} } : item));
+    applyCanvasChange((value) => value.map((item) => item.id === page.id ? { ...item, slots: {}, crops: {} } : item));
     notify('Page cleared. Cards remain in the pool.', 'info');
-  }, [commitEditing, notify]);
+  }, [commitEditing, applyCanvasChange, notify]);
 
   const resetLayout = useCallback(() => {
     const pageId = pagesRef.current[currentPageRef.current].id;
-    setPages((value) => value.map((page) => page.id === pageId ? { ...page, merges: [] } : page));
+    applyCanvasChange((value) => value.map((page) => page.id === pageId ? { ...page, merges: [] } : page));
     setSelBox(null);
     notify('Merged frames reset.', 'info');
-  }, [notify]);
+  }, [applyCanvasChange, notify]);
 
   const onPoolClick = useCallback((event, visibleIndex) => {
     const item = visiblePool[visibleIndex];
@@ -1692,6 +1792,12 @@ export default function CardBinder() {
 
   useEffect(() => {
     const keydown = (event) => {
+      const key = event.key.toLowerCase();
+      const commandKey = event.ctrlKey || event.metaKey;
+      const undoCommand = commandKey && !event.shiftKey && key === 'z';
+      const redoCommand = (event.ctrlKey && key === 'y') || (commandKey && event.shiftKey && key === 'z');
+      if (undoCommand) { event.preventDefault(); undoAction(); return; }
+      if (redoCommand) { event.preventDefault(); redoAction(); return; }
       if (isEditableTarget(event.target)) return;
       const value = editingRef.current;
       if (value) {
@@ -1728,7 +1834,7 @@ export default function CardBinder() {
     };
     window.addEventListener('keydown', keydown);
     return () => window.removeEventListener('keydown', keydown);
-  }, [cancelEditing, commitEditing, selectAllVisible, openPanel, selBox, combineMode, selected, deleteImages, setCombineMode, canMerge, performMerge, selectedMerges.length, unmergeBox, fillSelection, switchPage]);
+  }, [undoAction, redoAction, cancelEditing, commitEditing, selectAllVisible, openPanel, selBox, combineMode, selected, deleteImages, setCombineMode, canMerge, performMerge, selectedMerges.length, unmergeBox, fillSelection, switchPage]);
 
   useEffect(() => {
     if (!openPanel) return undefined;
@@ -1821,11 +1927,11 @@ export default function CardBinder() {
               if (combineMode) { setSelBox(expandBox(mergeBox(slot), currentMerges)); return; }
               if (selectedOrdered.length) placeCards(selectedOrdered, currentPage, slot.key);
             }}
-            className={`group grid size-full place-items-center overflow-hidden border border-dashed outline-none transition-colors focus-visible:ring-2 focus-visible:ring-red-500 ${settings.view === 'binder' ? 'border-zinc-500/80 bg-black/45 text-zinc-200 shadow-[inset_0_0_20px_rgba(0,0,0,0.5)] hover:border-red-600 hover:bg-red-950/40 hover:text-red-100' : 'border-zinc-400 bg-white/30 text-zinc-700 hover:border-red-600 hover:text-red-800'} ${previewIndex >= 0 ? '!border-emerald-400 !shadow-[inset_0_0_0_2px_rgb(52_211_153)]' : ''}`}
+            className={`group grid size-full cursor-pointer place-items-center overflow-hidden border border-dashed outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-red-500 hover:border-red-500 hover:bg-red-950/10 ${settings.view === 'binder' ? 'border-zinc-500/80 bg-black/45 text-zinc-200 shadow-[inset_0_0_20px_rgba(0,0,0,0.5)] hover:text-red-100' : 'border-zinc-400 bg-white/30 text-zinc-700 hover:text-red-800'} ${previewIndex >= 0 ? '!border-red-500 !bg-red-950/20 !shadow-[inset_0_0_0_2px_rgba(239,68,68,0.25),0_0_20px_rgba(220,38,38,0.18)]' : ''}`}
             style={{ borderRadius: radius }}
           >
             {labelVisible && <span className="flex flex-col items-center gap-1 text-[11px] font-semibold"><Icon name="plus" size="lg" /><span>{slot.cs * slot.rs > 1 ? `${boxDims(slot)} frame` : `Slot ${slotIndex + 1}`}</span></span>}
-            {previewIndex >= 0 && <span className="absolute left-1.5 top-1.5 grid size-5 place-items-center rounded-full bg-emerald-500 text-[10px] font-bold text-emerald-950">{previewIndex + 1}</span>}
+            {previewIndex >= 0 && <span className="absolute left-1.5 top-1.5 grid size-5 place-items-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-lg shadow-red-950/60">{previewIndex + 1}</span>}
           </button>
           {slotActions}
         </div>
@@ -1865,7 +1971,7 @@ export default function CardBinder() {
             }}
           />
         )}
-        <div className={`relative size-full overflow-hidden bg-white ${settings.view === 'binder' ? 'sleeve-sheen' : ''} ${isEditing ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-zinc-900' : ''} ${previewIndex >= 0 ? 'ring-2 ring-inset ring-emerald-400' : ''}`} style={{ borderRadius: radius }}>
+        <div className={`relative size-full overflow-hidden bg-white transition-all duration-200 ${settings.view === 'binder' ? 'sleeve-sheen' : ''} ${isEditing ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-zinc-900' : ''} ${previewIndex >= 0 ? 'ring-2 ring-inset ring-red-500 shadow-[0_0_20px_rgba(220,38,38,0.25)]' : ''}`} style={{ borderRadius: radius }}>
           {source ? <img
             data-img-id={imgId}
             src={source}
@@ -1882,7 +1988,7 @@ export default function CardBinder() {
         {!dragInfo && !combineMode && !editing && dpi && <span title={`${dpi} effective DPI at print size`} className={`absolute bottom-1.5 right-1.5 z-40 hidden rounded-full px-1.5 py-0.5 text-[9px] font-bold shadow group-hover:block ${dpiTone}`}>{dpi} DPI</span>}
         {slot.mergeId && <span className="absolute bottom-1.5 left-1.5 z-40 rounded-full bg-red-700/90 px-1.5 py-0.5 text-[9px] font-bold text-white shadow">{boxDims(slot)}</span>}
         {isEditing && <span className="absolute left-1/2 top-2 z-50 -translate-x-1/2 rounded-full bg-amber-500 px-2 py-0.5 text-[9px] font-bold text-amber-950 shadow">Drag to reposition</span>}
-        {previewIndex >= 0 && <span className="absolute left-1.5 top-1.5 z-50 grid size-5 place-items-center rounded-full bg-emerald-500 text-[10px] font-bold text-emerald-950">{previewIndex + 1}</span>}
+        {previewIndex >= 0 && <span className="absolute left-1.5 top-1.5 z-50 grid size-5 place-items-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-lg shadow-red-950/60">{previewIndex + 1}</span>}
       </div>
     );
   };
@@ -2060,15 +2166,15 @@ export default function CardBinder() {
                 <CanvasHelper editing={editing} multiDrag={dragInfo?.kind === 'pool' ? dragInfo.ids.length : 0} flowCount={multiFlow} combineMode={combineMode} settings={settings} paper={paper} card={card} printFit={printFit} offsetX={helperOffsetX} onCenter={() => { const value = editingRef.current; if (value) { const next = { ...value, x: 50, y: 50 }; editingRef.current = next; setEditing(next); } }} onCancel={cancelEditing} onDone={commitEditing} />
               </div>
             </div>
-            <div data-page-tray className="no-print scroll-area h-[124px] shrink-0 overflow-x-auto bg-[#0B0B0C]">
-              <div data-page-tray-inner className="mx-auto flex w-max items-center gap-2 py-3 pr-4" style={{ paddingLeft: `calc(1rem + ${2 * helperOffsetX}px)` }}>
+            <footer data-page-tray className="no-print scroll-area shrink-0 overflow-x-auto border-t border-zinc-800 bg-zinc-900/40 py-4">
+              <div data-page-tray-inner className="mx-auto flex w-max items-center gap-2 pr-4" style={{ paddingLeft: `calc(1rem + ${2 * helperOffsetX}px)` }}>
                 {pages.map(renderThumbnail)}
                 <div className="flex w-[82px] shrink-0 flex-col items-center justify-start gap-1 py-1">
                   <button type="button" onClick={addPage} aria-label="Add page" className="flex aspect-[1/1.414] w-14 shrink-0 items-center justify-center border border-dashed border-zinc-800 text-zinc-500 transition-colors hover:border-red-600/40 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="plus" size="lg" /></button>
                   <span className="text-[10px] font-medium whitespace-nowrap text-zinc-500">Add page</span>
                 </div>
               </div>
-            </div>
+            </footer>
           </main>
         </div>
         <div className="no-print pointer-events-none fixed bottom-5 right-5 z-[100] flex w-[360px] flex-col items-end gap-2">
