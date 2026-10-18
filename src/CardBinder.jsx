@@ -64,7 +64,7 @@ const IDB_NAME = 'digital-card-binder';
 const IDB_STORE = 'images';
 const IDB_VERSION = 1;
 const SHEET_PAD = { top: 0.3, right: 0.3, bottom: 0.3, left: 0.62 };
-const THUMB_BOX = { w: 64, h: 84 };
+const THUMB_BOX = { w: 56, h: 56 * 1.414, pad: 4 };
 const PAPER_SIZES = {
   a4: { label: 'A4 (210 × 297 mm)', short: 'A4', w: '210mm', h: '297mm', wIn: 210 * MM, hIn: 297 * MM },
   letter: { label: 'US Letter (216 × 279 mm)', short: 'Letter', w: '8.5in', h: '11in', wIn: 8.5, hIn: 11 },
@@ -439,8 +439,9 @@ function ToolbarDivider({ slim = false }) {
   return <span aria-hidden="true" className={`${slim ? 'mx-0.5 h-5' : 'mx-1 h-6'} w-px shrink-0 bg-white/10`} />;
 }
 
-function SegmentedControl({ value, onChange, options, ariaLabel, dense = false }) {
+function SegmentedControl({ value, onChange, options, ariaLabel, dense = false, appearance = 'default' }) {
   const currentIndex = Math.max(0, options.findIndex((option) => option.value === value));
+  const previewStyle = appearance === 'preview';
   const refs = useRef([]);
   const choose = (index) => {
     const option = options[index];
@@ -460,11 +461,20 @@ function SegmentedControl({ value, onChange, options, ariaLabel, dense = false }
     choose(index);
   };
   return (
-    <div role="radiogroup" aria-label={ariaLabel} onKeyDown={onKeyDown} className="relative grid h-8 w-auto min-w-fit shrink-0 auto-cols-fr grid-flow-col rounded-full border border-zinc-800 bg-[#151518] p-0.5">
+    <div
+      role="radiogroup"
+      aria-label={ariaLabel}
+      onKeyDown={onKeyDown}
+      className={previewStyle
+        ? 'relative flex h-8 w-auto min-w-fit shrink-0 rounded-lg border border-zinc-800 bg-zinc-900 p-1'
+        : 'relative grid h-8 w-auto min-w-fit shrink-0 auto-cols-fr grid-flow-col rounded-full border border-zinc-800 bg-[#151518] p-0.5'}
+    >
       <span
         aria-hidden="true"
-        className="absolute inset-y-0.5 left-0.5 rounded-full border border-red-800/60 bg-red-950/60 shadow-sm transition-transform motion-reduce:transition-none"
-        style={{ width: `calc((100% - 0.25rem) / ${options.length})`, transform: `translateX(${currentIndex * 100}%)` }}
+        className={previewStyle
+          ? 'absolute inset-y-1 left-1 rounded-md bg-red-600 shadow-sm transition-transform duration-200 ease-out motion-reduce:transition-none'
+          : 'absolute inset-y-0.5 left-0.5 rounded-full border border-red-800/60 bg-red-950/60 shadow-sm transition-transform duration-200 ease-out motion-reduce:transition-none'}
+        style={{ width: `calc((100% - ${previewStyle ? '0.5rem' : '0.25rem'}) / ${options.length})`, transform: `translateX(${currentIndex * 100}%)` }}
       />
       {options.map((option, index) => (
         <button
@@ -477,7 +487,7 @@ function SegmentedControl({ value, onChange, options, ariaLabel, dense = false }
           title={option.title}
           tabIndex={index === currentIndex ? 0 : -1}
           onClick={() => onChange(option.value)}
-          className={`relative z-10 inline-flex w-auto min-w-fit items-center justify-center gap-1 rounded-full font-medium whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${dense ? 'px-2.5 text-[11px]' : 'px-3 text-[12px]'} ${index === currentIndex ? 'text-red-400' : 'text-zinc-400 hover:text-zinc-100'}`}
+          className={`relative z-10 inline-flex w-auto min-w-fit items-center justify-center gap-1 font-medium whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${previewStyle ? 'rounded-md' : 'rounded-full'} ${dense ? 'px-2.5 text-[11px]' : 'px-3 text-[12px]'} ${index === currentIndex ? (previewStyle ? 'text-white' : 'text-red-400') : 'text-zinc-400 hover:text-zinc-100'}`}
         >
           {option.icon && <Icon name={option.icon} size="sm" />}
           <span>{option.label}</span>
@@ -718,7 +728,7 @@ function SetupToolbar({ settings, setSettings, fitInfo, suggestedPaper, onChoose
             list="scale-ticks"
             onChange={(event) => setCardSize({ scale: Number(event.target.value) / 100 })}
             onDoubleClick={() => setCardSize({ scale: 1 })}
-            className={`${custom ? 'w-24 min-[1600px]:w-28' : 'w-28'} shrink-0 accent-red-600`}
+            className={`${custom ? 'w-24 min-[1600px]:w-28' : 'w-28'} shrink-0 rounded-full accent-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[#121214]`}
           />
           <datalist id="scale-ticks"><option value="100" /></datalist>
           <strong className="w-auto min-w-[5ch] shrink-0 whitespace-nowrap text-right text-[12px] text-white">{Math.round(cleanSize.scale * 100)}%</strong>
@@ -739,7 +749,7 @@ function SetupToolbar({ settings, setSettings, fitInfo, suggestedPaper, onChoose
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <span className="hidden shrink-0 text-[12px] font-medium text-zinc-300 min-[1380px]:inline">Preview</span>
-        <SegmentedControl ariaLabel="Preview" value={settings.view} onChange={onViewChange} options={[{ value: 'binder', label: 'Binder' }, { value: 'paper', label: 'Paper' }]} dense={custom} />
+        <SegmentedControl ariaLabel="Preview" value={settings.view} onChange={onViewChange} options={[{ value: 'binder', label: 'Binder' }, { value: 'paper', label: 'Paper' }]} dense={custom} appearance="preview" />
         <PrintFitBadge fitInfo={fitInfo} paperKey={settings.paper} suggestedPaper={suggestedPaper} onUsePaper={(paper) => setSettings((value) => ({ ...value, paper }))} />
       </div>
     </div>
@@ -865,6 +875,7 @@ function CanvasToolbar({ combineMode, setCombineMode, selBox, canMerge, mergeLab
 
 function CanvasHelper({ editing, multiDrag, flowCount, combineMode, settings, paper, card, printFit, offsetX, onCenter, onCancel, onDone }) {
   let tone = 'border-zinc-800 bg-[#121214] text-zinc-200';
+  let plain = false;
   let content;
   if (editing) {
     tone = 'border-amber-400/30 bg-amber-950/90 text-amber-100';
@@ -876,7 +887,11 @@ function CanvasHelper({ editing, multiDrag, flowCount, combineMode, settings, pa
     tone = 'border-red-800/60 bg-red-950/80 text-red-100';
     content = <><Icon name="combine" size="sm" /><span>Combine mode · drag across slots, then Enter to merge · click a frame, then U to unmerge · Esc to exit</span></>;
   } else {
-    content = <>{settings.view === 'paper' && <span>{paper.short} · prints at {fmtPct(printFit)} · {fmtMm(card.w)} × {fmtMm(card.h)} mm ·</span>}<Kbd>Ctrl/⌘</Kbd><span>+ Click toggle ·</span><Kbd>Shift</Kbd><span>+ Click range · Drag the selection onto the binder</span></>;
+    plain = true;
+    content = <>{settings.view === 'paper' && <span>{paper.short} · prints at {fmtPct(printFit)} · {fmtMm(card.w)} × {fmtMm(card.h)} mm · </span>}<Kbd>Ctrl/⌘</Kbd><span> + Click toggle · </span><Kbd>Shift</Kbd><span> + Click range · Drag the selection onto the binder</span></>;
+  }
+  if (plain) {
+    return <div className="absolute top-full z-30 mt-4 block w-full -translate-x-1/2 text-center text-xs font-normal tracking-wide whitespace-nowrap text-zinc-400" style={{ left: `calc(50% + ${offsetX}px)` }}>{content}</div>;
   }
   return <div data-reposition-ui={editing ? '' : undefined} className={`absolute top-full z-30 mt-4 flex h-8 w-auto min-w-fit max-w-none -translate-x-1/2 items-center gap-1.5 rounded-full border px-3 text-[11px] whitespace-nowrap shadow-xl shadow-black/30 ${tone}`} style={{ left: `calc(50% + ${offsetX}px)` }}>{content}</div>;
 }
@@ -1896,7 +1911,7 @@ export default function CardBinder() {
   );
 
   const renderThumbnail = (page, pageIndex) => {
-    const unit = Math.min(THUMB_BOX.w / gridW, THUMB_BOX.h / gridH);
+    const unit = Math.min((THUMB_BOX.w - THUMB_BOX.pad * 2) / gridW, (THUMB_BOX.h - THUMB_BOX.pad * 2) / gridH);
     return (
       <button
         key={page.id}
@@ -1906,9 +1921,9 @@ export default function CardBinder() {
         onClick={() => switchPage(pageIndex)}
         onDragOver={(event) => { if (dragRef.current || hasFiles(event.dataTransfer)) { event.preventDefault(); event.dataTransfer.dropEffect = dragRef.current?.kind === 'slot' ? 'move' : 'copy'; } }}
         onDrop={(event) => handleThumbDrop(event, pageIndex)}
-        className={`group relative flex h-[96px] w-[82px] shrink-0 flex-col items-center justify-center gap-1 bg-transparent text-zinc-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${pageIndex === currentPage ? 'text-red-400' : 'hover:text-zinc-100'}`}
+        className={`group relative flex w-[82px] shrink-0 flex-col items-center justify-start gap-1 bg-transparent py-1 text-zinc-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${pageIndex === currentPage ? 'text-red-400' : 'hover:text-zinc-100'}`}
       >
-        <div className={`grid h-[68px] w-[64px] place-items-center overflow-hidden rounded-md border bg-[#0B0B0C] transition-colors ${pageIndex === currentPage ? 'border-red-700 ring-1 ring-red-950/70' : 'border-zinc-800 group-hover:border-zinc-600'}`}>
+        <div className={`grid aspect-[1/1.414] w-14 place-items-center overflow-hidden rounded-md border bg-[#0B0B0C] transition-colors ${pageIndex === currentPage ? 'border-red-700 ring-1 ring-red-950/70' : 'border-zinc-800 group-hover:border-zinc-600'}`}>
           <SheetGrid page={page} card={card} gap={settings.gap} unit={`${unit}px`} dims={dims} renderSlot={(slot) => {
             const id = page.slots[slot.key];
             const src = images[id] || pool.find((item) => item.id === id)?.src;
@@ -2048,7 +2063,10 @@ export default function CardBinder() {
             <div data-page-tray className="no-print scroll-area h-[124px] shrink-0 overflow-x-auto bg-[#0B0B0C]">
               <div data-page-tray-inner className="mx-auto flex w-max items-center gap-2 py-3 pr-4" style={{ paddingLeft: `calc(1rem + ${2 * helperOffsetX}px)` }}>
                 {pages.map(renderThumbnail)}
-                <button type="button" onClick={addPage} className="flex h-[96px] w-[82px] shrink-0 flex-col items-center justify-center gap-1.5 bg-transparent text-[11px] font-medium text-zinc-400 transition-colors hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="plus" size="lg" /><span className="whitespace-nowrap">Add page</span></button>
+                <div className="flex w-[82px] shrink-0 flex-col items-center justify-start gap-1 py-1">
+                  <button type="button" onClick={addPage} aria-label="Add page" className="flex aspect-[1/1.414] w-14 shrink-0 items-center justify-center border border-dashed border-zinc-800 text-zinc-500 transition-colors hover:border-red-600/40 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="plus" size="lg" /></button>
+                  <span className="text-[10px] font-medium whitespace-nowrap text-zinc-500">Add page</span>
+                </div>
               </div>
             </div>
           </main>
