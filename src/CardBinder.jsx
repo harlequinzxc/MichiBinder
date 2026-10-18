@@ -156,15 +156,21 @@ const pagesFromSheets = (sheets) => sheets
   .flatMap((sheet) => [sheet.front, sheet.back])
   .filter(Boolean)
   .sort((first, second) => first.order - second.order);
-const pageGroups = (count) => {
-  if (count <= 0) return [];
+const binderViewGroups = (totalPages) => {
+  if (totalPages <= 0) return [];
+  if (totalPages === 1) return [[0]];
+  const finalPageIndex = totalPages - 1;
   const groups = [[0]];
-  for (let index = 1; index < count; index += 2) groups.push(index + 1 < count ? [index, index + 1] : [index]);
+  for (let leftPageIndex = 1; leftPageIndex < finalPageIndex; leftPageIndex += 2) {
+    groups.push(leftPageIndex + 1 < finalPageIndex ? [leftPageIndex, leftPageIndex + 1] : [leftPageIndex]);
+  }
+  groups.push([finalPageIndex]);
   return groups;
 };
-const pageGroupFor = (pageIndex, count) => pageGroups(count).find((group) => group.includes(clamp(pageIndex, 0, count - 1))) || [0];
+const binderViewForPage = (pageIndex, totalPages) => binderViewGroups(totalPages)
+  .find((group) => group.includes(clamp(pageIndex, 0, totalPages - 1))) || [0];
 const pageSide = (pageIndex, count) => {
-  const group = pageGroupFor(pageIndex, count);
+  const group = binderViewForPage(pageIndex, count);
   if (group.length === 2) return group[0] === pageIndex ? 'left' : 'right';
   return pageIndex === 0 ? 'right' : 'left';
 };
@@ -1058,17 +1064,9 @@ export default function CardBinder() {
   const fitInfo = { gridW, gridH, printFit, fitsTrueSize };
   const suggestedPaper = Object.entries(PAPER_SIZES).find(([, value]) => fitFor(value) >= 0.9999)?.[0] || null;
   const current = pages[currentPage] || pages[0];
-  const spreadGroups = useMemo(() => pageGroups(pages.length), [pages.length]);
-  const activeSpread = useMemo(() => pageGroupFor(currentPage, pages.length), [currentPage, pages.length]);
+  const spreadGroups = useMemo(() => binderViewGroups(pages.length), [pages.length]);
+  const activeSpread = useMemo(() => binderViewForPage(currentPage, pages.length), [currentPage, pages.length]);
   const activeSpreadIndex = spreadGroups.findIndex((group) => group.includes(currentPage));
-  const sheetPreviewGroups = useMemo(() => {
-    const indexById = new Map(pages.map((page, pageIndex) => [page.id, pageIndex]));
-    return sheets.map((sheet, sheetIndex) => ({
-      sheet,
-      sheetIndex,
-      pages: [indexById.get(sheet.front.id), indexById.get(sheet.back.id)].filter(Number.isInteger),
-    }));
-  }, [pages, sheets]);
   const visible = useMemo(() => visibleAssignments(pages, dims), [pages, dims]);
   const hidden = useMemo(() => hiddenAssignments(pages, dims), [pages, dims]);
   const placedIds = useMemo(() => new Set(visible.map((assignment) => assignment.id)), [visible]);
@@ -1243,8 +1241,8 @@ export default function CardBinder() {
   }, [addFiles]);
 
   const beginPageFlip = useCallback((fromPage, toPage, fromCount = pagesRef.current.length, toCount = fromCount) => {
-    const fromKey = pageGroupFor(fromPage, fromCount).join('-');
-    const toKey = pageGroupFor(toPage, toCount).join('-');
+    const fromKey = binderViewForPage(fromPage, fromCount).join('-');
+    const toKey = binderViewForPage(toPage, toCount).join('-');
     previousPageIndexRef.current = fromPage;
     if (fromKey === toKey && fromCount === toCount) return;
     pageFlipTimerRef.current.forEach((timer) => window.clearTimeout(timer));
@@ -1407,7 +1405,7 @@ export default function CardBinder() {
   }, []);
 
   const goToAdjacentSpread = useCallback((direction) => {
-    const groups = pageGroups(pagesRef.current.length);
+    const groups = binderViewGroups(pagesRef.current.length);
     const groupIndex = groups.findIndex((group) => group.includes(currentPageRef.current));
     const nextGroup = groups[clamp(groupIndex + direction, 0, groups.length - 1)];
     if (nextGroup) switchPage(nextGroup[0]);
@@ -2275,16 +2273,14 @@ export default function CardBinder() {
     );
   };
 
-  const renderThumbnailGroup = ({ sheet, sheetIndex, pages: group }) => {
+  const renderThumbnailGroup = (group) => {
     const active = group.some((pageIndex) => activeSpread.includes(pageIndex));
     const pageNumbers = group.map((pageIndex) => pageIndex + 1);
-    const pageLabel = pageNumbers.length === 2 && pageNumbers[1] === pageNumbers[0] + 1
-      ? `Pages ${pageNumbers[0]}–${pageNumbers[1]}`
-      : `Pages ${pageNumbers.join(' & ')}`;
+    const label = group.length === 1 ? `Page ${pageNumbers[0]}` : `Pages ${pageNumbers[0]}–${pageNumbers[1]}`;
     return (
-      <div key={sheet.id} data-sheet-id={sheet.id} data-page-group={pageNumbers.join('-')} className={`relative flex shrink-0 flex-col items-center gap-1 pb-1 text-[10px] font-medium whitespace-nowrap ${active ? 'text-red-400' : 'text-zinc-500'}`}>
+      <div key={group.join('-')} data-page-group={pageNumbers.join('-')} className={`relative flex shrink-0 flex-col items-center gap-1 pb-1 text-[10px] font-medium whitespace-nowrap ${active ? 'text-red-400' : 'text-zinc-500'}`}>
         <div className="flex items-center gap-0.5">{group.map((pageIndex) => renderThumbnailLeaf(pages[pageIndex], pageIndex))}</div>
-        <span>Sheet {sheetIndex + 1} · {pageLabel}</span>
+        <span>{label}</span>
         {active && <span aria-hidden="true" className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-red-600" />}
       </div>
     );
@@ -2453,7 +2449,7 @@ export default function CardBinder() {
             </div>
             <footer data-page-tray className="no-print scroll-area shrink-0 overflow-x-auto border-t border-zinc-800 bg-zinc-900/40 py-4">
               <div data-page-tray-inner className="mx-auto flex w-max items-end gap-3 px-4">
-                {sheetPreviewGroups.map(renderThumbnailGroup)}
+                {spreadGroups.map(renderThumbnailGroup)}
                 <div className="flex shrink-0 flex-col items-center justify-start gap-1 pb-1">
                   <button type="button" onClick={addPage} aria-label="Add page" className="flex aspect-[1/1.414] w-14 shrink-0 items-center justify-center border border-dashed border-zinc-800 text-zinc-500 transition-colors hover:border-red-600/40 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="plus" size="lg" /></button>
                   <span className="text-[10px] font-medium whitespace-nowrap text-zinc-500">Add page</span>
