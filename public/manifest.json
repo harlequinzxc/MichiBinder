@@ -8,8 +8,8 @@
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
   "orientation": "landscape",
-  "background_color": "#09090b",
-  "theme_color": "#09090b",
+  "background_color": "#0B0B0C",
+  "theme_color": "#0B0B0C",
   "categories": ["productivity", "utilities", "photo"],
   "launch_handler": { "client_mode": "focus-existing" },
   "file_handlers": [
