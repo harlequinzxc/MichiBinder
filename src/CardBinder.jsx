@@ -100,8 +100,62 @@ const uid = (prefix = 'id') => `${prefix}-${Date.now().toString(36)}-${Math.rand
 const keyOf = (row, col) => `${row}-${col}`;
 const isEditableTarget = (element) => Boolean(element?.matches?.('input, textarea, select, [contenteditable="true"]'));
 const hasFiles = (dataTransfer) => Array.from(dataTransfer?.types || []).includes('Files');
-const emptyPage = () => ({ id: uid('page'), merges: [], slots: {}, crops: {} });
-const emptyPages = (count = 4) => Array.from({ length: count }, emptyPage);
+const emptyPage = (sheetId = null, face = null) => ({
+  id: uid('page'),
+  merges: [],
+  slots: {},
+  crops: {},
+  ...(sheetId && face ? { sheetId, face } : {}),
+});
+const emptySheet = () => {
+  const id = uid('sheet');
+  return { id, front: emptyPage(id, 'front'), back: emptyPage(id, 'back') };
+};
+const emptyPages = (count = 4) => {
+  const pageCount = Math.max(2, Math.ceil(count / 2) * 2);
+  return Array.from({ length: pageCount / 2 }, emptySheet).flatMap((sheet) => [sheet.front, sheet.back]);
+};
+const normalizePhysicalPages = (value) => {
+  const source = Array.isArray(value) && value.length ? [...value] : emptyPages();
+  const groups = new Map();
+  source.forEach((page) => {
+    if (!page?.sheetId || !['front', 'back'].includes(page.face)) return;
+    const group = groups.get(page.sheetId) || {};
+    group[page.face] = page;
+    groups.set(page.sheetId, group);
+  });
+  const valid = source.length % 2 === 0
+    && groups.size * 2 === source.length
+    && Array.from(groups.values()).every((group) => group.front && group.back);
+  const paired = valid ? source : (() => {
+    const pages = [...source];
+    if (pages.length % 2) pages.push(emptyPage());
+    const repaired = [];
+    for (let index = 0; index < pages.length; index += 2) {
+      const sheetId = uid('sheet');
+      repaired.push(
+        { ...pages[index], sheetId, face: 'front' },
+        { ...pages[index + 1], sheetId, face: 'back' },
+      );
+    }
+    return repaired;
+  })();
+  return paired.map((page, order) => ({ ...page, order }));
+};
+const sheetsFromPages = (value) => {
+  const pages = normalizePhysicalPages(value);
+  const sheets = new Map();
+  pages.forEach((page) => {
+    const sheet = sheets.get(page.sheetId) || { id: page.sheetId, front: null, back: null };
+    sheet[page.face] = page;
+    sheets.set(page.sheetId, sheet);
+  });
+  return Array.from(sheets.values());
+};
+const pagesFromSheets = (sheets) => sheets
+  .flatMap((sheet) => [sheet.front, sheet.back])
+  .filter(Boolean)
+  .sort((first, second) => first.order - second.order);
 const pageGroups = (count) => {
   if (count <= 0) return [];
   const groups = [[0]];
@@ -265,7 +319,10 @@ function applyPlacement(previousPages, ids, pageIndex, startKey, dims) {
   const targets = planPlacement(pages, pageIndex, startKey, ids.length, dims);
   const lastIndex = targets.length ? Math.max(...targets.map((target) => target.pageIndex)) : pages.length - 1;
   const before = pages.length;
-  while (pages.length <= lastIndex) pages.push(emptyPage());
+  while (pages.length <= lastIndex) {
+    const sheet = emptySheet();
+    pages.push(sheet.front, sheet.back);
+  }
   targets.forEach((target, index) => {
     pages[target.pageIndex].slots[target.key] = ids[index];
     delete pages[target.pageIndex].crops[target.key];
@@ -316,7 +373,14 @@ function sanitizePage(value = {}) {
   Object.entries(value.crops || {}).forEach(([key, crop]) => {
     if (slots[key] && crop?.img === slots[key]) crops[key] = { img: crop.img, x: clamp(crop.x, 0, 100), y: clamp(crop.y, 0, 100) };
   });
-  return { id: String(value.id || uid('page')), merges, slots, crops };
+  return {
+    id: String(value.id || uid('page')),
+    merges,
+    slots,
+    crops,
+    ...(typeof value.sheetId === 'string' ? { sheetId: value.sheetId } : {}),
+    ...(['front', 'back'].includes(value.face) ? { face: value.face } : {}),
+  };
 }
 
 function loadPersisted() {
@@ -326,7 +390,7 @@ function loadPersisted() {
     if (!raw) return fallback;
     const parsed = JSON.parse(raw);
     if (!parsed || Number(parsed.version) > SCHEMA_VERSION) return fallback;
-    const pages = Array.isArray(parsed.pages) && parsed.pages.length ? parsed.pages.map(sanitizePage) : emptyPages();
+    const pages = normalizePhysicalPages(Array.isArray(parsed.pages) && parsed.pages.length ? parsed.pages.map(sanitizePage) : emptyPages());
     const pool = Array.isArray(parsed.pool) ? parsed.pool.filter((item) => item && typeof item.id === 'string').map((item) => ({ id: item.id, name: String(item.name || 'Card image'), ...(typeof item.src === 'string' ? { src: item.src } : {}) })) : [];
     return {
       currentPage: clamp(Math.floor(Number(parsed.currentPage) || 0), 0, pages.length - 1),
@@ -628,9 +692,9 @@ function AppBar({
           <span className="min-w-[104px] px-2 text-center text-[12px] font-medium text-zinc-200">{pageLabel}</span>
           <button type="button" aria-label="Next page" title="Next spread" onClick={onNext} disabled={!canNext} className="grid size-7 place-items-center rounded-full text-zinc-300 transition-colors hover:bg-white/10 disabled:text-zinc-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="chevronRight" size="sm" /></button>
         </div>
-        <ToolButton icon="plus" label="Add Page" onClick={onAdd} />
-        <ToolButton icon="copy" onClick={onDuplicate} title="Duplicate page" />
-        <ToolButton icon="trash" label="Delete" variant="danger" onClick={onDelete} disabled={!canDelete} disabledReason="Keep at least one page" />
+        <ToolButton icon="plus" label="Add Page" onClick={onAdd} title="Insert a new two-page physical sheet" />
+        <ToolButton icon="copy" onClick={onDuplicate} title="Duplicate physical sheet" />
+        <ToolButton icon="trash" label="Delete" variant="danger" onClick={onDelete} disabled={!canDelete} disabledReason="Keep at least one physical sheet" />
       </nav>
 
       <div className="relative flex items-center justify-end gap-2">
@@ -922,7 +986,15 @@ function CanvasHelper({ editing, multiDrag, flowCount, combineMode, settings, pa
 
 export default function CardBinder() {
   const boot = useMemo(loadPersisted, []);
-  const [pages, setPages] = useState(boot.pages);
+  const [sheets, setSheets] = useState(() => sheetsFromPages(boot.pages));
+  const pages = useMemo(() => pagesFromSheets(sheets), [sheets]);
+  const setPages = useCallback((updater) => {
+    setSheets((currentSheets) => {
+      const currentPages = pagesFromSheets(currentSheets);
+      const nextPages = typeof updater === 'function' ? updater(currentPages) : updater;
+      return sheetsFromPages(nextPages);
+    });
+  }, []);
   const [currentPage, setCurrentPage] = useState(boot.currentPage);
   const [pool, setPool] = useState(boot.pool);
   const [settings, setSettings] = useState(boot.settings);
@@ -968,6 +1040,7 @@ export default function CardBinder() {
   const persistedRef = useRef(false);
   const pagesRef = useRef(pages);
   const currentPageRef = useRef(currentPage);
+  const previousPageIndexRef = useRef(currentPage);
   const layoutIdRef = useRef(settings.layout);
   const pastRef = useRef([]);
   const futureRef = useRef([]);
@@ -988,6 +1061,14 @@ export default function CardBinder() {
   const spreadGroups = useMemo(() => pageGroups(pages.length), [pages.length]);
   const activeSpread = useMemo(() => pageGroupFor(currentPage, pages.length), [currentPage, pages.length]);
   const activeSpreadIndex = spreadGroups.findIndex((group) => group.includes(currentPage));
+  const sheetPreviewGroups = useMemo(() => {
+    const indexById = new Map(pages.map((page, pageIndex) => [page.id, pageIndex]));
+    return sheets.map((sheet, sheetIndex) => ({
+      sheet,
+      sheetIndex,
+      pages: [indexById.get(sheet.front.id), indexById.get(sheet.back.id)].filter(Number.isInteger),
+    }));
+  }, [pages, sheets]);
   const visible = useMemo(() => visibleAssignments(pages, dims), [pages, dims]);
   const hidden = useMemo(() => hiddenAssignments(pages, dims), [pages, dims]);
   const placedIds = useMemo(() => new Set(visible.map((assignment) => assignment.id)), [visible]);
@@ -1164,18 +1245,20 @@ export default function CardBinder() {
   const beginPageFlip = useCallback((fromPage, toPage, fromCount = pagesRef.current.length, toCount = fromCount) => {
     const fromKey = pageGroupFor(fromPage, fromCount).join('-');
     const toKey = pageGroupFor(toPage, toCount).join('-');
+    previousPageIndexRef.current = fromPage;
     if (fromKey === toKey && fromCount === toCount) return;
     pageFlipTimerRef.current.forEach((timer) => window.clearTimeout(timer));
     pageFlipTimerRef.current = [];
     const token = pageFlipTokenRef.current + 1;
+    const direction = toPage > previousPageIndexRef.current ? 1 : -1;
     pageFlipTokenRef.current = token;
-    setPageFlip({ folded: true, animating: true, direction: toPage >= fromPage ? 1 : -1, token });
+    setPageFlip({ folded: true, animating: true, direction, token });
     const openTimer = window.setTimeout(() => {
       if (pageFlipTokenRef.current === token) setPageFlip((value) => value.token === token ? { ...value, folded: false } : value);
-    }, 50);
+    }, 40);
     const finishTimer = window.setTimeout(() => {
       if (pageFlipTokenRef.current === token) setPageFlip((value) => value.token === token ? { ...value, animating: false } : value);
-    }, 600);
+    }, 560);
     pageFlipTimerRef.current = [openTimer, finishTimer];
   }, []);
 
@@ -1193,10 +1276,11 @@ export default function CardBinder() {
 
   const restoreCanvasSnapshot = useCallback((snapshot) => {
     if (!snapshot?.pages?.length) return;
-    const nextPages = clonePages(snapshot.pages);
+    const nextPages = normalizePhysicalPages(clonePages(snapshot.pages));
     const nextPage = clamp(snapshot.currentPage, 0, nextPages.length - 1);
     const nextLayout = getLayout(snapshot.layout).id;
     const layoutChanged = layoutIdRef.current !== nextLayout;
+    previousPageIndexRef.current = currentPageRef.current;
     pagesRef.current = nextPages;
     currentPageRef.current = nextPage;
     layoutIdRef.current = nextLayout;
@@ -1221,8 +1305,9 @@ export default function CardBinder() {
     const previousPages = pagesRef.current;
     const previousPage = currentPageRef.current;
     const previousLayout = layoutIdRef.current;
-    const nextPages = typeof updater === 'function' ? updater(previousPages) : updater;
-    if (!Array.isArray(nextPages) || !nextPages.length) return { pages: previousPages, changed: false };
+    const candidatePages = typeof updater === 'function' ? updater(previousPages) : updater;
+    if (!Array.isArray(candidatePages) || !candidatePages.length) return { pages: previousPages, changed: false };
+    const nextPages = normalizePhysicalPages(candidatePages);
     const requestedPage = options.currentPage === undefined ? previousPage : options.currentPage;
     const nextPage = clamp(typeof requestedPage === 'function' ? requestedPage(previousPage) : requestedPage, 0, nextPages.length - 1);
     const nextLayout = options.layout ? getLayout(options.layout).id : previousLayout;
@@ -1234,6 +1319,7 @@ export default function CardBinder() {
     futureRef.current = [];
 
     pagesRef.current = nextPages;
+    if (nextPage !== previousPage) previousPageIndexRef.current = previousPage;
     currentPageRef.current = nextPage;
     setPages(nextPages);
     if (nextPage !== previousPage) setCurrentPage(nextPage);
@@ -1315,6 +1401,7 @@ export default function CardBinder() {
   const activateCanvasPage = useCallback((pageIndex) => {
     const nextPage = clamp(pageIndex, 0, pagesRef.current.length - 1);
     if (nextPage === currentPageRef.current) return;
+    previousPageIndexRef.current = currentPageRef.current;
     currentPageRef.current = nextPage;
     setCurrentPage(nextPage);
   }, []);
@@ -1802,9 +1889,10 @@ export default function CardBinder() {
     localStorage.removeItem(STORAGE_KEY);
     objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
     objectUrlsRef.current.clear();
-    const nextPages = emptyPages();
+    const nextPages = normalizePhysicalPages(emptyPages());
     pagesRef.current = nextPages;
     currentPageRef.current = 0;
+    previousPageIndexRef.current = 0;
     layoutIdRef.current = DEFAULT_LAYOUT;
     setPages(nextPages);
     clearHistory();
@@ -1821,32 +1909,71 @@ export default function CardBinder() {
 
   const addPage = useCallback(() => {
     commitEditing();
-    applyCanvasChange((value) => [...value, emptyPage()], { currentPage: pagesRef.current.length });
+    const previousCount = pagesRef.current.length;
+    const insertionIndex = Math.max(1, previousCount - 1);
+    const nextPage = insertionIndex + 1;
+    const sheet = emptySheet();
+    beginPageFlip(currentPageRef.current, nextPage, previousCount, previousCount + 2);
+    applyCanvasChange(
+      (value) => [...value.slice(0, insertionIndex), sheet.front, sheet.back, ...value.slice(insertionIndex)],
+      { currentPage: nextPage },
+    );
     setSelBox(null);
     setSelectionPageId(null);
-  }, [commitEditing, applyCanvasChange]);
+    notify(`New sheet inserted as pages ${insertionIndex + 1}–${insertionIndex + 2}.`, 'success');
+  }, [commitEditing, beginPageFlip, applyCanvasChange, notify]);
 
   const duplicatePage = useCallback(() => {
     commitEditing();
     const sourceIndex = currentPageRef.current;
-    applyCanvasChange((value) => {
-      const source = value[sourceIndex];
-      const copy = { id: uid('page'), merges: source.merges.map((merge) => ({ ...merge, id: uid('merge') })), slots: { ...source.slots }, crops: Object.fromEntries(Object.entries(source.crops).map(([key, crop]) => [key, { ...crop }])) };
-      return [...value.slice(0, sourceIndex + 1), copy, ...value.slice(sourceIndex + 1)];
-    }, { currentPage: sourceIndex + 1 });
-    notify('Page duplicated.', 'success');
-  }, [commitEditing, applyCanvasChange, notify]);
+    const sourcePage = pagesRef.current[sourceIndex];
+    if (!sourcePage) return;
+    const sourceIndices = pagesRef.current
+      .map((page, pageIndex) => page.sheetId === sourcePage.sheetId ? pageIndex : -1)
+      .filter((pageIndex) => pageIndex >= 0);
+    const insertionIndex = Math.max(...sourceIndices) + 1;
+    const nextSheetId = uid('sheet');
+    const copyFace = (source, face) => ({
+      ...source,
+      id: uid('page'),
+      sheetId: nextSheetId,
+      face,
+      merges: source.merges.map((merge) => ({ ...merge, id: uid('merge') })),
+      slots: { ...source.slots },
+      crops: Object.fromEntries(Object.entries(source.crops).map(([key, crop]) => [key, { ...crop }])),
+    });
+    const sourceFront = pagesRef.current.find((page) => page.sheetId === sourcePage.sheetId && page.face === 'front');
+    const sourceBack = pagesRef.current.find((page) => page.sheetId === sourcePage.sheetId && page.face === 'back');
+    if (!sourceFront || !sourceBack) return;
+    const copies = [copyFace(sourceFront, 'front'), copyFace(sourceBack, 'back')];
+    beginPageFlip(sourceIndex, insertionIndex, pagesRef.current.length, pagesRef.current.length + 2);
+    applyCanvasChange(
+      (value) => [...value.slice(0, insertionIndex), ...copies, ...value.slice(insertionIndex)],
+      { currentPage: insertionIndex },
+    );
+    notify('Physical sheet duplicated.', 'success');
+  }, [commitEditing, beginPageFlip, applyCanvasChange, notify]);
 
   const deletePage = useCallback(() => {
-    if (pagesRef.current.length <= 1) return;
-    if (Object.keys(pagesRef.current[currentPageRef.current].slots).length && !window.confirm(`Delete page ${currentPageRef.current + 1}? Cards remain in the pool.`)) return;
-    commitEditing();
+    if (pagesRef.current.length <= 2) return;
     const pageIndex = currentPageRef.current;
-    const nextPage = Math.max(0, Math.min(pageIndex, pagesRef.current.length - 2));
-    applyCanvasChange((value) => value.filter((_, index) => index !== pageIndex), { currentPage: nextPage });
+    const page = pagesRef.current[pageIndex];
+    if (!page) return;
+    const sheetIndices = pagesRef.current
+      .map((item, index) => item.sheetId === page.sheetId ? index : -1)
+      .filter((index) => index >= 0);
+    const sheetPages = sheetIndices.map((index) => pagesRef.current[index]);
+    const pageLabels = sheetIndices.map((index) => index + 1).join(' & ');
+    if (sheetPages.some((item) => Object.keys(item.slots).length)
+      && !window.confirm(`Delete the physical sheet containing pages ${pageLabels}? Cards remain in the pool.`)) return;
+    commitEditing();
+    const nextLength = pagesRef.current.length - sheetPages.length;
+    const nextPage = Math.max(0, Math.min(Math.min(...sheetIndices), nextLength - 1));
+    applyCanvasChange((value) => value.filter((item) => item.sheetId !== page.sheetId), { currentPage: nextPage });
     setSelBox(null);
     setSelectionPageId(null);
-  }, [commitEditing, applyCanvasChange]);
+    notify('Physical sheet removed.', 'info');
+  }, [commitEditing, applyCanvasChange, notify]);
 
   const clearPage = useCallback((pageIndex = currentPageRef.current) => {
     const page = pagesRef.current[pageIndex];
@@ -1951,7 +2078,7 @@ export default function CardBinder() {
 
   const frameWIn = settings.view === 'paper' ? paper.wIn : gridW + SHEET_PAD.left + SHEET_PAD.right;
   const frameHIn = settings.view === 'paper' ? paper.hIn : gridH + SHEET_PAD.top + SHEET_PAD.bottom;
-  const spineGap = 4;
+  const spineGap = 24;
   const pageAreaWidth = Math.max(160, (stageSize.w - 80 - spineGap) / 2);
   const ppi = Math.max(12, Math.min(pageAreaWidth / frameWIn, (stageSize.h - 136) / frameHIn));
   const gridPpi = settings.view === 'paper' ? ppi * printFit : ppi;
@@ -2123,13 +2250,14 @@ export default function CardBinder() {
 
   const renderThumbnailLeaf = (page, pageIndex) => {
     const unit = Math.min((THUMB_BOX.w - THUMB_BOX.pad * 2) / gridW, (THUMB_BOX.h - THUMB_BOX.pad * 2) / gridH);
-    const active = pageIndex === currentPage;
+    const active = activeSpread.includes(pageIndex);
+    const currentLeaf = pageIndex === currentPage;
     return (
       <button
         key={page.id}
         type="button"
         aria-label={`Page ${pageIndex + 1}`}
-        aria-current={active ? 'page' : undefined}
+        aria-current={currentLeaf ? 'page' : undefined}
         onClick={() => switchPage(pageIndex)}
         onDragOver={(event) => { if (dragRef.current || hasFiles(event.dataTransfer)) { event.preventDefault(); event.dataTransfer.dropEffect = dragRef.current?.kind === 'slot' ? 'move' : 'copy'; } }}
         onDrop={(event) => handleThumbDrop(event, pageIndex)}
@@ -2147,13 +2275,16 @@ export default function CardBinder() {
     );
   };
 
-  const renderThumbnailGroup = (group) => {
-    const active = group.includes(currentPage);
-    const label = group.length === 1 ? `Page ${group[0] + 1}` : `Pages ${group[0] + 1}–${group[1] + 1}`;
+  const renderThumbnailGroup = ({ sheet, sheetIndex, pages: group }) => {
+    const active = group.some((pageIndex) => activeSpread.includes(pageIndex));
+    const pageNumbers = group.map((pageIndex) => pageIndex + 1);
+    const pageLabel = pageNumbers.length === 2 && pageNumbers[1] === pageNumbers[0] + 1
+      ? `Pages ${pageNumbers[0]}–${pageNumbers[1]}`
+      : `Pages ${pageNumbers.join(' & ')}`;
     return (
-      <div key={group.join('-')} data-page-group={group.map((index) => index + 1).join('-')} className={`relative flex shrink-0 flex-col items-center gap-1 pb-1 text-[10px] font-medium whitespace-nowrap ${active ? 'text-red-400' : 'text-zinc-500'}`}>
+      <div key={sheet.id} data-sheet-id={sheet.id} data-page-group={pageNumbers.join('-')} className={`relative flex shrink-0 flex-col items-center gap-1 pb-1 text-[10px] font-medium whitespace-nowrap ${active ? 'text-red-400' : 'text-zinc-500'}`}>
         <div className="flex items-center gap-0.5">{group.map((pageIndex) => renderThumbnailLeaf(pages[pageIndex], pageIndex))}</div>
-        <span>{label}</span>
+        <span>Sheet {sheetIndex + 1} · {pageLabel}</span>
         {active && <span aria-hidden="true" className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-red-600" />}
       </div>
     );
@@ -2170,18 +2301,20 @@ export default function CardBinder() {
     const pageCanMerge = Boolean(combineMode && pageSelBox && pageSelBox.rs * pageSelBox.cs > 1 && !pageExactMerge);
     const pageSlots = getSlots(page, dims);
     const pageFilled = pageSlots.filter((slot) => page.slots[slot.key]).length;
-    const foldedRotation = side === 'left'
-      ? (pageFlip.direction > 0 ? '90deg' : '-90deg')
-      : (pageFlip.direction > 0 ? '-90deg' : '90deg');
+    const foldedRotation = pageFlip.direction > 0 ? '-180deg' : '180deg';
     const pageRotation = pageFlip.folded ? foldedRotation : '0deg';
-    const originClass = side === 'left' ? 'origin-right' : 'origin-left';
+    const rotationClass = pageFlip.folded
+      ? (pageFlip.direction > 0 ? '[transform:rotateY(-180deg)]' : '[transform:rotateY(180deg)]')
+      : '[transform:rotateY(0deg)]';
+    const originClass = pageFlip.direction > 0 ? 'origin-left' : 'origin-right';
     return (
       <div
         key={page.id}
         data-canvas
         data-page-index={pageIndex}
         data-page-side={side}
-        className={`relative transition-transform duration-500 ease-in-out [backface-visibility:hidden] [transform-style:preserve-3d] will-change-transform ${originClass} ${pageFlip.animating ? 'pointer-events-none' : ''}`}
+        data-flip-direction={pageFlip.direction > 0 ? 'forward' : 'backward'}
+        className={`relative transform-gpu transition-transform duration-500 ease-in-out [backface-visibility:hidden] [transform-style:preserve-3d] will-change-transform ${rotationClass} ${originClass} ${pageFlip.animating ? 'pointer-events-none' : ''}`}
         style={{ transform: `rotateY(${pageRotation}) translateZ(0)`, width: frameWidth, height: frameHeight, gridColumn: side === 'left' ? 1 : 2 }}
       >
         <CanvasToolbar
@@ -2255,7 +2388,7 @@ export default function CardBinder() {
             onAdd={addPage}
             onDuplicate={duplicatePage}
             onDelete={deletePage}
-            canDelete={pages.length > 1}
+            canDelete={pages.length > 2}
             saveStatus={saveStatus}
             storageMode={storageMode}
             installPrompt={installPrompt}
@@ -2311,8 +2444,8 @@ export default function CardBinder() {
             >
               <div
                 data-spread
-                className="relative grid grid-cols-2 [transform-style:preserve-3d]"
-                style={{ width: spreadWidth, height: frameHeight, columnGap: spineGap }}
+                className="relative grid grid-cols-2 gap-6 [transform-style:preserve-3d]"
+                style={{ width: spreadWidth, height: frameHeight }}
               >
                 {activeSpread.length === 2 && <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-1/2 z-30 w-px -translate-x-1/2 bg-black/90 shadow-[-12px_0_20px_-8px_rgba(0,0,0,0.9),12px_0_20px_-8px_rgba(0,0,0,0.9)]" />}
                 {activeSpread.map(renderCanvasLeaf)}
@@ -2320,7 +2453,7 @@ export default function CardBinder() {
             </div>
             <footer data-page-tray className="no-print scroll-area shrink-0 overflow-x-auto border-t border-zinc-800 bg-zinc-900/40 py-4">
               <div data-page-tray-inner className="mx-auto flex w-max items-end gap-3 px-4">
-                {spreadGroups.map(renderThumbnailGroup)}
+                {sheetPreviewGroups.map(renderThumbnailGroup)}
                 <div className="flex shrink-0 flex-col items-center justify-start gap-1 pb-1">
                   <button type="button" onClick={addPage} aria-label="Add page" className="flex aspect-[1/1.414] w-14 shrink-0 items-center justify-center border border-dashed border-zinc-800 text-zinc-500 transition-colors hover:border-red-600/40 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="plus" size="lg" /></button>
                   <span className="text-[10px] font-medium whitespace-nowrap text-zinc-500">Add page</span>
