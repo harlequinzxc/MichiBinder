@@ -101,6 +101,19 @@ const keyOf = (row, col) => `${row}-${col}`;
 const isEditableTarget = (element) => Boolean(element?.matches?.('input, textarea, select, [contenteditable="true"]'));
 const hasFiles = (dataTransfer) => Array.from(dataTransfer?.types || []).includes('Files');
 const emptyPage = () => ({ id: uid('page'), merges: [], slots: {}, crops: {} });
+const emptyPages = (count = 4) => Array.from({ length: count }, emptyPage);
+const pageGroups = (count) => {
+  if (count <= 0) return [];
+  const groups = [[0]];
+  for (let index = 1; index < count; index += 2) groups.push(index + 1 < count ? [index, index + 1] : [index]);
+  return groups;
+};
+const pageGroupFor = (pageIndex, count) => pageGroups(count).find((group) => group.includes(clamp(pageIndex, 0, count - 1))) || [0];
+const pageSide = (pageIndex, count) => {
+  const group = pageGroupFor(pageIndex, count);
+  if (group.length === 2) return group[0] === pageIndex ? 'left' : 'right';
+  return pageIndex === 0 ? 'right' : 'left';
+};
 const clonePages = (pages) => pages.map((page) => ({
   ...page,
   merges: (page.merges || []).map((merge) => ({ ...merge })),
@@ -307,13 +320,13 @@ function sanitizePage(value = {}) {
 }
 
 function loadPersisted() {
-  const fallback = { currentPage: 0, settings: sanitizeSettings(), pool: [], pages: [emptyPage()] };
+  const fallback = { currentPage: 0, settings: sanitizeSettings(), pool: [], pages: emptyPages() };
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return fallback;
     const parsed = JSON.parse(raw);
     if (!parsed || Number(parsed.version) > SCHEMA_VERSION) return fallback;
-    const pages = Array.isArray(parsed.pages) && parsed.pages.length ? parsed.pages.map(sanitizePage) : [emptyPage()];
+    const pages = Array.isArray(parsed.pages) && parsed.pages.length ? parsed.pages.map(sanitizePage) : emptyPages();
     const pool = Array.isArray(parsed.pool) ? parsed.pool.filter((item) => item && typeof item.id === 'string').map((item) => ({ id: item.id, name: String(item.name || 'Card image'), ...(typeof item.src === 'string' ? { src: item.src } : {}) })) : [];
     return {
       currentPage: clamp(Math.floor(Number(parsed.currentPage) || 0), 0, pages.length - 1),
@@ -580,8 +593,9 @@ function PopoverShell({ title, icon, children }) {
 }
 
 function AppBar({
-  currentPage,
-  pageCount,
+  pageLabel,
+  canPrevious,
+  canNext,
   onPrevious,
   onNext,
   onAdd,
@@ -610,9 +624,9 @@ function AppBar({
 
       <nav aria-label="Pages" className="flex items-center gap-2">
         <div className="flex h-8 items-center rounded-full border border-zinc-800 bg-[#121214] p-0.5">
-          <button type="button" aria-label="Previous page" title="Previous page" onClick={onPrevious} disabled={currentPage === 0} className="grid size-7 place-items-center rounded-full text-zinc-300 transition-colors hover:bg-white/10 disabled:text-zinc-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="chevronLeft" size="sm" /></button>
-          <span className="min-w-[78px] px-2 text-center text-[12px] font-medium text-zinc-200">Page {currentPage + 1} / {pageCount}</span>
-          <button type="button" aria-label="Next page" title="Next page" onClick={onNext} disabled={currentPage === pageCount - 1} className="grid size-7 place-items-center rounded-full text-zinc-300 transition-colors hover:bg-white/10 disabled:text-zinc-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="chevronRight" size="sm" /></button>
+          <button type="button" aria-label="Previous page" title="Previous spread" onClick={onPrevious} disabled={!canPrevious} className="grid size-7 place-items-center rounded-full text-zinc-300 transition-colors hover:bg-white/10 disabled:text-zinc-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="chevronLeft" size="sm" /></button>
+          <span className="min-w-[104px] px-2 text-center text-[12px] font-medium text-zinc-200">{pageLabel}</span>
+          <button type="button" aria-label="Next page" title="Next spread" onClick={onNext} disabled={!canNext} className="grid size-7 place-items-center rounded-full text-zinc-300 transition-colors hover:bg-white/10 disabled:text-zinc-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="chevronRight" size="sm" /></button>
         </div>
         <ToolButton icon="plus" label="Add Page" onClick={onAdd} />
         <ToolButton icon="copy" onClick={onDuplicate} title="Duplicate page" />
@@ -676,7 +690,7 @@ function ShortcutsPopover() {
     ['Ctrl/⌘ + Z', 'Undo canvas change'], ['Ctrl + Y / Ctrl/⌘ + Shift + Z', 'Redo canvas change'],
     ['Ctrl/⌘ + A', 'Select visible cards'], ['Esc', 'Cancel or clear'], ['Delete', 'Delete selected cards'],
     ['M', 'Toggle Combine mode'], ['Enter', 'Merge / confirm'], ['U', 'Unmerge selection'],
-    ['← / →', 'Previous / next page'], ['PageUp / PageDown', 'Previous / next page'], ['F', 'Fill page'],
+    ['← / →', 'Previous / next spread'], ['PageUp / PageDown', 'Previous / next spread'], ['F', 'Fill active page'],
     ['Double-click', 'Reposition an image'],
   ];
   return (
@@ -924,24 +938,30 @@ export default function CardBinder() {
   const [installPrompt, setInstallPrompt] = useState(null);
   const [combineMode, setCombineModeState] = useState(false);
   const [selBox, setSelBox] = useState(null);
+  const [selectionPageId, setSelectionPageId] = useState(null);
+  const [pageFlip, setPageFlip] = useState({ folded: false, animating: false, direction: 1, token: 0 });
   const [marqueeActive, setMarqueeActive] = useState(false);
   const [dragInfo, setDragInfo] = useState(null);
   const [dropPreview, setDropPreview] = useState([]);
   const [sidebarDropActive, setSidebarDropActive] = useState(false);
   const [editing, setEditing] = useState(null);
   const [stageSize, setStageSize] = useState({ w: 1000, h: 620 });
-  const [past, setPast] = useState([]);
-  const [future, setFuture] = useState([]);
 
   const stageRef = useRef(null);
   const inputRef = useRef(null);
   const panelRootRef = useRef(null);
   const dragRef = useRef(null);
   const marqueeRef = useRef(null);
+  const selBoxRef = useRef(selBox);
+  const selectionPageIdRef = useRef(selectionPageId);
+  const dropPreviewRef = useRef(dropPreview);
   const suppressClickRef = useRef(false);
   const slotActionGuardRef = useRef(0);
   const editingRef = useRef(null);
   const panRef = useRef(null);
+  const pageFlipTimerRef = useRef([]);
+  const pageFlipTokenRef = useRef(0);
+  const historyRestoreTimerRef = useRef([]);
   const dimensionsRef = useRef(null);
   const sessionIdsRef = useRef(new Set());
   const objectUrlsRef = useRef(new Set());
@@ -949,8 +969,8 @@ export default function CardBinder() {
   const pagesRef = useRef(pages);
   const currentPageRef = useRef(currentPage);
   const layoutIdRef = useRef(settings.layout);
-  const pastRef = useRef(past);
-  const futureRef = useRef(future);
+  const pastRef = useRef([]);
+  const futureRef = useRef([]);
 
   const layout = getLayout(settings.layout);
   const dims = useMemo(() => ({ rows: layout.rows, cols: layout.cols }), [layout.rows, layout.cols]);
@@ -965,6 +985,9 @@ export default function CardBinder() {
   const fitInfo = { gridW, gridH, printFit, fitsTrueSize };
   const suggestedPaper = Object.entries(PAPER_SIZES).find(([, value]) => fitFor(value) >= 0.9999)?.[0] || null;
   const current = pages[currentPage] || pages[0];
+  const spreadGroups = useMemo(() => pageGroups(pages.length), [pages.length]);
+  const activeSpread = useMemo(() => pageGroupFor(currentPage, pages.length), [currentPage, pages.length]);
+  const activeSpreadIndex = spreadGroups.findIndex((group) => group.includes(currentPage));
   const visible = useMemo(() => visibleAssignments(pages, dims), [pages, dims]);
   const hidden = useMemo(() => hiddenAssignments(pages, dims), [pages, dims]);
   const placedIds = useMemo(() => new Set(visible.map((assignment) => assignment.id)), [visible]);
@@ -972,11 +995,12 @@ export default function CardBinder() {
   const selectedOrdered = useMemo(() => pool.filter((item) => selected.includes(item.id)).map((item) => item.id), [pool, selected]);
   const printPages = useMemo(() => pages.filter((page) => !settings.skipEmptyPages || getSlots(page, dims).some((slot) => page.slots[slot.key])), [pages, settings.skipEmptyPages, dims]);
 
-  useEffect(() => { pagesRef.current = pages; }, [pages]);
-  useEffect(() => { currentPageRef.current = currentPage; }, [currentPage]);
   useEffect(() => { layoutIdRef.current = settings.layout; }, [settings.layout]);
   useEffect(() => { dimsRef.current = dims; }, [dims]);
   useEffect(() => { editingRef.current = editing; }, [editing]);
+  useEffect(() => { selBoxRef.current = selBox; }, [selBox]);
+  useEffect(() => { selectionPageIdRef.current = selectionPageId; }, [selectionPageId]);
+  useEffect(() => { dropPreviewRef.current = dropPreview; }, [dropPreview]);
 
   const notify = useCallback((message, tone = 'info', action = null) => {
     const id = uid('toast');
@@ -1004,7 +1028,11 @@ export default function CardBinder() {
           const orphans = records.filter((record) => !present.has(record.id)).sort((a, b) => (a.added || 0) - (b.added || 0)).map((record) => ({ id: record.id, name: record.name || 'Card image' }));
           const reconciled = [...kept, ...orphans];
           const valid = new Set(reconciled.map((item) => item.id));
-          setPages((currentPages) => pruneMissingImages(currentPages, valid));
+          setPages((currentPages) => {
+            const nextPages = pruneMissingImages(currentPages, valid);
+            pagesRef.current = nextPages;
+            return nextPages;
+          });
           return reconciled;
         });
         setStorageMode('indexeddb');
@@ -1013,7 +1041,11 @@ export default function CardBinder() {
         setStorageMode('localstorage');
         const valid = new Set(boot.pool.filter((item) => item.src).map((item) => item.id));
         setPool((value) => value.filter((item) => item.src || sessionIdsRef.current.has(item.id)));
-        setPages((value) => pruneMissingImages(value, valid));
+        setPages((value) => {
+          const nextPages = pruneMissingImages(value, valid);
+          pagesRef.current = nextPages;
+          return nextPages;
+        });
       } finally {
         if (!cancelled) setHydrated(true);
       }
@@ -1047,7 +1079,9 @@ export default function CardBinder() {
     if (!node || !('ResizeObserver' in window)) return undefined;
     const observer = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect;
-      if (width > 0 && height > 0) setStageSize({ w: width, h: height });
+      if (width > 0 && height > 0) setStageSize((value) => (
+        Math.abs(value.w - width) < 0.5 && Math.abs(value.h - height) < 0.5 ? value : { w: width, h: height }
+      ));
     });
     observer.observe(node);
     return () => observer.disconnect();
@@ -1127,11 +1161,34 @@ export default function CardBinder() {
     return () => { live = false; };
   }, [addFiles]);
 
+  const beginPageFlip = useCallback((fromPage, toPage, fromCount = pagesRef.current.length, toCount = fromCount) => {
+    const fromKey = pageGroupFor(fromPage, fromCount).join('-');
+    const toKey = pageGroupFor(toPage, toCount).join('-');
+    if (fromKey === toKey && fromCount === toCount) return;
+    pageFlipTimerRef.current.forEach((timer) => window.clearTimeout(timer));
+    pageFlipTimerRef.current = [];
+    const token = pageFlipTokenRef.current + 1;
+    pageFlipTokenRef.current = token;
+    setPageFlip({ folded: true, animating: true, direction: toPage >= fromPage ? 1 : -1, token });
+    const openTimer = window.setTimeout(() => {
+      if (pageFlipTokenRef.current === token) setPageFlip((value) => value.token === token ? { ...value, folded: false } : value);
+    }, 50);
+    const finishTimer = window.setTimeout(() => {
+      if (pageFlipTokenRef.current === token) setPageFlip((value) => value.token === token ? { ...value, animating: false } : value);
+    }, 600);
+    pageFlipTimerRef.current = [openTimer, finishTimer];
+  }, []);
+
+  useEffect(() => () => {
+    pageFlipTimerRef.current.forEach((timer) => window.clearTimeout(timer));
+    historyRestoreTimerRef.current.forEach((timer) => window.clearTimeout(timer));
+  }, []);
+
   const clearHistory = useCallback(() => {
+    historyRestoreTimerRef.current.forEach((timer) => window.clearTimeout(timer));
+    historyRestoreTimerRef.current = [];
     pastRef.current = [];
     futureRef.current = [];
-    setPast([]);
-    setFuture([]);
   }, []);
 
   const restoreCanvasSnapshot = useCallback((snapshot) => {
@@ -1139,22 +1196,28 @@ export default function CardBinder() {
     const nextPages = clonePages(snapshot.pages);
     const nextPage = clamp(snapshot.currentPage, 0, nextPages.length - 1);
     const nextLayout = getLayout(snapshot.layout).id;
+    const layoutChanged = layoutIdRef.current !== nextLayout;
     pagesRef.current = nextPages;
     currentPageRef.current = nextPage;
     layoutIdRef.current = nextLayout;
     dimsRef.current = { rows: getLayout(nextLayout).rows, cols: getLayout(nextLayout).cols };
-    setPages(nextPages);
-    setCurrentPage(nextPage);
-    setSettings((value) => value.layout === nextLayout ? value : { ...value, layout: nextLayout });
-    setSelBox(null);
-    setMarqueeActive(false);
-    marqueeRef.current = null;
-    setDropPreview([]);
-    setEditing(null);
-    editingRef.current = null;
+    const renderTimer = window.setTimeout(() => {
+      setPages(nextPages);
+      setCurrentPage(nextPage);
+      if (layoutChanged) setSettings((value) => ({ ...value, layout: nextLayout }));
+      historyRestoreTimerRef.current = historyRestoreTimerRef.current.filter((timer) => timer !== renderTimer);
+    }, 0);
+    historyRestoreTimerRef.current.push(renderTimer);
+    if (selBoxRef.current) { selBoxRef.current = null; setSelBox(null); }
+    if (selectionPageIdRef.current) { selectionPageIdRef.current = null; setSelectionPageId(null); }
+    if (marqueeRef.current) { marqueeRef.current = null; setMarqueeActive(false); }
+    if (dropPreviewRef.current.length) { dropPreviewRef.current = []; setDropPreview([]); }
+    if (editingRef.current) { editingRef.current = null; setEditing(null); }
   }, []);
 
   const applyCanvasChange = useCallback((updater, options = {}) => {
+    historyRestoreTimerRef.current.forEach((timer) => window.clearTimeout(timer));
+    historyRestoreTimerRef.current = [];
     const previousPages = pagesRef.current;
     const previousPage = currentPageRef.current;
     const previousLayout = layoutIdRef.current;
@@ -1169,8 +1232,6 @@ export default function CardBinder() {
     const nextPast = [...pastRef.current, makeCanvasSnapshot(previousPages, previousPage, previousLayout)].slice(-HISTORY_LIMIT);
     pastRef.current = nextPast;
     futureRef.current = [];
-    setPast(nextPast);
-    setFuture([]);
 
     pagesRef.current = nextPages;
     currentPageRef.current = nextPage;
@@ -1214,8 +1275,6 @@ export default function CardBinder() {
     const nextFuture = [...futureRef.current, makeCanvasSnapshot(pagesRef.current, currentPageRef.current, layoutIdRef.current)].slice(-HISTORY_LIMIT);
     pastRef.current = nextPast;
     futureRef.current = nextFuture;
-    setPast(nextPast);
-    setFuture(nextFuture);
     restoreCanvasSnapshot(previous);
     return true;
   }, [commitEditing, restoreCanvasSnapshot]);
@@ -1228,8 +1287,6 @@ export default function CardBinder() {
     const nextPast = [...pastRef.current, makeCanvasSnapshot(pagesRef.current, currentPageRef.current, layoutIdRef.current)].slice(-HISTORY_LIMIT);
     pastRef.current = nextPast;
     futureRef.current = nextFuture;
-    setPast(nextPast);
-    setFuture(nextFuture);
     restoreCanvasSnapshot(next);
     return true;
   }, [commitEditing, restoreCanvasSnapshot]);
@@ -1238,16 +1295,36 @@ export default function CardBinder() {
     commitEditing();
     setCombineModeState((value) => {
       const resolved = typeof next === 'function' ? next(value) : next;
-      if (!resolved) setSelBox(null);
+      if (!resolved) { setSelBox(null); setSelectionPageId(null); }
       return resolved;
     });
   }, [commitEditing]);
 
   const switchPage = useCallback((index) => {
     commitEditing();
-    setCurrentPage((value) => clamp(typeof index === 'function' ? index(value) : index, 0, pagesRef.current.length - 1));
+    const previousPage = currentPageRef.current;
+    const nextPage = clamp(typeof index === 'function' ? index(previousPage) : index, 0, pagesRef.current.length - 1);
+    if (nextPage === previousPage) return;
+    beginPageFlip(previousPage, nextPage);
+    currentPageRef.current = nextPage;
+    setCurrentPage(nextPage);
     setSelBox(null);
-  }, [commitEditing]);
+    setSelectionPageId(null);
+  }, [beginPageFlip, commitEditing]);
+
+  const activateCanvasPage = useCallback((pageIndex) => {
+    const nextPage = clamp(pageIndex, 0, pagesRef.current.length - 1);
+    if (nextPage === currentPageRef.current) return;
+    currentPageRef.current = nextPage;
+    setCurrentPage(nextPage);
+  }, []);
+
+  const goToAdjacentSpread = useCallback((direction) => {
+    const groups = pageGroups(pagesRef.current.length);
+    const groupIndex = groups.findIndex((group) => group.includes(currentPageRef.current));
+    const nextGroup = groups[clamp(groupIndex + direction, 0, groups.length - 1)];
+    if (nextGroup) switchPage(nextGroup[0]);
+  }, [switchPage]);
 
   const placeCards = useCallback((ids, pageIndex = currentPageRef.current, startKey = null) => {
     if (!ids?.length) return;
@@ -1382,13 +1459,15 @@ export default function CardBinder() {
 
   const startSlotDrag = useCallback((event, pageId, key, imgId) => {
     commitEditing();
+    const pageIndex = pagesRef.current.findIndex((page) => page.id === pageId);
+    if (pageIndex >= 0) activateCanvasPage(pageIndex);
     const payload = { kind: 'slot', pageId, key, imgId };
     dragRef.current = payload;
     try { event.dataTransfer.setData(DRAG_MIME, JSON.stringify(payload)); } catch { /* live ref is authoritative */ }
     event.dataTransfer.effectAllowed = 'move';
     makeDragGhost(event, [imgId]);
     requestAnimationFrame(() => setDragInfo(payload));
-  }, [commitEditing, makeDragGhost]);
+  }, [commitEditing, activateCanvasPage, makeDragGhost]);
 
   const resetDrag = useCallback(() => {
     dragRef.current = null;
@@ -1405,28 +1484,29 @@ export default function CardBinder() {
     } catch { return null; }
   }, []);
 
-  const handleSlotDragOver = useCallback((event, slot) => {
+  const handleSlotDragOver = useCallback((event, slot, pageIndex = currentPageRef.current) => {
     if (combineMode || editingRef.current) return;
     const payload = dragRef.current;
     if (!payload && !hasFiles(event.dataTransfer)) return;
     event.preventDefault();
     event.stopPropagation();
     event.dataTransfer.dropEffect = payload?.kind === 'slot' ? 'move' : 'copy';
-    if (payload?.kind === 'pool') setDropPreview(planPlacement(pagesRef.current, currentPageRef.current, slot.key, payload.ids.length, dimsRef.current));
-    else setDropPreview([{ pageIndex: currentPageRef.current, key: slot.key }]);
+    if (payload?.kind === 'pool') setDropPreview(planPlacement(pagesRef.current, pageIndex, slot.key, payload.ids.length, dimsRef.current));
+    else setDropPreview([{ pageIndex, key: slot.key }]);
   }, [combineMode]);
 
-  const handleSlotDrop = useCallback(async (event, slot) => {
+  const handleSlotDrop = useCallback(async (event, slot, pageIndex = currentPageRef.current) => {
     event.preventDefault();
     event.stopPropagation();
     const payload = getPayload(event);
+    activateCanvasPage(pageIndex);
     if (hasFiles(event.dataTransfer)) {
       const ids = await addFiles(event.dataTransfer.files);
-      placeCards(ids, currentPageRef.current, slot.key);
-    } else if (payload?.kind === 'pool') placeCards(payload.ids, currentPageRef.current, slot.key);
-    else if (payload?.kind === 'slot') moveSlotCard(payload, currentPageRef.current, slot.key);
+      placeCards(ids, pageIndex, slot.key);
+    } else if (payload?.kind === 'pool') placeCards(payload.ids, pageIndex, slot.key);
+    else if (payload?.kind === 'slot') moveSlotCard(payload, pageIndex, slot.key);
     resetDrag();
-  }, [getPayload, addFiles, placeCards, moveSlotCard, resetDrag]);
+  }, [getPayload, activateCanvasPage, addFiles, placeCards, moveSlotCard, resetDrag]);
 
   const handleStageDrop = useCallback(async (event) => {
     if (combineMode || editingRef.current) return;
@@ -1462,10 +1542,12 @@ export default function CardBinder() {
     resetDrag();
   }, [getPayload, addFiles, placeCards, moveSlotCard, resetDrag]);
 
-  const performMerge = useCallback((box) => {
+  const performMerge = useCallback((box, pageIndex = currentPageRef.current) => {
     if (!box || box.rs * box.cs <= 1) return;
-    const pageId = pagesRef.current[currentPageRef.current]?.id;
+    const pageId = pagesRef.current[pageIndex]?.id;
     if (!pageId) return;
+    activateCanvasPage(pageIndex);
+    setSelectionPageId(pageId);
     let unassigned = 0;
     applyCanvasChange((value) => value.map((page) => {
       if (page.id !== pageId) return page;
@@ -1491,17 +1573,22 @@ export default function CardBinder() {
       label: 'Undo',
       onClick: undoAction,
     });
-  }, [applyCanvasChange, notify, undoAction]);
+  }, [activateCanvasPage, applyCanvasChange, notify, undoAction]);
 
-  const selectedMerges = useMemo(() => selBox ? activeMerges(current, dims).filter((merge) => boxesIntersect(merge, selBox)) : [], [selBox, current, dims]);
-  const exactMerge = useMemo(() => activeMerges(current, dims).some((merge) => sameBox(merge, selBox)), [current, dims, selBox]);
+  const selectionPageIndex = selectionPageId ? pages.findIndex((page) => page.id === selectionPageId) : currentPage;
+  const selectionPage = pages[selectionPageIndex] || current;
+  const selectedMerges = useMemo(() => selBox ? activeMerges(selectionPage, dims).filter((merge) => boxesIntersect(merge, selBox)) : [], [selBox, selectionPage, dims]);
+  const exactMerge = useMemo(() => activeMerges(selectionPage, dims).some((merge) => sameBox(merge, selBox)), [selectionPage, dims, selBox]);
   const canMerge = Boolean(combineMode && selBox && selBox.rs * selBox.cs > 1 && !exactMerge);
 
-  const unmergeById = useCallback((mergeId) => {
-    const page = pagesRef.current[currentPageRef.current];
+  const unmergeById = useCallback((mergeId, pageIndex = currentPageRef.current) => {
+    const page = pagesRef.current[pageIndex];
+    if (!page) return;
     const merge = activeMerges(page, dimsRef.current).find((item) => item.id === mergeId);
     if (!merge) return;
+    activateCanvasPage(pageIndex);
     const pageId = page.id;
+    setSelectionPageId(pageId);
     const snapshot = { ...merge };
 
     applyCanvasChange((value) => value.map((item) => (
@@ -1517,12 +1604,14 @@ export default function CardBinder() {
         undoAction();
       },
     });
-  }, [applyCanvasChange, notify, undoAction]);
+  }, [activateCanvasPage, applyCanvasChange, notify, undoAction]);
 
-  const unmergeBox = useCallback((box = selBox) => {
+  const unmergeBox = useCallback((box = selBox, pageIndex = selectionPageIndex) => {
     if (!box) return;
     let count = 0;
-    const pageId = pagesRef.current[currentPageRef.current]?.id;
+    const pageId = pagesRef.current[pageIndex]?.id;
+    if (!pageId) return;
+    activateCanvasPage(pageIndex);
     applyCanvasChange((value) => value.map((page) => {
       if (page.id !== pageId) return page;
       const merges = page.merges.filter((merge) => {
@@ -1533,30 +1622,34 @@ export default function CardBinder() {
       return { ...page, merges };
     }));
     setSelBox(null);
+    setSelectionPageId(null);
     requestAnimationFrame(() => { if (count) notify(`${plural(count, 'frame')} split into slots.`, 'info'); });
-  }, [selBox, applyCanvasChange, notify]);
+  }, [selBox, selectionPageIndex, activateCanvasPage, applyCanvasChange, notify]);
 
-  const beginMarquee = useCallback((event, slot, isEmpty) => {
+  const beginMarquee = useCallback((event, slot, isEmpty, page, pageIndex) => {
     if (event.button !== 0 || editingRef.current || dragRef.current || suppressClickRef.current || performance.now() < slotActionGuardRef.current) return;
     if (!combineMode && !isEmpty) return;
+    activateCanvasPage(pageIndex);
+    setSelectionPageId(page.id);
     const quick = !combineMode && isEmpty;
-    marqueeRef.current = { start: slotBox(slot.r, slot.c), current: slotBox(slot.r, slot.c), box: slotBox(slot.r, slot.c), quick, moved: false, pointerId: event.pointerId };
+    marqueeRef.current = { start: slotBox(slot.r, slot.c), current: slotBox(slot.r, slot.c), box: slotBox(slot.r, slot.c), quick, moved: false, pointerId: event.pointerId, pageIndex, pageId: page.id };
     setMarqueeActive(true);
     event.currentTarget.setPointerCapture?.(event.pointerId);
-    if (combineMode) setSelBox(expandBox(slotBox(slot.r, slot.c), activeMerges(current, dims)));
-  }, [combineMode, current, dims]);
+    if (combineMode) setSelBox(expandBox(slotBox(slot.r, slot.c), activeMerges(page, dimsRef.current)));
+  }, [combineMode, activateCanvasPage]);
 
   const moveMarquee = useCallback((event) => {
     const state = marqueeRef.current;
     if (!state) return;
     const target = document.elementFromPoint(event.clientX, event.clientY)?.closest?.('[data-key][data-r][data-c]');
-    if (!target || !stageRef.current?.contains(target)) return;
+    const targetCanvas = target?.closest?.('[data-canvas]');
+    if (!target || !stageRef.current?.contains(target) || Number(targetCanvas?.dataset.pageIndex) !== state.pageIndex) return;
     const next = slotBox(Number(target.dataset.r), Number(target.dataset.c));
     const moved = next.r !== state.start.r || next.c !== state.start.c;
     state.current = next;
     state.moved = state.moved || moved;
     if (state.moved) {
-      const expanded = expandBox(unionBox(state.start, next), activeMerges(pagesRef.current[currentPageRef.current], dimsRef.current));
+      const expanded = expandBox(unionBox(state.start, next), activeMerges(pagesRef.current[state.pageIndex], dimsRef.current));
       state.box = expanded;
       setSelBox(expanded);
     }
@@ -1572,9 +1665,10 @@ export default function CardBinder() {
       window.setTimeout(() => { suppressClickRef.current = false; }, 0);
     }
     if (state.quick && state.moved && state.box && state.box.rs * state.box.cs > 1) {
-      performMerge(state.box);
+      performMerge(state.box, state.pageIndex);
     } else if (state.quick) {
       setSelBox(null);
+      setSelectionPageId(null);
     }
   }, [performMerge]);
 
@@ -1665,6 +1759,7 @@ export default function CardBinder() {
     if (layoutId === settings.layout) return;
     commitEditing();
     setSelBox(null);
+    setSelectionPageId(null);
     const nextLayout = getLayout(layoutId);
     const nextDims = { rows: nextLayout.rows, cols: nextLayout.cols };
     applyCanvasChange((value) => value, { layout: layoutId });
@@ -1707,7 +1802,7 @@ export default function CardBinder() {
     localStorage.removeItem(STORAGE_KEY);
     objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
     objectUrlsRef.current.clear();
-    const nextPages = [emptyPage()];
+    const nextPages = emptyPages();
     pagesRef.current = nextPages;
     currentPageRef.current = 0;
     layoutIdRef.current = DEFAULT_LAYOUT;
@@ -1716,6 +1811,8 @@ export default function CardBinder() {
     setPool([]);
     setImages({});
     setSelected([]);
+    setSelBox(null);
+    setSelectionPageId(null);
     setSettings(sanitizeSettings());
     setCurrentPage(0);
     setOpenPanel(null);
@@ -1726,6 +1823,7 @@ export default function CardBinder() {
     commitEditing();
     applyCanvasChange((value) => [...value, emptyPage()], { currentPage: pagesRef.current.length });
     setSelBox(null);
+    setSelectionPageId(null);
   }, [commitEditing, applyCanvasChange]);
 
   const duplicatePage = useCallback(() => {
@@ -1747,23 +1845,28 @@ export default function CardBinder() {
     const nextPage = Math.max(0, Math.min(pageIndex, pagesRef.current.length - 2));
     applyCanvasChange((value) => value.filter((_, index) => index !== pageIndex), { currentPage: nextPage });
     setSelBox(null);
+    setSelectionPageId(null);
   }, [commitEditing, applyCanvasChange]);
 
-  const clearPage = useCallback(() => {
-    const page = pagesRef.current[currentPageRef.current];
-    if (!Object.keys(page.slots).length) return;
-    if (!window.confirm(`Clear every card from page ${currentPageRef.current + 1}? Cards remain in the pool.`)) return;
+  const clearPage = useCallback((pageIndex = currentPageRef.current) => {
+    const page = pagesRef.current[pageIndex];
+    if (!page || !Object.keys(page.slots).length) return;
+    if (!window.confirm(`Clear every card from page ${pageIndex + 1}? Cards remain in the pool.`)) return;
     commitEditing();
+    activateCanvasPage(pageIndex);
     applyCanvasChange((value) => value.map((item) => item.id === page.id ? { ...item, slots: {}, crops: {} } : item));
     notify('Page cleared. Cards remain in the pool.', 'info');
-  }, [commitEditing, applyCanvasChange, notify]);
+  }, [commitEditing, activateCanvasPage, applyCanvasChange, notify]);
 
-  const resetLayout = useCallback(() => {
-    const pageId = pagesRef.current[currentPageRef.current].id;
+  const resetLayout = useCallback((pageIndex = currentPageRef.current) => {
+    const pageId = pagesRef.current[pageIndex]?.id;
+    if (!pageId) return;
+    activateCanvasPage(pageIndex);
     applyCanvasChange((value) => value.map((page) => page.id === pageId ? { ...page, merges: [] } : page));
     setSelBox(null);
+    setSelectionPageId(null);
     notify('Merged frames reset.', 'info');
-  }, [applyCanvasChange, notify]);
+  }, [activateCanvasPage, applyCanvasChange, notify]);
 
   const onPoolClick = useCallback((event, visibleIndex) => {
     const item = visiblePool[visibleIndex];
@@ -1817,24 +1920,24 @@ export default function CardBinder() {
       }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') { event.preventDefault(); selectAllVisible(); return; }
       if (event.key === 'Escape') {
-        if (marqueeRef.current) { marqueeRef.current = null; setMarqueeActive(false); setSelBox(null); }
+        if (marqueeRef.current) { marqueeRef.current = null; setMarqueeActive(false); setSelBox(null); setSelectionPageId(null); }
         else if (openPanel) setOpenPanel(null);
-        else if (selBox) setSelBox(null);
+        else if (selBox) { setSelBox(null); setSelectionPageId(null); }
         else if (combineMode) setCombineMode(false);
         else if (selected.length) setSelected([]);
         return;
       }
       if (event.key === 'Delete' || event.key === 'Backspace') { if (selected.length) { event.preventDefault(); deleteImages(selected); } return; }
       if (event.key.toLowerCase() === 'm') { event.preventDefault(); setCombineMode((state) => !state); return; }
-      if (event.key === 'Enter' && canMerge) { event.preventDefault(); performMerge(selBox); return; }
+      if (event.key === 'Enter' && canMerge) { event.preventDefault(); performMerge(selBox, selectionPageIndex); return; }
       if (event.key.toLowerCase() === 'u' && selectedMerges.length) { event.preventDefault(); unmergeBox(); return; }
       if (event.key.toLowerCase() === 'f' && selected.length) { event.preventDefault(); fillSelection(); return; }
-      if (event.key === 'ArrowLeft' || event.key === 'PageUp') { event.preventDefault(); switchPage((index) => index - 1); return; }
-      if (event.key === 'ArrowRight' || event.key === 'PageDown') { event.preventDefault(); switchPage((index) => index + 1); }
+      if (event.key === 'ArrowLeft' || event.key === 'PageUp') { event.preventDefault(); goToAdjacentSpread(-1); return; }
+      if (event.key === 'ArrowRight' || event.key === 'PageDown') { event.preventDefault(); goToAdjacentSpread(1); }
     };
     window.addEventListener('keydown', keydown);
     return () => window.removeEventListener('keydown', keydown);
-  }, [undoAction, redoAction, cancelEditing, commitEditing, selectAllVisible, openPanel, selBox, combineMode, selected, deleteImages, setCombineMode, canMerge, performMerge, selectedMerges.length, unmergeBox, fillSelection, switchPage]);
+  }, [undoAction, redoAction, cancelEditing, commitEditing, selectAllVisible, openPanel, selBox, combineMode, selected, deleteImages, setCombineMode, canMerge, performMerge, selectionPageIndex, selectedMerges.length, unmergeBox, fillSelection, goToAdjacentSpread]);
 
   useEffect(() => {
     if (!openPanel) return undefined;
@@ -1848,24 +1951,23 @@ export default function CardBinder() {
 
   const frameWIn = settings.view === 'paper' ? paper.wIn : gridW + SHEET_PAD.left + SHEET_PAD.right;
   const frameHIn = settings.view === 'paper' ? paper.hIn : gridH + SHEET_PAD.top + SHEET_PAD.bottom;
-  const ppi = Math.max(12, Math.min((stageSize.w - 64) / frameWIn, (stageSize.h - 136) / frameHIn));
+  const spineGap = 4;
+  const pageAreaWidth = Math.max(160, (stageSize.w - 80 - spineGap) / 2);
+  const ppi = Math.max(12, Math.min(pageAreaWidth / frameWIn, (stageSize.h - 136) / frameHIn));
   const gridPpi = settings.view === 'paper' ? ppi * printFit : ppi;
   const frameWidth = frameWIn * ppi;
   const frameHeight = frameHIn * ppi;
-  const gridWidthPx = gridW * gridPpi;
-  const gridHeightPx = gridH * gridPpi;
+  const spreadWidth = frameWidth * 2 + spineGap;
   const helperOffsetX = settings.view === 'binder' ? ((SHEET_PAD.left - SHEET_PAD.right) / 2) * ppi : 0;
-  const currentSlots = getSlots(current, dims);
-  const filled = currentSlots.filter((slot) => current.slots[slot.key]).length;
-  const currentMerges = activeMerges(current, dims);
   const multiFlow = dragInfo?.kind === 'pool' && dragInfo.ids.length > 1 ? Math.max(0, planPlacement(pages, currentPage, null, dragInfo.ids.length, dims).filter((target) => target.pageIndex > currentPage).length) : 0;
 
-  const renderEditorSlot = (slot, slotIndex) => {
-    const imgId = current.slots[slot.key];
+  const renderEditorSlot = (page, pageIndex, slot, slotIndex) => {
+    const imgId = page.slots[slot.key];
     const source = images[imgId] || pool.find((item) => item.id === imgId)?.src;
-    const crop = imgId ? getCrop(current, slot.key, imgId) : { x: 50, y: 50 };
-    const isEditing = editing?.pageId === current.id && editing.key === slot.key && editing.imgId === imgId;
-    const previewIndex = dropPreview.findIndex((target) => target.pageIndex === currentPage && target.key === slot.key);
+    const crop = imgId ? getCrop(page, slot.key, imgId) : { x: 50, y: 50 };
+    const isEditing = editing?.pageId === page.id && editing.key === slot.key && editing.imgId === imgId;
+    const previewIndex = dropPreview.findIndex((target) => target.pageIndex === pageIndex && target.key === slot.key);
+    const pageMerges = activeMerges(page, dims);
     const radius = Math.max(settings.view === 'binder' ? 3 : 1, gridPpi * (settings.view === 'binder' ? 0.09 : 0.04));
     const frameW = spanW(slot.cs, settings.gap, card);
     const frameH = spanH(slot.rs, settings.gap, card);
@@ -1892,7 +1994,7 @@ export default function CardBinder() {
             aria-label={`Unmerge ${boxDims(slot)} frame`}
             title={`Unmerge ${boxDims(slot)} frame`}
             onPointerDown={stopSlotAction}
-            onClick={(event) => activateSlotAction(event, () => unmergeById(slot.mergeId))}
+            onClick={(event) => activateSlotAction(event, () => unmergeById(slot.mergeId, pageIndex))}
             onDoubleClick={stopSlotAction}
             className="grid size-6 place-items-center rounded-md bg-black/70 text-zinc-200 ring-1 ring-white/20 backdrop-blur transition-colors hover:bg-red-600 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
           >
@@ -1906,7 +2008,7 @@ export default function CardBinder() {
             aria-label="Remove card"
             title="Remove card"
             onPointerDown={stopSlotAction}
-            onClick={(event) => activateSlotAction(event, () => removeSlotCard(current.id, slot.key))}
+            onClick={(event) => activateSlotAction(event, () => { activateCanvasPage(pageIndex); removeSlotCard(page.id, slot.key); })}
             onDoubleClick={stopSlotAction}
             className="grid size-6 place-items-center rounded-md bg-black/70 text-zinc-200 ring-1 ring-white/20 backdrop-blur transition-colors hover:bg-red-500 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
           >
@@ -1921,11 +2023,12 @@ export default function CardBinder() {
         <div className="group/slot relative size-full">
           <button
             type="button"
-            onPointerDown={(event) => beginMarquee(event, slot, true)}
+            onPointerDown={(event) => beginMarquee(event, slot, true, page, pageIndex)}
             onClick={() => {
               if (suppressClickRef.current || performance.now() < slotActionGuardRef.current) return;
-              if (combineMode) { setSelBox(expandBox(mergeBox(slot), currentMerges)); return; }
-              if (selectedOrdered.length) placeCards(selectedOrdered, currentPage, slot.key);
+              activateCanvasPage(pageIndex);
+              if (combineMode) { setSelectionPageId(page.id); setSelBox(expandBox(mergeBox(slot), pageMerges)); return; }
+              if (selectedOrdered.length) placeCards(selectedOrdered, pageIndex, slot.key);
             }}
             className={`group grid size-full cursor-pointer place-items-center overflow-hidden border border-dashed outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-red-500 hover:border-red-500 hover:bg-red-950/10 ${settings.view === 'binder' ? 'border-zinc-500/80 bg-black/45 text-zinc-200 shadow-[inset_0_0_20px_rgba(0,0,0,0.5)] hover:text-red-100' : 'border-zinc-400 bg-white/30 text-zinc-700 hover:text-red-800'} ${previewIndex >= 0 ? '!border-red-500 !bg-red-950/20 !shadow-[inset_0_0_0_2px_rgba(239,68,68,0.25),0_0_20px_rgba(220,38,38,0.18)]' : ''}`}
             style={{ borderRadius: radius }}
@@ -1942,19 +2045,21 @@ export default function CardBinder() {
       <div
         data-editing-slot={isEditing ? '' : undefined}
         draggable={!combineMode && !editing}
-        onDragStart={(event) => startSlotDrag(event, current.id, slot.key, imgId)}
+        onDragStart={(event) => startSlotDrag(event, page.id, slot.key, imgId)}
         onDragEnd={resetDrag}
-        onPointerDown={(event) => isEditing ? beginPan(event) : beginMarquee(event, slot, false)}
+        onPointerDown={(event) => isEditing ? beginPan(event) : beginMarquee(event, slot, false, page, pageIndex)}
         onPointerMove={isEditing ? movePan : undefined}
         onPointerUp={isEditing ? endPan : undefined}
         onPointerCancel={isEditing ? endPan : undefined}
         onDoubleClick={(event) => {
           if (performance.now() < slotActionGuardRef.current) { event.stopPropagation(); return; }
-          startReposition(event, current, slot, imgId);
+          activateCanvasPage(pageIndex);
+          startReposition(event, page, slot, imgId);
         }}
         onClick={() => {
           if (suppressClickRef.current || performance.now() < slotActionGuardRef.current) return;
-          if (combineMode) setSelBox(expandBox(mergeBox(slot), currentMerges));
+          activateCanvasPage(pageIndex);
+          if (combineMode) { setSelectionPageId(page.id); setSelBox(expandBox(mergeBox(slot), pageMerges)); }
         }}
         className={`group group/slot relative size-full ${!combineMode && !editing ? 'cursor-grab active:cursor-grabbing' : ''}`}
       >
@@ -1993,13 +2098,13 @@ export default function CardBinder() {
     );
   };
 
-  const slotDropProps = (slot) => ({
-    onDragOver: (event) => handleSlotDragOver(event, slot),
+  const slotDropProps = (pageIndex) => (slot) => ({
+    onDragOver: (event) => handleSlotDragOver(event, slot, pageIndex),
     onDragLeave: (event) => { if (!event.currentTarget.contains(event.relatedTarget)) setDropPreview([]); },
-    onDrop: (event) => handleSlotDrop(event, slot),
+    onDrop: (event) => handleSlotDrop(event, slot, pageIndex),
   });
 
-  const selectionOverlay = selBox && (
+  const renderSelectionOverlay = (page) => selectionPageId === page.id && selBox && (
     <div
       className="slot-area pointer-events-none z-50 grid place-items-center rounded-lg border-2 border-red-600 bg-red-950/50 shadow-[inset_0_0_0_1px_rgba(255,255,255,.12)]"
       style={{ '--col-start': selBox.c + 1, '--col-span': selBox.cs, '--row-start': selBox.r + 1, '--row-span': selBox.rs }}
@@ -2010,26 +2115,27 @@ export default function CardBinder() {
     </div>
   );
 
-  const editorGrid = (
-    <SheetGrid page={current} card={card} gap={settings.gap} unit={`${gridPpi}px`} dims={dims} animate renderSlot={renderEditorSlot} getSlotProps={slotDropProps}>
-      {selectionOverlay}
+  const renderEditorGrid = (page, pageIndex) => (
+    <SheetGrid page={page} card={card} gap={settings.gap} unit={`${gridPpi}px`} dims={dims} animate renderSlot={(slot, slotIndex) => renderEditorSlot(page, pageIndex, slot, slotIndex)} getSlotProps={slotDropProps(pageIndex)}>
+      {renderSelectionOverlay(page)}
     </SheetGrid>
   );
 
-  const renderThumbnail = (page, pageIndex) => {
+  const renderThumbnailLeaf = (page, pageIndex) => {
     const unit = Math.min((THUMB_BOX.w - THUMB_BOX.pad * 2) / gridW, (THUMB_BOX.h - THUMB_BOX.pad * 2) / gridH);
+    const active = pageIndex === currentPage;
     return (
       <button
         key={page.id}
         type="button"
         aria-label={`Page ${pageIndex + 1}`}
-        aria-current={pageIndex === currentPage ? 'page' : undefined}
+        aria-current={active ? 'page' : undefined}
         onClick={() => switchPage(pageIndex)}
         onDragOver={(event) => { if (dragRef.current || hasFiles(event.dataTransfer)) { event.preventDefault(); event.dataTransfer.dropEffect = dragRef.current?.kind === 'slot' ? 'move' : 'copy'; } }}
         onDrop={(event) => handleThumbDrop(event, pageIndex)}
-        className={`group relative flex w-[82px] shrink-0 flex-col items-center justify-start gap-1 bg-transparent py-1 text-zinc-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${pageIndex === currentPage ? 'text-red-400' : 'hover:text-zinc-100'}`}
+        className="group shrink-0 bg-transparent p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
       >
-        <div className={`grid aspect-[1/1.414] w-14 place-items-center overflow-hidden rounded-md border bg-[#0B0B0C] transition-colors ${pageIndex === currentPage ? 'border-red-700 ring-1 ring-red-950/70' : 'border-zinc-800 group-hover:border-zinc-600'}`}>
+        <div className={`grid aspect-[1/1.414] w-14 place-items-center overflow-hidden rounded-md border bg-[#0B0B0C] transition-colors ${active ? 'border-red-600 ring-1 ring-red-950/70' : 'border-zinc-800 group-hover:border-red-600/50'}`}>
           <SheetGrid page={page} card={card} gap={settings.gap} unit={`${unit}px`} dims={dims} renderSlot={(slot) => {
             const id = page.slots[slot.key];
             const src = images[id] || pool.find((item) => item.id === id)?.src;
@@ -2037,9 +2143,79 @@ export default function CardBinder() {
             return <div className="size-full overflow-hidden border border-zinc-800 bg-zinc-900">{src && <img src={src} alt="" className="size-full" style={{ objectFit: settings.fit, objectPosition: `${crop.x}% ${crop.y}%` }} />}</div>;
           }} />
         </div>
-        <span className="text-[10px] font-medium whitespace-nowrap">Page {pageIndex + 1}</span>
-        {pageIndex === currentPage && <span aria-hidden="true" className="absolute inset-x-5 bottom-0 h-0.5 rounded-full bg-red-600" />}
       </button>
+    );
+  };
+
+  const renderThumbnailGroup = (group) => {
+    const active = group.includes(currentPage);
+    const label = group.length === 1 ? `Page ${group[0] + 1}` : `Pages ${group[0] + 1}–${group[1] + 1}`;
+    return (
+      <div key={group.join('-')} data-page-group={group.map((index) => index + 1).join('-')} className={`relative flex shrink-0 flex-col items-center gap-1 pb-1 text-[10px] font-medium whitespace-nowrap ${active ? 'text-red-400' : 'text-zinc-500'}`}>
+        <div className="flex items-center gap-0.5">{group.map((pageIndex) => renderThumbnailLeaf(pages[pageIndex], pageIndex))}</div>
+        <span>{label}</span>
+        {active && <span aria-hidden="true" className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-red-600" />}
+      </div>
+    );
+  };
+
+  const renderCanvasLeaf = (pageIndex) => {
+    const page = pages[pageIndex];
+    if (!page) return null;
+    const side = pageSide(pageIndex, pages.length);
+    const pageSelBox = selectionPageId === page.id ? selBox : null;
+    const pageMerges = activeMerges(page, dims);
+    const pageSelectedMerges = pageSelBox ? pageMerges.filter((merge) => boxesIntersect(merge, pageSelBox)) : [];
+    const pageExactMerge = pageMerges.some((merge) => sameBox(merge, pageSelBox));
+    const pageCanMerge = Boolean(combineMode && pageSelBox && pageSelBox.rs * pageSelBox.cs > 1 && !pageExactMerge);
+    const pageSlots = getSlots(page, dims);
+    const pageFilled = pageSlots.filter((slot) => page.slots[slot.key]).length;
+    const foldedRotation = side === 'left'
+      ? (pageFlip.direction > 0 ? '90deg' : '-90deg')
+      : (pageFlip.direction > 0 ? '-90deg' : '90deg');
+    const pageRotation = pageFlip.folded ? foldedRotation : '0deg';
+    const originClass = side === 'left' ? 'origin-right' : 'origin-left';
+    return (
+      <div
+        key={page.id}
+        data-canvas
+        data-page-index={pageIndex}
+        data-page-side={side}
+        className={`relative transition-transform duration-500 ease-in-out [backface-visibility:hidden] [transform-style:preserve-3d] will-change-transform ${originClass} ${pageFlip.animating ? 'pointer-events-none' : ''}`}
+        style={{ transform: `rotateY(${pageRotation}) translateZ(0)`, width: frameWidth, height: frameHeight, gridColumn: side === 'left' ? 1 : 2 }}
+      >
+        <CanvasToolbar
+          combineMode={combineMode}
+          setCombineMode={(next) => { activateCanvasPage(pageIndex); setCombineMode(next); }}
+          selBox={pageSelBox}
+          canMerge={pageCanMerge}
+          mergeLabel={`Merge ${pageSelBox ? boxDims(pageSelBox) : ''}`}
+          onMerge={() => performMerge(pageSelBox, pageIndex)}
+          selectedMergeCount={pageSelectedMerges.length}
+          onUnmerge={() => unmergeBox(pageSelBox, pageIndex)}
+          onResetLayout={() => resetLayout(pageIndex)}
+          onClearPage={() => clearPage(pageIndex)}
+          filled={pageFilled}
+          total={layout.pockets}
+          mergedCount={pageMerges.length}
+          layout={layout}
+        />
+        {settings.view === 'binder' ? (
+          <div
+            className="sheet-frame relative flex size-full items-start justify-start overflow-hidden rounded-2xl bg-gradient-to-br from-[#1A1A1D] via-[#121214] to-[#0B0B0C] ring-1 ring-red-950/40 shadow-[0_28px_80px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.06)]"
+            style={{ paddingTop: SHEET_PAD.top * ppi, paddingRight: (side === 'left' ? SHEET_PAD.left : SHEET_PAD.right) * ppi, paddingBottom: SHEET_PAD.bottom * ppi, paddingLeft: (side === 'left' ? SHEET_PAD.right : SHEET_PAD.left) * ppi }}
+          >
+            {[0.17, 0.5, 0.83].map((position) => <span key={position} aria-hidden="true" className={`absolute size-3 -translate-y-1/2 rounded-full bg-zinc-950 ring-1 ring-black shadow-[inset_0_0_3px_black,0_1px_0_rgba(255,255,255,.15)] ${side === 'left' ? 'translate-x-1/2' : '-translate-x-1/2'}`} style={{ [side === 'left' ? 'right' : 'left']: (SHEET_PAD.left * ppi) / 2, top: `${position * 100}%` }} />)}
+            {renderEditorGrid(page, pageIndex)}
+          </div>
+        ) : (
+          <div className="sheet-frame relative grid size-full place-items-center overflow-hidden bg-[#f4f4f5] shadow-[0_25px_70px_rgba(0,0,0,0.45)] ring-1 ring-black/20">
+            <span aria-hidden="true" className="pointer-events-none absolute border border-dashed border-zinc-400" style={{ inset: PRINT_SAFE_MARGIN_IN * ppi }} />
+            {renderEditorGrid(page, pageIndex)}
+          </div>
+        )}
+        {pageIndex === currentPage && <CanvasHelper editing={editing} multiDrag={dragInfo?.kind === 'pool' ? dragInfo.ids.length : 0} flowCount={multiFlow} combineMode={combineMode} settings={settings} paper={paper} card={card} printFit={printFit} offsetX={side === 'left' ? -helperOffsetX : helperOffsetX} onCenter={() => { const value = editingRef.current; if (value) { const next = { ...value, x: 50, y: 50 }; editingRef.current = next; setEditing(next); } }} onCancel={cancelEditing} onDone={commitEditing} />}
+      </div>
     );
   };
 
@@ -2071,10 +2247,11 @@ export default function CardBinder() {
       <div className="app-shell flex flex-col bg-[#0B0B0C] text-zinc-200">
         <div ref={panelRootRef}>
           <AppBar
-            currentPage={currentPage}
-            pageCount={pages.length}
-            onPrevious={() => switchPage((index) => index - 1)}
-            onNext={() => switchPage((index) => index + 1)}
+            pageLabel={activeSpread.length === 1 ? `Page ${activeSpread[0] + 1} / ${pages.length}` : `Pages ${activeSpread[0] + 1}–${activeSpread[1] + 1} / ${pages.length}`}
+            canPrevious={activeSpreadIndex > 0}
+            canNext={activeSpreadIndex < spreadGroups.length - 1}
+            onPrevious={() => goToAdjacentSpread(-1)}
+            onNext={() => goToAdjacentSpread(1)}
             onAdd={addPage}
             onDuplicate={duplicatePage}
             onDelete={deletePage}
@@ -2126,50 +2303,25 @@ export default function CardBinder() {
           <main className="flex min-w-0 flex-1 flex-col">
             <div
               ref={stageRef}
-              className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-[#0B0B0C] bg-[radial-gradient(circle_at_center,rgba(220,38,38,0.055),transparent_52%)]"
+              className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-[#0B0B0C] bg-[radial-gradient(circle_at_center,rgba(220,38,38,0.055),transparent_52%)] [perspective:1500px]"
               onPointerMove={moveMarquee}
-              onPointerDown={(event) => { if (event.target === event.currentTarget && combineMode) setSelBox(null); }}
+              onPointerDown={(event) => { if (event.target === event.currentTarget && combineMode) { setSelBox(null); setSelectionPageId(null); } }}
               onDragOver={(event) => { if (!combineMode && (dragRef.current?.kind === 'pool' || hasFiles(event.dataTransfer))) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; } }}
               onDrop={handleStageDrop}
             >
-              <div data-canvas className="relative" style={{ width: frameWidth, height: frameHeight }}>
-                <CanvasToolbar
-                  combineMode={combineMode}
-                  setCombineMode={setCombineMode}
-                  selBox={selBox}
-                  canMerge={canMerge}
-                  mergeLabel={`Merge ${selBox ? boxDims(selBox) : ''}`}
-                  onMerge={() => performMerge(selBox)}
-                  selectedMergeCount={selectedMerges.length}
-                  onUnmerge={() => unmergeBox()}
-                  onResetLayout={resetLayout}
-                  onClearPage={clearPage}
-                  filled={filled}
-                  total={layout.pockets}
-                  mergedCount={currentMerges.length}
-                  layout={layout}
-                />
-                {settings.view === 'binder' ? (
-                  <div
-                    className="sheet-frame relative flex size-full items-start justify-start rounded-2xl bg-gradient-to-br from-[#1A1A1D] via-[#121214] to-[#0B0B0C] ring-1 ring-red-950/40 shadow-[0_28px_80px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.06)]"
-                    style={{ paddingTop: SHEET_PAD.top * ppi, paddingRight: SHEET_PAD.right * ppi, paddingBottom: SHEET_PAD.bottom * ppi, paddingLeft: SHEET_PAD.left * ppi }}
-                  >
-                    {[0.17, 0.5, 0.83].map((position) => <span key={position} aria-hidden="true" className="absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-zinc-950 ring-1 ring-black shadow-[inset_0_0_3px_black,0_1px_0_rgba(255,255,255,.15)]" style={{ left: (SHEET_PAD.left * ppi) / 2, top: `${position * 100}%` }} />)}
-                    {editorGrid}
-                  </div>
-                ) : (
-                  <div className="sheet-frame relative grid size-full place-items-center bg-[#f4f4f5] shadow-[0_25px_70px_rgba(0,0,0,0.45)] ring-1 ring-black/20">
-                    <span aria-hidden="true" className="pointer-events-none absolute border border-dashed border-zinc-400" style={{ inset: PRINT_SAFE_MARGIN_IN * ppi }} />
-                    {editorGrid}
-                  </div>
-                )}
-                <CanvasHelper editing={editing} multiDrag={dragInfo?.kind === 'pool' ? dragInfo.ids.length : 0} flowCount={multiFlow} combineMode={combineMode} settings={settings} paper={paper} card={card} printFit={printFit} offsetX={helperOffsetX} onCenter={() => { const value = editingRef.current; if (value) { const next = { ...value, x: 50, y: 50 }; editingRef.current = next; setEditing(next); } }} onCancel={cancelEditing} onDone={commitEditing} />
+              <div
+                data-spread
+                className="relative grid grid-cols-2 [transform-style:preserve-3d]"
+                style={{ width: spreadWidth, height: frameHeight, columnGap: spineGap }}
+              >
+                {activeSpread.length === 2 && <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-1/2 z-30 w-px -translate-x-1/2 bg-black/90 shadow-[-12px_0_20px_-8px_rgba(0,0,0,0.9),12px_0_20px_-8px_rgba(0,0,0,0.9)]" />}
+                {activeSpread.map(renderCanvasLeaf)}
               </div>
             </div>
             <footer data-page-tray className="no-print scroll-area shrink-0 overflow-x-auto border-t border-zinc-800 bg-zinc-900/40 py-4">
-              <div data-page-tray-inner className="mx-auto flex w-max items-center gap-2 pr-4" style={{ paddingLeft: `calc(1rem + ${2 * helperOffsetX}px)` }}>
-                {pages.map(renderThumbnail)}
-                <div className="flex w-[82px] shrink-0 flex-col items-center justify-start gap-1 py-1">
+              <div data-page-tray-inner className="mx-auto flex w-max items-end gap-3 px-4">
+                {spreadGroups.map(renderThumbnailGroup)}
+                <div className="flex shrink-0 flex-col items-center justify-start gap-1 pb-1">
                   <button type="button" onClick={addPage} aria-label="Add page" className="flex aspect-[1/1.414] w-14 shrink-0 items-center justify-center border border-dashed border-zinc-800 text-zinc-500 transition-colors hover:border-red-600/40 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="plus" size="lg" /></button>
                   <span className="text-[10px] font-medium whitespace-nowrap text-zinc-500">Add page</span>
                 </div>
