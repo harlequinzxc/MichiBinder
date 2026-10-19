@@ -683,33 +683,35 @@ function AppBar({
   shortcuts,
 }) {
   return (
-    <header className="titlebar no-print grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center border-b border-white/5 bg-neutral-950/95 px-4 py-2.5 shadow-[0_1px_0_rgba(255,255,255,0.02)] backdrop-blur-xl">
-      <div className="flex min-w-0 items-center gap-3">
-        <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-lg border border-white/5 bg-neutral-900 shadow-lg shadow-black/40"><img src="/icons/icon.svg" alt="" className="size-9" /></span>
+    <header className="titlebar no-print flex items-center justify-between border-b border-white/[0.06] bg-neutral-900/80 px-6 py-2.5 shadow-[0_1px_0_rgba(255,255,255,0.02)] backdrop-blur-md">
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-lg border border-white/[0.06] bg-neutral-900 shadow-lg shadow-black/40"><img src="/icons/icon.svg" alt="" className="size-9" /></span>
         <div className="flex min-w-0 items-baseline gap-3">
           <h1 className="shrink-0 text-[15px] font-semibold tracking-tight text-white">Digital Card Binder</h1>
           <SaveStatus status={saveStatus} storageMode={storageMode} />
         </div>
-      </div>
-
-      <nav aria-label="Pages" className="relative z-20 flex items-center justify-center">
-        <div className="flex h-8 items-center rounded-full border border-white/10 bg-neutral-900/90 p-0.5 shadow-inner shadow-black/30">
-          <button type="button" aria-label="Previous page" title="Previous spread" onClick={onPrevious} disabled={!canPrevious} className="grid size-7 place-items-center rounded-full text-neutral-300 transition-colors hover:bg-white/10 hover:text-white disabled:text-neutral-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="chevronLeft" size="sm" /></button>
-          <span className="min-w-[112px] px-2 text-center text-[12px] font-medium tracking-wide text-neutral-200">{pageLabel}</span>
-          <button type="button" aria-label="Next page" title="Next spread" onClick={onNext} disabled={!canNext} className="grid size-7 place-items-center rounded-full text-neutral-300 transition-colors hover:bg-white/10 hover:text-white disabled:text-neutral-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="chevronRight" size="sm" /></button>
-        </div>
-        <span aria-label="Page actions" className="absolute left-full ml-3 flex shrink-0 items-center gap-1">
-          <ToolButton icon="plus" label="Add Page" onClick={onAdd} title="Insert a new two-page physical sheet" className="max-[1420px]:[&>span]:hidden" />
+        <ToolbarDivider />
+        <div aria-label="Page actions" className="flex shrink-0 items-center gap-1">
+          <ToolButton icon="plus" label="Add Page" variant="primary" onClick={onAdd} title="Insert a new two-page physical sheet" className="max-[1420px]:[&>span]:hidden" />
           <ToolButton icon="copy" onClick={onDuplicate} title="Duplicate physical sheet" />
           <ToolButton icon="trash" label="Delete" variant="danger" onClick={onDelete} disabled={!canDelete} disabledReason="Keep at least one physical sheet" className="max-[1540px]:[&>span]:hidden" />
-        </span>
+        </div>
+      </div>
+
+      <nav aria-label="Pages" className="flex shrink-0 items-center justify-center">
+        <div className="flex h-8 items-center rounded-md border border-white/[0.08] bg-neutral-950/65 pl-3 pr-1 shadow-inner shadow-black/30">
+          <span className="min-w-[112px] text-center text-[11px] font-medium tracking-wide text-neutral-200">{pageLabel}</span>
+          <i aria-hidden="true" className="mx-1 h-4 w-px bg-white/[0.08]" />
+          <button type="button" aria-label="Previous page" title="Previous spread" onClick={onPrevious} disabled={!canPrevious} className="grid size-6 place-items-center rounded text-neutral-400 transition-colors hover:bg-white/10 hover:text-white disabled:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="chevronLeft" size="sm" /></button>
+          <button type="button" aria-label="Next page" title="Next spread" onClick={onNext} disabled={!canNext} className="grid size-6 place-items-center rounded text-neutral-400 transition-colors hover:bg-white/10 hover:text-white disabled:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="chevronRight" size="sm" /></button>
+        </div>
       </nav>
 
-      <div className="relative flex items-center justify-end gap-1.5">
-        {installPrompt && <ToolButton icon="install" label="Install App" variant="outline" onClick={onInstall} className="max-[1500px]:[&>span]:hidden" />}
+      <div className="relative flex min-w-0 flex-1 items-center justify-end gap-1.5">
+        {installPrompt && <ToolButton icon="install" variant="outline" onClick={onInstall} title="Install App" />}
         <ToolButton icon="keyboard" onClick={() => setOpenPanel(openPanel === 'shortcuts' ? null : 'shortcuts')} active={openPanel === 'shortcuts'} title="Keyboard shortcuts" className="hidden min-[1320px]:inline-flex" />
         <ToolButton icon="sliders" label="Print Setup" onClick={() => setOpenPanel(openPanel === 'print' ? null : 'print')} active={openPanel === 'print'} className="max-[1400px]:[&>span]:hidden" />
-        <ToolButton icon="printer" label="Print / PDF" variant="outline" onClick={onPrint} />
+        <ToolButton icon="printer" label="Print / PDF" variant="outline" onClick={onPrint} className="shadow-sm" />
         {openPanel === 'print' && printSetup}
         {openPanel === 'shortcuts' && shortcuts}
       </div>
@@ -857,13 +859,13 @@ function UploadZone({ empty, active, inputRef, onFiles }) {
     <label
       tabIndex={0}
       onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); inputRef.current?.click(); } }}
-      className={`group flex cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-neutral-700 bg-neutral-900/50 transition-colors hover:border-neutral-500 hover:bg-neutral-800/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${empty ? 'min-h-36 flex-col gap-3 p-5 text-center' : 'gap-3 p-3'} ${active ? 'border-red-600 bg-red-950/35' : ''}`}
+      className={`group flex cursor-pointer items-center justify-center rounded-lg border border-dashed border-neutral-700 bg-neutral-900/20 transition-all hover:border-neutral-600 hover:bg-neutral-900/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${empty ? 'min-h-32 flex-col gap-2.5 p-4 text-center' : 'gap-3 p-3'} ${active ? 'border-red-600 bg-red-950/30' : ''}`}
     >
       <input ref={inputRef} type="file" accept="image/*" multiple className="sr-only" onChange={(event) => { onFiles(event.target.files); event.target.value = ''; }} />
-      <span className={`${empty ? 'size-11' : 'size-8'} grid shrink-0 place-items-center rounded-lg border border-white/5 bg-neutral-800 text-neutral-300 transition-colors group-hover:bg-neutral-700 group-hover:text-white ${active ? 'border-red-500/30 bg-red-950/70 text-red-300' : ''}`}><Icon name="upload" size={empty ? 'lg' : 'md'} /></span>
+      <span className={`${empty ? 'size-10' : 'size-8'} grid shrink-0 place-items-center rounded-lg border border-white/5 bg-neutral-800 text-neutral-300 transition-colors group-hover:bg-neutral-700 group-hover:text-white ${active ? 'border-red-500/30 bg-red-950/70 text-red-300' : ''}`}><Icon name="upload" size={empty ? 'lg' : 'md'} /></span>
       <span>
-        <span className="block text-[13px] font-semibold text-neutral-200">{empty ? 'Drop card images here' : 'Add more cards'}</span>
-        {empty && <span className="mt-1 block text-xs leading-relaxed text-neutral-400">or click to browse · PNG, JPG, WEBP, AVIF · multiple files</span>}
+        <span className="block text-xs font-semibold text-neutral-200">{empty ? 'Drop card images here' : 'Add more cards'}</span>
+        {empty && <><span className="mt-1 block text-[11px] text-neutral-400">or click to browse</span><span className="mt-1 block text-[10px] tracking-wide text-neutral-500">PNG, JPG, WEBP, AVIF · multiple files</span></>}
       </span>
     </label>
   );
@@ -924,13 +926,13 @@ function CardPool({
       onDrop={onDrop}
       onClick={(event) => { if (event.target === event.currentTarget) onClearSelection(); }}
     >
-      <div className="flex flex-wrap items-center justify-between gap-2 px-4 pb-2 pt-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 pb-2 pt-3">
         <div><h2 className="text-sm font-semibold tracking-tight text-white">Card Pool</h2><p className="mt-0.5 text-[11px] text-neutral-400">{plural(pool.length, 'card')} · {selected.length} selected</p></div>
         <button
           type="button"
           aria-pressed={settings.hidePlaced}
           onClick={() => setSettings((value) => ({ ...value, hidePlaced: !value.hidePlaced }))}
-          className={`inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${settings.hidePlaced ? 'border-red-800/60 bg-red-950/50 text-red-300' : 'border-white/5 bg-neutral-800 text-neutral-300 hover:bg-neutral-700 hover:text-white'}`}
+          className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${settings.hidePlaced ? 'border-red-800/60 bg-red-950/50 text-red-300' : 'border-white/[0.05] bg-neutral-800 text-neutral-300 hover:bg-neutral-700 hover:text-white'}`}
         >
           <Icon name={settings.hidePlaced ? 'eyeOff' : 'eye'} size="sm" />
           <span>Unplaced only</span>
@@ -994,17 +996,15 @@ function CanvasHelper({ editing, multiDrag, flowCount, combineMode, offsetX, onC
   return <div data-reposition-ui={editing ? '' : undefined} className={`absolute top-full z-30 mt-4 flex h-8 w-auto min-w-fit max-w-none -translate-x-1/2 items-center gap-1.5 rounded-full border px-3 text-[11px] whitespace-nowrap shadow-xl shadow-black/30 ${tone}`} style={{ left: `calc(50% + ${offsetX}px)` }}>{content}</div>;
 }
 
-function WorkspaceStatusBar({ settings, paper, card, printFit }) {
+function WorkspaceStatusBar() {
   return (
-    <div data-workspace-status className="no-print flex w-full shrink-0 items-center justify-center gap-2 border-t border-white/5 bg-neutral-900/60 px-4 py-1.5 font-mono text-[11px] tracking-wide text-neutral-400 backdrop-blur-md">
-      {settings.view === 'paper' && <span className="text-neutral-300">{paper.short} · {fmtPct(printFit)} · {fmtMm(card.w)} × {fmtMm(card.h)} mm</span>}
-      {settings.view === 'paper' && <span aria-hidden="true" className="text-neutral-600">•</span>}
-      <Kbd>Ctrl/⌘</Kbd><span>+ click to toggle</span>
-      <span aria-hidden="true" className="text-neutral-600">•</span>
-      <Kbd>Shift</Kbd><span>+ click for range</span>
-      <span aria-hidden="true" className="text-neutral-600">•</span>
-      <span>Drag selected cards onto the binder</span>
-    </div>
+    <footer data-workspace-status className="no-print pointer-events-none fixed bottom-0 left-0 right-0 z-50 flex select-none items-center justify-center gap-4 overflow-hidden border-t border-white/[0.05] bg-neutral-950/90 px-4 py-1 font-mono text-[10px] whitespace-nowrap text-neutral-400 backdrop-blur-md">
+      <span><kbd className="rounded border border-neutral-700 bg-neutral-800 px-1 font-sans text-neutral-200 shadow-sm">Ctrl/⌘</kbd> + Click to toggle selection</span>
+      <span aria-hidden="true" className="text-neutral-700">|</span>
+      <span><kbd className="rounded border border-neutral-700 bg-neutral-800 px-1 font-sans text-neutral-200 shadow-sm">Shift</kbd> + Click for page ranges</span>
+      <span aria-hidden="true" className="text-neutral-700">|</span>
+      <span>Drag and drop assets directly onto active binder slots</span>
+    </footer>
   );
 }
 
@@ -1014,7 +1014,7 @@ function BinderSpine({ view }) {
     <div
       data-binder-spine
       aria-hidden="true"
-      className={`pointer-events-none absolute inset-y-0 left-1/2 z-30 -translate-x-1/2 ${binderView ? 'w-6 bg-gradient-to-r from-black/30 via-transparent to-black/30 shadow-[inset_8px_0_14px_-12px_rgba(0,0,0,0.95),inset_-8px_0_14px_-12px_rgba(0,0,0,0.95)]' : 'w-px bg-black/70'}`}
+      className={`pointer-events-none absolute inset-y-0 left-1/2 z-30 -translate-x-1/2 ${binderView ? 'w-8 bg-gradient-to-r from-black/50 via-transparent to-black/50 shadow-[inset_10px_0_18px_-12px_rgba(0,0,0,0.98),inset_-10px_0_18px_-12px_rgba(0,0,0,0.98)]' : 'w-px bg-black/70'}`}
     >
       <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-black/80" />
       {binderView && [0.17, 0.5, 0.83].map((position) => (
@@ -2220,7 +2220,7 @@ export default function CardBinder() {
               if (combineMode) { setSelectionPageId(page.id); setSelBox(expandBox(mergeBox(slot), pageMerges)); return; }
               if (selectedOrdered.length) placeCards(selectedOrdered, pageIndex, slot.key);
             }}
-            className={`group grid size-full cursor-pointer place-items-center overflow-hidden border border-dashed outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-red-500 hover:border-red-500 hover:bg-red-950/10 ${settings.view === 'binder' ? 'border-zinc-500/80 bg-black/45 text-zinc-200 shadow-[inset_0_0_20px_rgba(0,0,0,0.5)] hover:text-red-100' : 'border-zinc-400 bg-white/30 text-zinc-700 hover:text-red-800'} ${previewIndex >= 0 ? '!border-red-500 !bg-red-950/20 !shadow-[inset_0_0_0_2px_rgba(239,68,68,0.25),0_0_20px_rgba(220,38,38,0.18)]' : ''}`}
+            className={`group grid size-full cursor-pointer place-items-center overflow-hidden border outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-red-500 ${settings.view === 'binder' ? 'border-white/[0.03] bg-neutral-900/40 text-neutral-300 shadow-[inset_0_0_20px_rgba(0,0,0,0.32)] hover:border-white/[0.08] hover:bg-neutral-900/70 hover:text-neutral-100' : 'border-dashed border-zinc-400 bg-white/30 text-zinc-700 hover:border-red-500 hover:text-red-800'} ${previewIndex >= 0 ? '!border-red-500 !bg-red-950/20 !shadow-[inset_0_0_0_2px_rgba(239,68,68,0.25),0_0_20px_rgba(220,38,38,0.18)]' : ''}`}
             style={{ borderRadius: radius }}
           >
             {labelVisible && <span className="flex flex-col items-center gap-1 text-[11px] font-semibold"><Icon name="plus" size="lg" /><span>{slot.cs * slot.rs > 1 ? `${boxDims(slot)} frame` : `Slot ${slotIndex + 1}`}</span></span>}
@@ -2266,7 +2266,7 @@ export default function CardBinder() {
             }}
           />
         )}
-        <div className={`relative size-full overflow-hidden bg-white transition-all duration-200 ${settings.view === 'binder' ? 'sleeve-sheen' : ''} ${isEditing ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-zinc-900' : ''} ${previewIndex >= 0 ? 'ring-2 ring-inset ring-red-500 shadow-[0_0_20px_rgba(220,38,38,0.25)]' : ''}`} style={{ borderRadius: radius }}>
+        <div className={`relative size-full overflow-hidden border bg-white transition-all duration-200 ${settings.view === 'binder' ? 'sleeve-sheen border-white/[0.03] bg-neutral-900/40 hover:border-white/[0.08] hover:bg-neutral-900/70' : 'border-transparent'} ${isEditing ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-zinc-900' : ''} ${previewIndex >= 0 ? 'ring-2 ring-inset ring-red-500 shadow-[0_0_20px_rgba(220,38,38,0.25)]' : ''}`} style={{ borderRadius: radius }}>
           {source ? <img
             data-img-id={imgId}
             src={source}
@@ -2344,7 +2344,7 @@ export default function CardBinder() {
     const label = group.length === 1 ? `Page ${pageNumbers[0]}` : `Pages ${pageNumbers[0]}–${pageNumbers[1]}`;
     return (
       <div key={group.join('-')} data-page-group={pageNumbers.join('-')} className={`relative flex shrink-0 flex-col items-center gap-2 pb-1 text-[10px] font-medium whitespace-nowrap ${active ? 'text-red-400' : 'text-neutral-500'}`}>
-        <div className={`flex items-center gap-0.5 rounded-sm p-1 ${active ? 'ring-2 ring-red-500 ring-offset-4 ring-offset-neutral-950' : ''}`}>{group.map((pageIndex) => renderThumbnailLeaf(pages[pageIndex], pageIndex))}</div>
+        <div className={`flex items-center gap-0.5 rounded-md p-1 transition-transform duration-200 ${active ? 'scale-105 ring-2 ring-red-500 ring-offset-4 ring-offset-neutral-950' : ''}`}>{group.map((pageIndex) => renderThumbnailLeaf(pages[pageIndex], pageIndex))}</div>
         <span>{label}</span>
       </div>
     );
@@ -2397,7 +2397,7 @@ export default function CardBinder() {
         />}
         {settings.view === 'binder' ? (
           <div
-            className="sheet-frame relative flex size-full items-start justify-start overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-b from-neutral-800 to-neutral-800/90 shadow-[0_8px_30px_rgb(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.06)]"
+            className="sheet-frame relative flex size-full items-start justify-start overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-b from-neutral-800 to-neutral-800/90 shadow-[0_20px_50px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.05)]"
             style={{ paddingTop: SHEET_PAD.top * ppi, paddingRight: (side === 'left' ? SHEET_PAD.left : SHEET_PAD.right) * ppi, paddingBottom: SHEET_PAD.bottom * ppi, paddingLeft: (side === 'left' ? SHEET_PAD.right : SHEET_PAD.left) * ppi }}
           >
             {[0.17, 0.5, 0.83].map((position) => <span key={position} aria-hidden="true" className={`absolute size-3 -translate-y-1/2 rounded-full border border-black/80 bg-neutral-900 ring-1 ring-white/10 shadow-[inset_0_2px_4px_rgba(0,0,0,0.95),0_1px_0_rgba(255,255,255,0.12)] ${side === 'left' ? 'translate-x-1/2' : '-translate-x-1/2'}`} style={{ [side === 'left' ? 'right' : 'left']: (SHEET_PAD.left * ppi) / 2, top: `${position * 100}%` }} />)}
@@ -2419,7 +2419,7 @@ export default function CardBinder() {
       key={`cover-${side}`}
       data-cover-layer={side}
       aria-hidden="true"
-      className="relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-neutral-900 via-neutral-950 to-black shadow-[inset_0_0_70px_rgba(0,0,0,0.9),0_8px_30px_rgb(0,0,0,0.6)]"
+      className="relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-neutral-900 via-neutral-950 to-black shadow-[inset_0_0_70px_rgba(0,0,0,0.9),0_20px_50px_rgba(0,0,0,0.8)]"
       style={{ width: frameWidth, height: frameHeight, gridColumn: side === 'left' ? 1 : 2, gridRow: 1 }}
     />
   );
@@ -2601,7 +2601,7 @@ export default function CardBinder() {
           onChooseLayout={chooseLayout}
           onViewChange={(view) => { commitEditing(); setSettings((value) => ({ ...value, view })); }}
         />
-        <div className="flex min-h-0 flex-1">
+        <div className="flex min-h-0 flex-1 pb-6">
           <CardPool
             pool={pool}
             visiblePool={visiblePool}
@@ -2629,12 +2629,20 @@ export default function CardBinder() {
           <main className="flex min-w-0 flex-1 flex-col">
             <div
               ref={stageRef}
-              className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-neutral-950 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.035),transparent_55%)] [perspective:1200px]"
+              className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-neutral-950 bg-[radial-gradient(ellipse_at_center,rgba(82,82,91,0.18),transparent_65%)] [perspective:1200px]"
               onPointerMove={moveMarquee}
               onPointerDown={(event) => { if (event.target === event.currentTarget && combineMode) { setSelBox(null); setSelectionPageId(null); } }}
               onDragOver={(event) => { if (!combineMode && (dragRef.current?.kind === 'pool' || hasFiles(event.dataTransfer))) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; } }}
               onDrop={handleStageDrop}
             >
+              {settings.view === 'binder' && (
+                <span
+                  data-binder-bed
+                  aria-hidden="true"
+                  className="pointer-events-none absolute rounded-[2rem] border border-white/[0.03] bg-gradient-to-b from-neutral-900/35 to-black/20 shadow-[0_30px_90px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.025)]"
+                  style={{ width: spreadWidth + 48, height: frameHeight + 48 }}
+                />
+              )}
               <div
                 data-spread
                 data-flip-active={pageFlip.animating ? '' : undefined}
@@ -2645,7 +2653,7 @@ export default function CardBinder() {
                   clipPath: pageFlip.animating ? 'inset(0 -100% 0 -100%)' : undefined,
                 }}
               >
-                {(activeSpread.length === 2 || pageFlip.animating) && <BinderSpine view={settings.view} />}
+                {(settings.view === 'binder' || activeSpread.length === 2 || pageFlip.animating) && <BinderSpine view={settings.view} />}
                 {pageFlip.animating && pageFlip.plan && (
                   <span
                     data-turn-cast-shadow
@@ -2672,10 +2680,10 @@ export default function CardBinder() {
                 </div>
               </div>
             </footer>
-            <WorkspaceStatusBar settings={settings} paper={paper} card={card} printFit={printFit} />
           </main>
         </div>
-        <div className="no-print pointer-events-none fixed bottom-5 right-5 z-[100] flex w-[360px] flex-col items-end gap-2">
+        <WorkspaceStatusBar />
+        <div className="no-print pointer-events-none fixed bottom-10 right-5 z-[100] flex w-[360px] flex-col items-end gap-2">
           {toasts.map((toast) => <div key={toast.id} role="status" className={`animate-toast pointer-events-auto flex max-w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-[12px] shadow-2xl shadow-black/40 ${toastTones[toast.tone] || toastTones.info}`}><span className="leading-relaxed">{toast.message}</span>{toast.action && <button type="button" onClick={() => { setToasts((value) => value.filter((item) => item.id !== toast.id)); toast.action.onClick(); }} className="shrink-0 rounded-md bg-white/10 px-2 py-1 font-semibold text-white hover:bg-white/20">{toast.action.label}</button>}<button type="button" title="Dismiss" aria-label="Dismiss notification" onClick={() => setToasts((value) => value.filter((item) => item.id !== toast.id))} className="grid size-6 shrink-0 place-items-center rounded-md text-current hover:bg-white/10"><Icon name="x" size="sm" /></button></div>)}
         </div>
       </div>
