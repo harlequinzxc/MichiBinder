@@ -2,18 +2,19 @@ import {
   AlertTriangle,
   BookOpen,
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Columns4,
   Copy,
   Eraser,
-  Eye,
-  EyeOff,
   File,
   Grid2X2,
   Grid3X3,
   Image as ImageIcon,
   Keyboard,
+  Layers,
   LayoutGrid,
   MonitorDown,
   Move,
@@ -507,13 +508,13 @@ const ICONS = {
   alert: AlertTriangle,
   book: BookOpen,
   check: Check,
+  chevronDown: ChevronDown,
   chevronLeft: ChevronLeft,
   chevronRight: ChevronRight,
+  chevronUp: ChevronUp,
   combine: SquareDashedMousePointer,
   copy: Copy,
   eraser: Eraser,
-  eye: Eye,
-  eyeOff: EyeOff,
   file: File,
   grid: LayoutGrid,
   grid2x2: Grid2X2,
@@ -522,6 +523,7 @@ const ICONS = {
   image: ImageIcon,
   install: MonitorDown,
   keyboard: Keyboard,
+  layers: Layers,
   merge: TableCellsMerge,
   move: Move,
   plus: Plus,
@@ -947,22 +949,16 @@ function SetupToolbar({ settings, setSettings, fitInfo, suggestedPaper, onChoose
 
 function CardPool({
   pool,
-  visiblePool,
   selected,
   placedIds,
   images,
-  settings,
-  setSettings,
   inputRef,
   onFiles,
   onPoolClick,
   onPoolDoubleClick,
   onPoolDragStart,
   onDragEnd,
-  onSelectAll,
   onClearSelection,
-  onFill,
-  onDeleteSelected,
   sidebarDropActive,
   slotDropActive,
   onDragOver,
@@ -986,11 +982,9 @@ function CardPool({
   onFetchedCardAdd,
 }) {
   const searchActive = Boolean(searchQuery.trim() || selectedSet);
-  const customUploadedCards = pool.filter((item) => item.source !== 'tcgdex');
-  const visibleCustomCards = visiblePool
+  const customUploadedCards = pool
     .filter((item) => item.source !== 'tcgdex')
     .map((item) => ({ ...item, localUrlDataString: images[item.id] || item.src || '' }));
-  const selectedCustomCount = selected.filter((id) => customUploadedCards.some((item) => item.id === id)).length;
   const handleLocalUploadEvent = (event) => {
     onFiles(event.target.files);
     event.target.value = '';
@@ -1010,32 +1004,22 @@ function CardPool({
     >
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 pb-2 pt-3">
         <div><h2 className="text-sm font-semibold tracking-tight text-white">Card Pool</h2><p className="mt-0.5 text-[11px] text-neutral-400">{plural(pool.length, 'card')} · {selected.length} selected</p></div>
-        {activeTab === 'michi' && (
-          <button
-            type="button"
-            aria-pressed={settings.hidePlaced}
-            onClick={() => setSettings((value) => ({ ...value, hidePlaced: !value.hidePlaced }))}
-            className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-white/[0.06] bg-neutral-900 px-2.5 py-0.5 text-[11px] font-medium transition-colors hover:bg-neutral-800 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${settings.hidePlaced ? 'text-neutral-100' : 'text-neutral-400'}`}
-          >
-            <Icon name={settings.hidePlaced ? 'eyeOff' : 'eye'} size="sm" />
-            <span>Unplaced only</span>
-          </button>
-        )}
       </div>
       <nav aria-label="Card source" className="px-4 pb-3">
         <div className="grid grid-cols-2 rounded-lg border border-white/[0.06] bg-neutral-950 p-0.5 shadow-inner">
           {[
-            { id: 'tcgdex', label: 'TCGdex' },
-            { id: 'michi', label: 'Michi' },
+            { id: 'tcgdex', label: 'Cards', icon: 'layers' },
+            { id: 'michi', label: 'Michi', icon: 'sparkles' },
           ].map((tab) => (
             <button
               key={tab.id}
               type="button"
               aria-pressed={activeTab === tab.id}
               onClick={() => chooseTab(tab.id)}
-              className={`h-7 rounded-md text-[11px] font-semibold tracking-wide transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${activeTab === tab.id ? 'border border-red-500/25 bg-red-950/60 text-red-300 shadow-sm' : 'border border-transparent text-neutral-500 hover:bg-neutral-900 hover:text-neutral-200'}`}
+              className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${activeTab === tab.id ? 'border border-red-500/25 bg-red-950/60 text-red-300 shadow-sm' : 'border border-transparent text-neutral-500 hover:bg-neutral-900 hover:text-neutral-200'}`}
             >
-              {tab.label}
+              <Icon name={tab.icon} size="sm" className="w-3.5 h-3.5" />
+              <span>{tab.label}</span>
             </button>
           ))}
         </div>
@@ -1058,33 +1042,13 @@ function CardPool({
             <span className="block text-[10px] font-mono text-neutral-500 tracking-normal mt-0.5">PNG, JPG, or WEBP files</span>
           </div>
 
-          <div className="flex gap-1.5 mt-3 select-none">
-            <span className="px-2.5 py-0.5 rounded-full border border-red-500/30 bg-red-500/10 text-red-400 text-[10px] font-bold tracking-wide uppercase">Find</span>
-            <span className="px-2.5 py-0.5 rounded-full border border-white/[0.06] bg-neutral-900 text-neutral-500 text-[10px] font-bold tracking-wide uppercase hover:text-neutral-300 transition-colors cursor-pointer">My art</span>
-          </div>
-
-          <div className="mt-2.5">
-            <select aria-label="Pocket fit" className="w-full px-2.5 py-1.5 bg-neutral-950 border border-white/[0.06] rounded-md text-xs font-medium text-neutral-400 focus:outline-none cursor-pointer">
-              <option>Any pocket fit</option>
-            </select>
-          </div>
-
-          {customUploadedCards.length > 0 && (
-            <div role="toolbar" aria-label="Custom asset actions" className="mt-3 grid grid-cols-[0.6fr_1.1fr_1fr_1.2fr] gap-1">
-              <ToolButton icon="selectAll" label="All" dense onClick={() => onSelectAll(visibleCustomCards.map((item) => item.id))} disabled={!visibleCustomCards.length} disabledReason="No visible custom assets" className="w-full px-1 text-[11px]" />
-              <ToolButton icon="x" label={selectedCustomCount ? `None (${selectedCustomCount})` : 'None'} dense onClick={onClearSelection} disabled={!selectedCustomCount} className={`w-full px-1 text-[11px] ${selectedCustomCount ? 'text-zinc-200' : 'pointer-events-none opacity-40'}`} />
-              <ToolButton icon="wand" label={selectedCustomCount ? `Fill (${selectedCustomCount})` : 'Fill'} dense variant={selectedCustomCount ? 'primary' : 'ghost'} onClick={onFill} disabled={!selectedCustomCount} className={`w-full px-1 text-[11px] ${selectedCustomCount ? '' : 'pointer-events-none opacity-40'}`} />
-              <ToolButton icon="trash" label={selectedCustomCount ? `Delete (${selectedCustomCount})` : 'Delete'} dense variant="danger" onClick={onDeleteSelected} disabled={!selectedCustomCount} className={`w-full px-1 text-[11px] ${selectedCustomCount ? '' : 'pointer-events-none opacity-40'}`} />
-            </div>
-          )}
-
           <div className="flex items-center justify-between px-1 py-1.5 border-b border-white/[0.04] mt-3 mb-2 select-none">
             <span className="text-[10px] font-bold tracking-widest uppercase text-neutral-500">Your Uploads</span>
             <span className="text-[10px] font-mono text-neutral-400 bg-neutral-800 px-1.5 py-0.5 rounded-md border border-white/[0.04]">{customUploadedCards.length} assets</span>
           </div>
 
           <div role="listbox" aria-label="Custom uploaded cards" aria-multiselectable="true" className="scroll-area grid grid-cols-3 gap-2 overflow-y-auto max-h-[calc(100vh-320px)] scrollbar-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden p-0.5" onClick={(event) => { if (event.target === event.currentTarget) onClearSelection(); }}>
-            {visibleCustomCards.map((localCard) => {
+            {customUploadedCards.map((localCard) => {
               const selectionIndex = selected.indexOf(localCard.id);
               const placed = placedIds.has(localCard.id);
               return (
@@ -1098,7 +1062,7 @@ function CardPool({
                   tabIndex={0}
                   draggable="true"
                   title={`${localCard.name || 'Custom Art'} · drag to a binder slot`}
-                  onClick={(event) => onPoolClick(event, localCard.id, visibleCustomCards)}
+                  onClick={(event) => onPoolClick(event, localCard.id, customUploadedCards)}
                   onDoubleClick={() => onPoolDoubleClick(localCard.id)}
                   onKeyDown={(event) => { if (event.key === 'Enter') onPoolDoubleClick(localCard.id); }}
                   onDragStart={(event) => onPoolDragStart(event, localCard.id)}
@@ -1113,7 +1077,6 @@ function CardPool({
               );
             })}
             {!customUploadedCards.length && <div className="col-span-3 py-10 text-center text-[11px] leading-relaxed text-neutral-500">Upload custom card art to build your private Michi collection.</div>}
-            {customUploadedCards.length > 0 && !visibleCustomCards.length && <div className="col-span-3 py-10 text-center text-[11px] leading-relaxed text-neutral-500">Every custom asset is placed. Turn off “Unplaced only” to see them.</div>}
           </div>
         </section>
       ) : (
@@ -1158,9 +1121,16 @@ function CardPool({
 
           {searchActive ? (
             <section aria-label="TCGdex search results" className="flex min-h-0 flex-1 flex-col px-3 pb-4">
-              <div className="flex items-center justify-between px-1 py-1.5 border-b border-white/[0.04] mb-2 select-none">
-                <span className="text-[10px] font-bold tracking-widest uppercase text-neutral-500">TCGdex Catalog</span>
-                <span aria-live="polite" className="text-[10px] font-mono text-neutral-400 bg-neutral-800 px-1.5 py-0.5 rounded-md border border-white/[0.04]">{isLoading ? 'Loading…' : plural(fetchedCards.length, 'item')}</span>
+              <div className="flex items-center justify-between px-1 py-1.5 border-b border-white/[0.04] mb-2">
+                <span aria-live="polite" className="text-[10px] font-mono text-neutral-400 bg-neutral-800 px-1.5 py-0.5 rounded border border-white/[0.04]">{isLoading ? 'Loading…' : plural(fetchedCards.length, 'item')}</span>
+                <button
+                  type="button"
+                  onClick={() => { setSearchQuery(''); setSelectedSet(''); setApiPage(1); }}
+                  className="flex items-center gap-1 text-[10px] font-medium tracking-wide text-neutral-400 hover:text-neutral-200 transition-colors cursor-pointer select-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-red-500/50 rounded-sm"
+                >
+                  <Icon name="x" size="xs" className="w-3 h-3" />
+                  <span>Clear Filters</span>
+                </button>
               </div>
               {searchError && <div role="alert" className="mx-1 mb-2 rounded-md border border-red-500/20 bg-red-950/30 px-2.5 py-2 text-[10px] leading-relaxed text-red-300">{searchError}</div>}
               <div data-tcgdex-results role="listbox" aria-label="Pokémon card search results" aria-busy={isLoading} className="scroll-area grid grid-cols-2 gap-3 p-1 overflow-y-auto max-h-[calc(100vh-280px)] scrollbar-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden group">
@@ -1296,6 +1266,7 @@ export default function CardBinder() {
   const [currentPage, setCurrentPage] = useState(boot.currentPage);
   const [pool, setPool] = useState(boot.pool);
   const [activeTab, setActiveTab] = useState('tcgdex');
+  const [showBottomPreview, setShowBottomPreview] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [fetchedCards, setFetchedCards] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -2523,11 +2494,11 @@ export default function CardBinder() {
   }, [visiblePool, selectionAnchor]);
 
   const selectAllVisible = useCallback((requestedIds) => {
-    const defaultItems = activeTab === 'michi' ? visiblePool.filter((item) => item.source !== 'tcgdex') : visiblePool;
+    const defaultItems = activeTab === 'michi' ? pool.filter((item) => item.source !== 'tcgdex') : visiblePool;
     const ids = Array.isArray(requestedIds) ? requestedIds : defaultItems.map((item) => item.id);
     setSelected(ids);
     setSelectionAnchor(ids[0] || null);
-  }, [activeTab, visiblePool]);
+  }, [activeTab, pool, visiblePool]);
 
   useEffect(() => {
     const keydown = (event) => {
@@ -3058,22 +3029,16 @@ export default function CardBinder() {
         <div className="flex min-h-0 flex-1 pb-7">
           <CardPool
             pool={pool}
-            visiblePool={visiblePool}
             selected={selected}
             placedIds={placedIds}
             images={images}
-            settings={settings}
-            setSettings={setSettings}
             inputRef={inputRef}
             onFiles={addFiles}
             onPoolClick={onPoolClick}
             onPoolDoubleClick={(id) => placeCards([id], currentPage, null)}
             onPoolDragStart={startPoolDrag}
             onDragEnd={resetDrag}
-            onSelectAll={selectAllVisible}
             onClearSelection={() => { setSelected([]); setSelectionAnchor(null); }}
-            onFill={fillSelection}
-            onDeleteSelected={() => deleteImages(selected)}
             sidebarDropActive={sidebarDropActive}
             slotDropActive={sidebarDropActive && dragInfo?.kind === 'slot'}
             onDragOver={(event) => { if (dragRef.current || hasFiles(event.dataTransfer)) { event.preventDefault(); setSidebarDropActive(true); event.dataTransfer.dropEffect = dragRef.current?.kind === 'slot' ? 'move' : 'copy'; } }}
@@ -3096,10 +3061,10 @@ export default function CardBinder() {
             onFetchedCardDragStart={startFetchedCardDrag}
             onFetchedCardAdd={addFetchedCardToPage}
           />
-          <main className="flex min-w-0 flex-1 flex-col">
+          <main className="relative flex min-w-0 flex-1 flex-col">
             <div
               ref={stageRef}
-              className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-neutral-950 bg-[radial-gradient(ellipse_at_center,rgba(82,82,91,0.18),transparent_65%)]"
+              className={`relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-neutral-950 bg-[radial-gradient(ellipse_at_center,rgba(82,82,91,0.18),transparent_65%)] transition-[height] duration-200 ${showBottomPreview ? 'h-[calc(100vh-180px)]' : 'h-[calc(100vh-60px)]'}`}
               onPointerMove={moveMarquee}
               onPointerDown={(event) => { if (event.target === event.currentTarget && combineMode) { setSelBox(null); setSelectionPageId(null); } }}
               onDragOver={(event) => { if (!combineMode && (['pool', 'remote'].includes(dragRef.current?.kind) || hasFiles(event.dataTransfer))) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; } }}
@@ -3145,15 +3110,26 @@ export default function CardBinder() {
                 </div>
               </div>
             </div>
-            <footer data-page-tray className="no-print scroll-area relative shrink-0 overflow-x-auto border-t border-white/5 bg-neutral-950/65 py-4 backdrop-blur-md before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white/10 before:to-transparent">
-              <div data-page-tray-inner className="mx-auto flex w-max items-end gap-5 px-6">
-                {spreadGroups.map(renderThumbnailGroup)}
-                <div className="flex shrink-0 flex-col items-center justify-start gap-1 pb-1">
-                  <button type="button" onClick={addPage} aria-label="Add page" className="flex aspect-[1/1.414] w-14 shrink-0 items-center justify-center rounded-sm border border-dashed border-neutral-700 text-neutral-500 transition-colors hover:border-neutral-500 hover:bg-neutral-900 hover:text-neutral-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="plus" size="lg" /></button>
-                  <span className="text-[10px] font-medium whitespace-nowrap text-neutral-500">Add page</span>
+            {showBottomPreview && (
+              <footer data-page-tray className="no-print scroll-area relative shrink-0 overflow-x-auto border-t border-white/5 bg-neutral-950/65 py-4 backdrop-blur-md before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white/10 before:to-transparent">
+                <div data-page-tray-inner className="mx-auto flex w-max items-end gap-5 px-6">
+                  {spreadGroups.map(renderThumbnailGroup)}
+                  <div className="flex shrink-0 flex-col items-center justify-start gap-1 pb-1">
+                    <button type="button" onClick={addPage} aria-label="Add page" className="flex aspect-[1/1.414] w-14 shrink-0 items-center justify-center rounded-sm border border-dashed border-neutral-700 text-neutral-500 transition-colors hover:border-neutral-500 hover:bg-neutral-900 hover:text-neutral-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="plus" size="lg" /></button>
+                    <span className="text-[10px] font-medium whitespace-nowrap text-neutral-500">Add page</span>
+                  </div>
                 </div>
-              </div>
-            </footer>
+              </footer>
+            )}
+            <button
+              type="button"
+              aria-pressed={!showBottomPreview}
+              onClick={() => setShowBottomPreview((prev) => !prev)}
+              className="no-print absolute bottom-4 right-4 z-50 p-2 bg-neutral-900/90 hover:bg-neutral-800 border border-white/[0.06] rounded-md shadow-lg text-neutral-400 hover:text-neutral-200 backdrop-blur-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+              title={showBottomPreview ? 'Collapse Page Navigator' : 'Expand Page Navigator'}
+            >
+              <Icon name={showBottomPreview ? 'chevronDown' : 'chevronUp'} size="md" className="w-4 h-4" />
+            </button>
           </main>
         </div>
         <WorkspaceStatusBar />
