@@ -2401,19 +2401,40 @@ export default function CardBinder() {
   const renderTurningSheet = () => {
     const plan = pageFlip.plan;
     if (!plan) return null;
-    const frontPageIndex = pages.findIndex((page) => page.id === plan.frontPageId);
-    const backPageIndex = pages.findIndex((page) => page.id === plan.backPageId);
-    if (frontPageIndex < 0 || backPageIndex < 0) return null;
+
+    const frontPageIndex = pages.findIndex(
+      (page) => page.id === plan.frontPageId,
+    );
+
+    const backPageIndex = pages.findIndex(
+      (page) => page.id === plan.backPageId,
+    );
+
+    if (frontPageIndex < 0 || backPageIndex < 0) {
+      return null;
+    }
+
     const forward = pageFlip.direction > 0;
-    const rotation = pageFlip.turned ? (forward ? '-180deg' : '180deg') : '0deg';
-    const rotationClass = pageFlip.turned
-      ? (forward ? '[transform:rotateY(-180deg)]' : '[transform:rotateY(180deg)]')
-      : '[transform:rotateY(0deg)]';
-    const originClass = forward ? 'origin-left' : 'origin-right';
+
+    // Track the transition angle smoothly without conflicting with Tailwind classes
+    const rotation = pageFlip.turned
+      ? forward
+        ? '-180deg'
+        : '180deg'
+      : '0deg';
+
+    // Pin the transform origin precisely to the center spine line of the layout
+    const originClass = forward
+      ? 'origin-left'
+      : 'origin-right';
+
+    // Force the layout side matching to remain physically uniform during the arc
     const frontSide = forward ? 'right' : 'left';
     const backSide = forward ? 'left' : 'right';
+
+    // Reverse rotation calculation
     const backRotation = forward ? '180deg' : '-180deg';
-    const backRotationClass = forward ? '[transform:rotateY(180deg)]' : '[transform:rotateY(-180deg)]';
+
     return (
       <div
         data-turning-sheet
@@ -2423,15 +2444,16 @@ export default function CardBinder() {
         data-front-page={frontPageIndex + 1}
         data-back-page={backPageIndex + 1}
         inert
-        className={`absolute top-0 z-50 transform-gpu pointer-events-none transition-transform duration-500 ease-in-out [transform-style:preserve-3d] will-change-transform ${originClass} ${rotationClass}`}
+        className={`absolute top-0 z-50 transform-gpu pointer-events-none transition-transform duration-500 ease-in-out [transform-style:preserve-3d] will-change-transform ${originClass}`}
         style={{
           width: frameWidth,
           height: frameHeight,
-          left: forward ? '50%' : undefined,
-          right: forward ? undefined : '50%',
-          transform: `rotateY(${rotation}) translateZ(1px)`,
+          // Enforce smooth tracking from the exact 50% midpoint line
+          left: forward ? '50%' : '0',
+          transform: `rotateY(${rotation}) translateZ(2px)`, // Lift z-index physically to avoid 3D clipping
         }}
       >
+        {/* Front side of the physical turning sheet */}
         {renderCanvasLeaf(frontPageIndex, {
           renderKey: `turn-front-${plan.frontPageId}`,
           side: frontSide,
@@ -2442,8 +2464,14 @@ export default function CardBinder() {
           showHelper: false,
           ariaHidden: true,
           className: 'absolute inset-0 z-20 [backface-visibility:hidden] [transform-style:preserve-3d]',
-          style: { transform: 'rotateY(0deg) translateZ(0)' },
+          style: {
+            width: '100%',
+            height: '100%',
+            transform: 'rotateY(0deg) translateZ(0.5px)',
+          },
         })}
+
+        {/* Reverse side of the physical turning sheet */}
         {renderCanvasLeaf(backPageIndex, {
           renderKey: `turn-back-${plan.backPageId}`,
           side: backSide,
@@ -2453,8 +2481,12 @@ export default function CardBinder() {
           showChrome: false,
           showHelper: false,
           ariaHidden: true,
-          className: `absolute inset-0 z-10 [backface-visibility:hidden] [transform-style:preserve-3d] ${backRotationClass}`,
-          style: { transform: `rotateY(${backRotation}) translateZ(0)` },
+          className: 'absolute inset-0 z-10 [backface-visibility:hidden] [transform-style:preserve-3d]',
+          style: {
+            width: '100%',
+            height: '100%',
+            transform: `rotateY(${backRotation}) translateZ(0.5px)`,
+          },
         })}
       </div>
     );
