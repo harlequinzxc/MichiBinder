@@ -502,7 +502,7 @@ function ToolButton({ icon, label, onClick, disabled = false, disabledReason, ac
     ghost: active ? 'bg-red-950/60 text-red-400 ring-1 ring-inset ring-red-800/60' : 'text-zinc-300 hover:bg-white/10 hover:text-white',
     primary: 'bg-red-600 text-white shadow-lg shadow-red-950/40 hover:bg-red-700',
     danger: 'text-red-300 hover:bg-red-500/15 hover:text-red-200',
-    outline: 'border border-zinc-700 bg-[#121214] text-zinc-200 hover:border-zinc-600 hover:bg-zinc-900',
+    outline: 'border border-neutral-700 bg-neutral-800 text-neutral-200 hover:border-neutral-600 hover:bg-neutral-700',
   };
   const button = (
     <button
@@ -683,31 +683,33 @@ function AppBar({
   shortcuts,
 }) {
   return (
-    <header className="titlebar no-print grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center border-b border-zinc-800 bg-[#0B0B0C] px-4 py-3">
+    <header className="titlebar no-print grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center border-b border-white/5 bg-neutral-950/95 px-4 py-2.5 shadow-[0_1px_0_rgba(255,255,255,0.02)] backdrop-blur-xl">
       <div className="flex min-w-0 items-center gap-3">
-        <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-[#121214] ring-1 ring-inset ring-red-950/60 shadow-lg shadow-black/40"><img src="/icons/icon.svg" alt="" className="size-9" /></span>
+        <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-lg border border-white/5 bg-neutral-900 shadow-lg shadow-black/40"><img src="/icons/icon.svg" alt="" className="size-9" /></span>
         <div className="flex min-w-0 items-baseline gap-3">
           <h1 className="shrink-0 text-[15px] font-semibold tracking-tight text-white">Digital Card Binder</h1>
           <SaveStatus status={saveStatus} storageMode={storageMode} />
         </div>
       </div>
 
-      <nav aria-label="Pages" className="flex items-center gap-2">
-        <div className="flex h-8 items-center rounded-full border border-zinc-800 bg-[#121214] p-0.5">
-          <button type="button" aria-label="Previous page" title="Previous spread" onClick={onPrevious} disabled={!canPrevious} className="grid size-7 place-items-center rounded-full text-zinc-300 transition-colors hover:bg-white/10 disabled:text-zinc-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="chevronLeft" size="sm" /></button>
-          <span className="min-w-[104px] px-2 text-center text-[12px] font-medium text-zinc-200">{pageLabel}</span>
-          <button type="button" aria-label="Next page" title="Next spread" onClick={onNext} disabled={!canNext} className="grid size-7 place-items-center rounded-full text-zinc-300 transition-colors hover:bg-white/10 disabled:text-zinc-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="chevronRight" size="sm" /></button>
+      <nav aria-label="Pages" className="relative z-20 flex items-center justify-center">
+        <div className="flex h-8 items-center rounded-full border border-white/10 bg-neutral-900/90 p-0.5 shadow-inner shadow-black/30">
+          <button type="button" aria-label="Previous page" title="Previous spread" onClick={onPrevious} disabled={!canPrevious} className="grid size-7 place-items-center rounded-full text-neutral-300 transition-colors hover:bg-white/10 hover:text-white disabled:text-neutral-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="chevronLeft" size="sm" /></button>
+          <span className="min-w-[112px] px-2 text-center text-[12px] font-medium tracking-wide text-neutral-200">{pageLabel}</span>
+          <button type="button" aria-label="Next page" title="Next spread" onClick={onNext} disabled={!canNext} className="grid size-7 place-items-center rounded-full text-neutral-300 transition-colors hover:bg-white/10 hover:text-white disabled:text-neutral-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="chevronRight" size="sm" /></button>
         </div>
-        <ToolButton icon="plus" label="Add Page" onClick={onAdd} title="Insert a new two-page physical sheet" />
-        <ToolButton icon="copy" onClick={onDuplicate} title="Duplicate physical sheet" />
-        <ToolButton icon="trash" label="Delete" variant="danger" onClick={onDelete} disabled={!canDelete} disabledReason="Keep at least one physical sheet" />
+        <span aria-label="Page actions" className="absolute left-full ml-3 flex shrink-0 items-center gap-1">
+          <ToolButton icon="plus" label="Add Page" onClick={onAdd} title="Insert a new two-page physical sheet" className="max-[1420px]:[&>span]:hidden" />
+          <ToolButton icon="copy" onClick={onDuplicate} title="Duplicate physical sheet" />
+          <ToolButton icon="trash" label="Delete" variant="danger" onClick={onDelete} disabled={!canDelete} disabledReason="Keep at least one physical sheet" className="max-[1540px]:[&>span]:hidden" />
+        </span>
       </nav>
 
-      <div className="relative flex items-center justify-end gap-2">
-        {installPrompt && <ToolButton icon="install" label="Install App" onClick={onInstall} />}
-        <ToolButton icon="keyboard" onClick={() => setOpenPanel(openPanel === 'shortcuts' ? null : 'shortcuts')} active={openPanel === 'shortcuts'} title="Keyboard shortcuts" className="hidden min-[1380px]:inline-flex" />
-        <ToolButton icon="sliders" label="Print Setup" onClick={() => setOpenPanel(openPanel === 'print' ? null : 'print')} active={openPanel === 'print'} className="max-[1320px]:[&>span]:hidden" />
-        <ToolButton icon="printer" label="Print / PDF" variant="primary" onClick={onPrint} />
+      <div className="relative flex items-center justify-end gap-1.5">
+        {installPrompt && <ToolButton icon="install" label="Install App" variant="outline" onClick={onInstall} className="max-[1500px]:[&>span]:hidden" />}
+        <ToolButton icon="keyboard" onClick={() => setOpenPanel(openPanel === 'shortcuts' ? null : 'shortcuts')} active={openPanel === 'shortcuts'} title="Keyboard shortcuts" className="hidden min-[1320px]:inline-flex" />
+        <ToolButton icon="sliders" label="Print Setup" onClick={() => setOpenPanel(openPanel === 'print' ? null : 'print')} active={openPanel === 'print'} className="max-[1400px]:[&>span]:hidden" />
+        <ToolButton icon="printer" label="Print / PDF" variant="outline" onClick={onPrint} />
         {openPanel === 'print' && printSetup}
         {openPanel === 'shortcuts' && shortcuts}
       </div>
@@ -790,11 +792,11 @@ function SetupToolbar({ settings, setSettings, fitInfo, suggestedPaper, onChoose
   const custom = cleanSize.preset === 'custom';
   const setCardSize = (patch) => setSettings((value) => ({ ...value, cardSize: sanitizeCardSize({ ...value.cardSize, ...patch }) }));
   return (
-    <div role="toolbar" aria-label="Card sizing" className="no-print flex w-full shrink-0 items-center justify-between gap-4 overflow-x-auto border-b border-zinc-800 bg-[#121214] px-4 py-2">
-      <div className="flex shrink-0 items-center gap-3">
-        <div className="flex shrink-0 items-center gap-2">
-          <Icon name="ruler" className="text-red-400" />
-          <span className={`${custom ? 'hidden min-[1600px]:inline' : 'hidden xl:inline'} shrink-0 text-[12px] font-medium text-zinc-300`}>Card size</span>
+    <div role="toolbar" aria-label="Card sizing" className="no-print flex w-full shrink-0 items-center justify-between gap-3 overflow-x-auto border-b border-white/5 bg-neutral-950/80 px-4 py-1.5 shadow-[0_1px_0_rgba(255,255,255,0.02)] backdrop-blur-xl">
+      <div className="flex shrink-0 items-center gap-2 text-xs font-medium text-neutral-400">
+        <div className="flex h-8 shrink-0 items-center gap-2 rounded-lg border border-white/5 bg-neutral-900/60 px-2">
+          <Icon name="ruler" className="text-neutral-400" />
+          <span className={`${custom ? 'hidden min-[1600px]:inline' : 'hidden xl:inline'} shrink-0 text-[11px] font-medium text-neutral-400`}>Card size</span>
           <select
             value={custom ? 'custom' : cleanSize.preset}
             aria-label="Card size"
@@ -802,7 +804,7 @@ function SetupToolbar({ settings, setSettings, fitInfo, suggestedPaper, onChoose
               if (event.target.value === 'custom') setCardSize({ preset: 'custom', customWmm: base.w, customHmm: base.h });
               else setCardSize({ preset: event.target.value });
             }}
-            className="h-8 w-auto min-w-fit shrink-0 rounded-lg border border-zinc-800 bg-[#121214] px-2 text-[12px] text-zinc-200 outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+            className="h-7 w-auto min-w-fit shrink-0 rounded-md border border-neutral-700 bg-neutral-900 px-2 text-[11px] font-medium text-neutral-200 outline-none transition-colors hover:border-neutral-600 focus-visible:ring-2 focus-visible:ring-red-500"
           >
             {CARD_PRESETS.map((preset) => <option key={preset.id} value={preset.id}>{preset.label} · {preset.hint}</option>)}
             <option value="custom">Custom…</option>
@@ -810,8 +812,8 @@ function SetupToolbar({ settings, setSettings, fitInfo, suggestedPaper, onChoose
           {custom && <div className="flex shrink-0 items-center gap-1"><MmField label="W" value={cleanSize.customWmm} onCommit={(customWmm) => setCardSize({ customWmm })} /><span className="text-zinc-500">×</span><MmField label="H" value={cleanSize.customHmm} onCommit={(customHmm) => setCardSize({ customHmm })} /><span className="text-[11px] text-zinc-400">mm</span></div>}
         </div>
         <ToolbarDivider />
-        <div className="flex shrink-0 items-center gap-2">
-          <span className={`${custom ? 'hidden min-[1600px]:inline' : ''} shrink-0 text-[12px] font-medium text-zinc-300`}>Scale</span>
+        <div className="flex h-8 shrink-0 items-center gap-2 rounded-lg border border-white/5 bg-neutral-900/60 px-2">
+          <span className={`${custom ? 'hidden min-[1600px]:inline' : ''} shrink-0 text-[11px] font-medium text-neutral-400`}>Scale</span>
           <input
             type="range"
             min={80}
@@ -822,16 +824,16 @@ function SetupToolbar({ settings, setSettings, fitInfo, suggestedPaper, onChoose
             list="scale-ticks"
             onChange={(event) => setCardSize({ scale: Number(event.target.value) / 100 })}
             onDoubleClick={() => setCardSize({ scale: 1 })}
-            className={`${custom ? 'w-24 min-[1600px]:w-28' : 'w-28'} shrink-0 rounded-full accent-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[#121214]`}
+            className={`${custom ? 'w-20 min-[1600px]:w-24' : 'w-24'} shrink-0 rounded-full accent-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-900`}
           />
           <datalist id="scale-ticks"><option value="100" /></datalist>
-          <strong className="w-auto min-w-[5ch] shrink-0 whitespace-nowrap text-right text-[12px] text-white">{Math.round(cleanSize.scale * 100)}%</strong>
+          <strong className="w-auto min-w-[5ch] shrink-0 whitespace-nowrap text-right text-[11px] font-semibold text-neutral-100">{Math.round(cleanSize.scale * 100)}%</strong>
           {cleanSize.scale !== 1 && <button type="button" title="Reset scale" aria-label="Reset scale" onClick={() => setCardSize({ scale: 1 })} className="grid size-7 shrink-0 place-items-center rounded-md text-zinc-400 hover:bg-white/10 hover:text-white"><Icon name="reset" size="sm" /></button>}
           <span className={`${custom ? 'hidden min-[1700px]:inline' : 'hidden min-[1440px]:inline'} w-auto min-w-fit shrink-0 whitespace-nowrap text-[11px] text-zinc-400`}>{fmtMm(resolved.w)} × {fmtMm(resolved.h)} mm</span>
         </div>
         <ToolbarDivider />
-        <div className="flex shrink-0 items-center gap-2">
-          <span className={`${custom ? 'hidden min-[1600px]:inline' : ''} shrink-0 text-[12px] font-medium text-zinc-300`}>Grid</span>
+        <div className="flex h-8 shrink-0 items-center gap-2 rounded-lg border border-white/5 bg-neutral-900/60 px-2">
+          <span className={`${custom ? 'hidden min-[1600px]:inline' : ''} shrink-0 text-[11px] font-medium text-neutral-400`}>Grid</span>
           <SegmentedControl
             ariaLabel="Pocket layout"
             value={settings.layout}
@@ -842,7 +844,7 @@ function SetupToolbar({ settings, setSettings, fitInfo, suggestedPaper, onChoose
         </div>
       </div>
       <div className="ml-auto flex shrink-0 items-center gap-2">
-        <span className="hidden shrink-0 text-[12px] font-medium text-zinc-300 min-[1380px]:inline">Preview</span>
+        <span className="hidden shrink-0 text-[11px] font-medium text-neutral-400 min-[1380px]:inline">Preview</span>
         <SegmentedControl ariaLabel="Preview" value={settings.view} onChange={onViewChange} options={[{ value: 'binder', label: 'Binder' }, { value: 'paper', label: 'Paper' }]} dense={custom} appearance="preview" />
         <PrintFitBadge fitInfo={fitInfo} paperKey={settings.paper} suggestedPaper={suggestedPaper} onUsePaper={(paper) => setSettings((value) => ({ ...value, paper }))} />
       </div>
@@ -855,13 +857,13 @@ function UploadZone({ empty, active, inputRef, onFiles }) {
     <label
       tabIndex={0}
       onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); inputRef.current?.click(); } }}
-      className={`group flex cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-zinc-500/80 bg-zinc-800/40 transition-colors hover:border-red-600 hover:bg-red-950/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${empty ? 'min-h-36 flex-col gap-3 p-5 text-center' : 'gap-3 p-3'} ${active ? 'border-red-700 bg-red-950/40' : ''}`}
+      className={`group flex cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-neutral-700 bg-neutral-900/50 transition-colors hover:border-neutral-500 hover:bg-neutral-800/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${empty ? 'min-h-36 flex-col gap-3 p-5 text-center' : 'gap-3 p-3'} ${active ? 'border-red-600 bg-red-950/35' : ''}`}
     >
       <input ref={inputRef} type="file" accept="image/*" multiple className="sr-only" onChange={(event) => { onFiles(event.target.files); event.target.value = ''; }} />
-      <span className={`${empty ? 'size-11' : 'size-8'} grid shrink-0 place-items-center rounded-lg bg-red-950/60 text-red-400`}><Icon name="upload" size={empty ? 'lg' : 'md'} /></span>
+      <span className={`${empty ? 'size-11' : 'size-8'} grid shrink-0 place-items-center rounded-lg border border-white/5 bg-neutral-800 text-neutral-300 transition-colors group-hover:bg-neutral-700 group-hover:text-white ${active ? 'border-red-500/30 bg-red-950/70 text-red-300' : ''}`}><Icon name="upload" size={empty ? 'lg' : 'md'} /></span>
       <span>
-        <span className="block text-[13px] font-semibold text-white">{empty ? 'Drop card images here' : 'Add more cards'}</span>
-        {empty && <span className="mt-1 block text-[11px] leading-relaxed text-zinc-300">or click to browse · PNG, JPG, WEBP, AVIF · multiple files</span>}
+        <span className="block text-[13px] font-semibold text-neutral-200">{empty ? 'Drop card images here' : 'Add more cards'}</span>
+        {empty && <span className="mt-1 block text-xs leading-relaxed text-neutral-400">or click to browse · PNG, JPG, WEBP, AVIF · multiple files</span>}
       </span>
     </label>
   );
@@ -916,15 +918,23 @@ function CardPool({
 }) {
   return (
     <aside
-      className={`no-print relative flex w-[340px] shrink-0 flex-col border-r border-zinc-800 bg-[#121214] ${sidebarDropActive ? 'ring-2 ring-inset ring-red-600' : ''}`}
+      className={`no-print relative flex w-[340px] shrink-0 flex-col border-r border-white/5 bg-neutral-950/80 shadow-[8px_0_28px_rgba(0,0,0,0.18)] ${sidebarDropActive ? 'ring-2 ring-inset ring-red-600' : ''}`}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
       onClick={(event) => { if (event.target === event.currentTarget) onClearSelection(); }}
     >
-      <div className="flex items-center justify-between px-4 pb-2 pt-4">
-        <div><h2 className="text-sm font-semibold text-white">Card Pool</h2><p className="mt-0.5 text-[11px] text-zinc-400">{plural(pool.length, 'card')} · {selected.length} selected</p></div>
-        <ToolButton icon={settings.hidePlaced ? 'eyeOff' : 'eye'} label="Unplaced only" active={settings.hidePlaced} dense onClick={() => setSettings((value) => ({ ...value, hidePlaced: !value.hidePlaced }))} />
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 pb-2 pt-4">
+        <div><h2 className="text-sm font-semibold tracking-tight text-white">Card Pool</h2><p className="mt-0.5 text-[11px] text-neutral-400">{plural(pool.length, 'card')} · {selected.length} selected</p></div>
+        <button
+          type="button"
+          aria-pressed={settings.hidePlaced}
+          onClick={() => setSettings((value) => ({ ...value, hidePlaced: !value.hidePlaced }))}
+          className={`inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${settings.hidePlaced ? 'border-red-800/60 bg-red-950/50 text-red-300' : 'border-white/5 bg-neutral-800 text-neutral-300 hover:bg-neutral-700 hover:text-white'}`}
+        >
+          <Icon name={settings.hidePlaced ? 'eyeOff' : 'eye'} size="sm" />
+          <span>Unplaced only</span>
+        </button>
       </div>
       <div className="px-4 pb-3"><UploadZone empty={!pool.length} active={sidebarDropActive && !slotDropActive} inputRef={inputRef} onFiles={onFiles} /></div>
       {pool.length > 0 && (
@@ -967,9 +977,8 @@ function CanvasToolbar({ combineMode, setCombineMode, selBox, canMerge, mergeLab
   );
 }
 
-function CanvasHelper({ editing, multiDrag, flowCount, combineMode, settings, paper, card, printFit, offsetX, onCenter, onCancel, onDone }) {
+function CanvasHelper({ editing, multiDrag, flowCount, combineMode, offsetX, onCenter, onCancel, onDone }) {
   let tone = 'border-zinc-800 bg-[#121214] text-zinc-200';
-  let plain = false;
   let content;
   if (editing) {
     tone = 'border-amber-400/30 bg-amber-950/90 text-amber-100';
@@ -980,14 +989,45 @@ function CanvasHelper({ editing, multiDrag, flowCount, combineMode, settings, pa
   } else if (combineMode) {
     tone = 'border-red-800/60 bg-red-950/80 text-red-100';
     content = <><Icon name="combine" size="sm" /><span>Combine mode · drag across slots, then Enter to merge · click a frame, then U to unmerge · Esc to exit</span></>;
-  } else {
-    plain = true;
-    content = <>{settings.view === 'paper' && <span>{paper.short} · prints at {fmtPct(printFit)} · {fmtMm(card.w)} × {fmtMm(card.h)} mm · </span>}<Kbd>Ctrl/⌘</Kbd><span> + Click toggle · </span><Kbd>Shift</Kbd><span> + Click range · Drag the selection onto the binder</span></>;
-  }
-  if (plain) {
-    return <div className="absolute top-full z-30 mt-4 block w-full -translate-x-1/2 text-center text-xs font-normal tracking-wide whitespace-nowrap text-zinc-400" style={{ left: `calc(50% + ${offsetX}px)` }}>{content}</div>;
-  }
+  } else return null;
+
   return <div data-reposition-ui={editing ? '' : undefined} className={`absolute top-full z-30 mt-4 flex h-8 w-auto min-w-fit max-w-none -translate-x-1/2 items-center gap-1.5 rounded-full border px-3 text-[11px] whitespace-nowrap shadow-xl shadow-black/30 ${tone}`} style={{ left: `calc(50% + ${offsetX}px)` }}>{content}</div>;
+}
+
+function WorkspaceStatusBar({ settings, paper, card, printFit }) {
+  return (
+    <div data-workspace-status className="no-print flex w-full shrink-0 items-center justify-center gap-2 border-t border-white/5 bg-neutral-900/60 px-4 py-1.5 font-mono text-[11px] tracking-wide text-neutral-400 backdrop-blur-md">
+      {settings.view === 'paper' && <span className="text-neutral-300">{paper.short} · {fmtPct(printFit)} · {fmtMm(card.w)} × {fmtMm(card.h)} mm</span>}
+      {settings.view === 'paper' && <span aria-hidden="true" className="text-neutral-600">•</span>}
+      <Kbd>Ctrl/⌘</Kbd><span>+ click to toggle</span>
+      <span aria-hidden="true" className="text-neutral-600">•</span>
+      <Kbd>Shift</Kbd><span>+ click for range</span>
+      <span aria-hidden="true" className="text-neutral-600">•</span>
+      <span>Drag selected cards onto the binder</span>
+    </div>
+  );
+}
+
+function BinderSpine({ view }) {
+  const binderView = view === 'binder';
+  return (
+    <div
+      data-binder-spine
+      aria-hidden="true"
+      className={`pointer-events-none absolute inset-y-0 left-1/2 z-30 -translate-x-1/2 ${binderView ? 'w-6 bg-gradient-to-r from-black/30 via-transparent to-black/30 shadow-[inset_8px_0_14px_-12px_rgba(0,0,0,0.95),inset_-8px_0_14px_-12px_rgba(0,0,0,0.95)]' : 'w-px bg-black/70'}`}
+    >
+      <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-black/80" />
+      {binderView && [0.17, 0.5, 0.83].map((position) => (
+        <span
+          key={position}
+          className="absolute left-1/2 h-3 w-14 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/10 bg-gradient-to-b from-neutral-500/70 via-neutral-800 to-black shadow-[0_2px_6px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.28),inset_0_-1px_0_rgba(0,0,0,0.9)]"
+          style={{ top: `${position * 100}%` }}
+        >
+          <span className="absolute inset-x-2 top-1/2 h-px bg-white/15" />
+        </span>
+      ))}
+    </div>
+  );
 }
 
 export default function CardBinder() {
@@ -2286,7 +2326,7 @@ export default function CardBinder() {
         onDrop={(event) => handleThumbDrop(event, pageIndex)}
         className="group shrink-0 bg-transparent p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
       >
-        <div className={`grid aspect-[1/1.414] w-14 place-items-center overflow-hidden rounded-md border bg-[#0B0B0C] transition-colors ${active ? 'border-red-600 ring-1 ring-red-950/70' : 'border-zinc-800 group-hover:border-red-600/50'}`}>
+        <div className={`grid aspect-[1/1.414] w-14 place-items-center overflow-hidden rounded-sm border bg-neutral-950 transition-colors ${currentLeaf ? 'border-white/25' : active ? 'border-neutral-700' : 'border-neutral-800 group-hover:border-neutral-600'}`}>
           <SheetGrid page={page} card={card} gap={settings.gap} unit={`${unit}px`} dims={dims} renderSlot={(slot) => {
             const id = page.slots[slot.key];
             const src = images[id] || pool.find((item) => item.id === id)?.src;
@@ -2303,10 +2343,9 @@ export default function CardBinder() {
     const pageNumbers = group.map((pageIndex) => pageIndex + 1);
     const label = group.length === 1 ? `Page ${pageNumbers[0]}` : `Pages ${pageNumbers[0]}–${pageNumbers[1]}`;
     return (
-      <div key={group.join('-')} data-page-group={pageNumbers.join('-')} className={`relative flex shrink-0 flex-col items-center gap-1 pb-1 text-[10px] font-medium whitespace-nowrap ${active ? 'text-red-400' : 'text-zinc-500'}`}>
-        <div className="flex items-center gap-0.5">{group.map((pageIndex) => renderThumbnailLeaf(pages[pageIndex], pageIndex))}</div>
+      <div key={group.join('-')} data-page-group={pageNumbers.join('-')} className={`relative flex shrink-0 flex-col items-center gap-2 pb-1 text-[10px] font-medium whitespace-nowrap ${active ? 'text-red-400' : 'text-neutral-500'}`}>
+        <div className={`flex items-center gap-0.5 rounded-sm p-1 ${active ? 'ring-2 ring-red-500 ring-offset-4 ring-offset-neutral-950' : ''}`}>{group.map((pageIndex) => renderThumbnailLeaf(pages[pageIndex], pageIndex))}</div>
         <span>{label}</span>
-        {active && <span aria-hidden="true" className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-red-600" />}
       </div>
     );
   };
@@ -2358,10 +2397,10 @@ export default function CardBinder() {
         />}
         {settings.view === 'binder' ? (
           <div
-            className="sheet-frame relative flex size-full items-start justify-start overflow-hidden rounded-2xl bg-gradient-to-br from-[#1A1A1D] via-[#121214] to-[#0B0B0C] ring-1 ring-red-950/40 shadow-[0_28px_80px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.06)]"
+            className="sheet-frame relative flex size-full items-start justify-start overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-b from-neutral-800 to-neutral-800/90 shadow-[0_8px_30px_rgb(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.06)]"
             style={{ paddingTop: SHEET_PAD.top * ppi, paddingRight: (side === 'left' ? SHEET_PAD.left : SHEET_PAD.right) * ppi, paddingBottom: SHEET_PAD.bottom * ppi, paddingLeft: (side === 'left' ? SHEET_PAD.right : SHEET_PAD.left) * ppi }}
           >
-            {[0.17, 0.5, 0.83].map((position) => <span key={position} aria-hidden="true" className={`absolute size-3 -translate-y-1/2 rounded-full bg-zinc-950 ring-1 ring-black shadow-[inset_0_0_3px_black,0_1px_0_rgba(255,255,255,.15)] ${side === 'left' ? 'translate-x-1/2' : '-translate-x-1/2'}`} style={{ [side === 'left' ? 'right' : 'left']: (SHEET_PAD.left * ppi) / 2, top: `${position * 100}%` }} />)}
+            {[0.17, 0.5, 0.83].map((position) => <span key={position} aria-hidden="true" className={`absolute size-3 -translate-y-1/2 rounded-full border border-black/80 bg-neutral-900 ring-1 ring-white/10 shadow-[inset_0_2px_4px_rgba(0,0,0,0.95),0_1px_0_rgba(255,255,255,0.12)] ${side === 'left' ? 'translate-x-1/2' : '-translate-x-1/2'}`} style={{ [side === 'left' ? 'right' : 'left']: (SHEET_PAD.left * ppi) / 2, top: `${position * 100}%` }} />)}
             {renderEditorGrid(page, pageIndex)}
           </div>
         ) : (
@@ -2370,7 +2409,7 @@ export default function CardBinder() {
             {renderEditorGrid(page, pageIndex)}
           </div>
         )}
-        {showHelper && pageIndex === currentPage && <CanvasHelper editing={editing} multiDrag={dragInfo?.kind === 'pool' ? dragInfo.ids.length : 0} flowCount={multiFlow} combineMode={combineMode} settings={settings} paper={paper} card={card} printFit={printFit} offsetX={side === 'left' ? -helperOffsetX : helperOffsetX} onCenter={() => { const value = editingRef.current; if (value) { const next = { ...value, x: 50, y: 50 }; editingRef.current = next; setEditing(next); } }} onCancel={cancelEditing} onDone={commitEditing} />}
+        {showHelper && pageIndex === currentPage && <CanvasHelper editing={editing} multiDrag={dragInfo?.kind === 'pool' ? dragInfo.ids.length : 0} flowCount={multiFlow} combineMode={combineMode} offsetX={side === 'left' ? -helperOffsetX : helperOffsetX} onCenter={() => { const value = editingRef.current; if (value) { const next = { ...value, x: 50, y: 50 }; editingRef.current = next; setEditing(next); } }} onCancel={cancelEditing} onDone={commitEditing} />}
       </div>
     );
   };
@@ -2380,7 +2419,7 @@ export default function CardBinder() {
       key={`cover-${side}`}
       data-cover-layer={side}
       aria-hidden="true"
-      className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#101012] via-[#09090B] to-black ring-1 ring-zinc-900 shadow-[inset_0_0_70px_rgba(0,0,0,0.9),0_28px_80px_rgba(0,0,0,0.5)]"
+      className="relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-neutral-900 via-neutral-950 to-black shadow-[inset_0_0_70px_rgba(0,0,0,0.9),0_8px_30px_rgb(0,0,0,0.6)]"
       style={{ width: frameWidth, height: frameHeight, gridColumn: side === 'left' ? 1 : 2, gridRow: 1 }}
     />
   );
@@ -2590,7 +2629,7 @@ export default function CardBinder() {
           <main className="flex min-w-0 flex-1 flex-col">
             <div
               ref={stageRef}
-              className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-[#0B0B0C] bg-[radial-gradient(circle_at_center,rgba(220,38,38,0.055),transparent_52%)] [perspective:1200px]"
+              className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-neutral-950 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.035),transparent_55%)] [perspective:1200px]"
               onPointerMove={moveMarquee}
               onPointerDown={(event) => { if (event.target === event.currentTarget && combineMode) { setSelBox(null); setSelectionPageId(null); } }}
               onDragOver={(event) => { if (!combineMode && (dragRef.current?.kind === 'pool' || hasFiles(event.dataTransfer))) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; } }}
@@ -2606,7 +2645,7 @@ export default function CardBinder() {
                   clipPath: pageFlip.animating ? 'inset(0 -100% 0 -100%)' : undefined,
                 }}
               >
-                {(activeSpread.length === 2 || pageFlip.animating) && <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-1/2 z-30 w-px -translate-x-1/2 bg-black/90 shadow-[-12px_0_20px_-8px_rgba(0,0,0,0.9),12px_0_20px_-8px_rgba(0,0,0,0.9)]" />}
+                {(activeSpread.length === 2 || pageFlip.animating) && <BinderSpine view={settings.view} />}
                 {pageFlip.animating && pageFlip.plan && (
                   <span
                     data-turn-cast-shadow
@@ -2624,15 +2663,16 @@ export default function CardBinder() {
                 ) : activeSpread.map((pageIndex) => renderCanvasLeaf(pageIndex))}
               </div>
             </div>
-            <footer data-page-tray className="no-print scroll-area shrink-0 overflow-x-auto border-t border-zinc-800 bg-zinc-900/40 py-4">
-              <div data-page-tray-inner className="mx-auto flex w-max items-end gap-3 px-4">
+            <footer data-page-tray className="no-print scroll-area shrink-0 overflow-x-auto border-t border-white/5 bg-neutral-950/65 py-4 backdrop-blur-md">
+              <div data-page-tray-inner className="mx-auto flex w-max items-end gap-5 px-6">
                 {spreadGroups.map(renderThumbnailGroup)}
                 <div className="flex shrink-0 flex-col items-center justify-start gap-1 pb-1">
-                  <button type="button" onClick={addPage} aria-label="Add page" className="flex aspect-[1/1.414] w-14 shrink-0 items-center justify-center border border-dashed border-zinc-800 text-zinc-500 transition-colors hover:border-red-600/40 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="plus" size="lg" /></button>
-                  <span className="text-[10px] font-medium whitespace-nowrap text-zinc-500">Add page</span>
+                  <button type="button" onClick={addPage} aria-label="Add page" className="flex aspect-[1/1.414] w-14 shrink-0 items-center justify-center rounded-sm border border-dashed border-neutral-700 text-neutral-500 transition-colors hover:border-neutral-500 hover:bg-neutral-900 hover:text-neutral-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="plus" size="lg" /></button>
+                  <span className="text-[10px] font-medium whitespace-nowrap text-neutral-500">Add page</span>
                 </div>
               </div>
             </footer>
+            <WorkspaceStatusBar settings={settings} paper={paper} card={card} printFit={printFit} />
           </main>
         </div>
         <div className="no-print pointer-events-none fixed bottom-5 right-5 z-[100] flex w-[360px] flex-col items-end gap-2">
