@@ -389,6 +389,40 @@ const getCrop = (page, key, imageId) => {
   return crop?.img === imageId ? { x: crop.x, y: crop.y } : { x: 50, y: 50 };
 };
 
+function compactCustomPrintPages(pages, dims, customIds) {
+  const instances = pages.flatMap((page) => Object.entries(page.slots)
+    .filter(([, id]) => customIds.has(id))
+    .sort(([firstKey], [secondKey]) => {
+      const [firstRow, firstCol] = firstKey.split('-').map(Number);
+      const [secondRow, secondCol] = secondKey.split('-').map(Number);
+      return (firstRow * MAX_COLS + firstCol) - (secondRow * MAX_COLS + secondCol);
+    })
+    .map(([key, id]) => ({ id, crop: getCrop(page, key, id) })));
+  if (!instances.length) return [];
+
+  const pageCapacity = dims.rows * dims.cols;
+  const occupiedPageCount = Math.ceil(instances.length / pageCapacity);
+  const physicalPageCount = Math.ceil(occupiedPageCount / 2) * 2;
+  const compiledPages = Array.from({ length: physicalPageCount }, (_, pageIndex) => ({
+    id: `print-custom-page-${pageIndex + 1}`,
+    sheetId: `print-custom-sheet-${Math.floor(pageIndex / 2) + 1}`,
+    face: pageIndex % 2 === 0 ? 'front' : 'back',
+    merges: [],
+    slots: {},
+    crops: {},
+  }));
+
+  instances.forEach((instance, instanceIndex) => {
+    const pageIndex = Math.floor(instanceIndex / pageCapacity);
+    const pocketIndex = instanceIndex % pageCapacity;
+    const key = keyOf(Math.floor(pocketIndex / dims.cols), pocketIndex % dims.cols);
+    compiledPages[pageIndex].slots[key] = instance.id;
+    if (instance.crop.x !== 50 || instance.crop.y !== 50) compiledPages[pageIndex].crops[key] = { img: instance.id, ...instance.crop };
+  });
+
+  return compiledPages.filter((page) => Object.keys(page.slots).length);
+}
+
 function coverGeometry(imageW, imageH, frame) {
   if (!imageW || !imageH || !frame?.w || !frame?.h) return { dispW: frame?.w || 0, dispH: frame?.h || 0, ovX: 0, ovY: 0 };
   const scale = Math.max(frame.w / imageW, frame.h / imageH);
@@ -787,7 +821,7 @@ function AppBar({
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-lg border border-white/[0.06] bg-neutral-900 shadow-lg shadow-black/40"><img src="/icons/icon.svg" alt="" className="size-9" /></span>
         <div className="flex min-w-0 flex-col justify-center">
-          <h1 className="shrink-0 text-[14px] font-semibold leading-tight tracking-tight whitespace-nowrap text-white max-[1180px]:hidden">Digital Card Binder</h1>
+          <h1 className="shrink-0 text-xs font-semibold tracking-tight bg-gradient-to-r from-neutral-100 to-neutral-300 bg-clip-text text-transparent select-none whitespace-nowrap max-[1180px]:hidden">MichiBinder</h1>
           <SaveStatus status={saveStatus} />
         </div>
         <ToolbarDivider />
@@ -805,10 +839,15 @@ function AppBar({
       <div className="relative flex min-w-0 flex-1 items-center justify-end gap-1.5">
         {installPrompt && <ToolButton icon="install" variant="outline" onClick={onInstall} title="Install App" />}
         <ToolButton icon="keyboard" onClick={() => setOpenPanel(openPanel === 'shortcuts' ? null : 'shortcuts')} active={openPanel === 'shortcuts'} title="Keyboard shortcuts" className="hidden min-[1560px]:inline-flex" />
-        <ToolButton icon="plus" label="Add Page" variant="primary" onClick={onAdd} title="Insert a new two-page physical sheet" className="max-[1420px]:[&>span]:hidden" />
-        <ToolButton icon="copy" onClick={onDuplicate} title="Duplicate physical sheet" className="max-[1180px]:hidden" />
-        <ToolButton icon="trash" label="Delete" onClick={onDelete} disabled={!canDelete} disabledReason="Keep at least one physical sheet" title="Delete physical sheet" className="[&>span]:hidden !text-neutral-500 hover:!bg-red-500/10 hover:!text-red-300" />
-        <ToolButton icon="sliders" label="Print Setup" onClick={() => setOpenPanel(openPanel === 'print' ? null : 'print')} active={openPanel === 'print'} title="Print setup" className="[&>span]:hidden" />
+        <div className="flex items-center justify-center gap-2 self-center h-8">
+          <button type="button" onClick={onAdd} title="Insert a new two-page physical sheet" className="h-8 px-3.5 flex items-center justify-center gap-1.5 text-xs font-semibold rounded-md bg-red-600 text-white shadow-lg shadow-red-950/40 transition-colors hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500">
+            <Icon name="plus" size="md" />
+            <span className="max-[1420px]:hidden">Add Page</span>
+          </button>
+          <ToolButton icon="copy" onClick={onDuplicate} title="Duplicate physical sheet" className="max-[1180px]:hidden" />
+          <ToolButton icon="trash" label="Delete" onClick={onDelete} disabled={!canDelete} disabledReason="Keep at least one physical sheet" title="Delete physical sheet" className="[&>span]:hidden !text-neutral-500 hover:!bg-red-500/10 hover:!text-red-300" />
+          <ToolButton icon="sliders" label="Print Setup" onClick={() => setOpenPanel(openPanel === 'print' ? null : 'print')} active={openPanel === 'print'} title="Print setup" className="[&>span]:hidden" />
+        </div>
         <div className="flex items-center gap-4 border-l border-white/[0.06] pl-4 ml-2">
           <div className="flex flex-col items-end gap-1">
             <span className="text-[9px] font-bold tracking-widest text-neutral-500 uppercase select-none">Print Scope</span>
@@ -948,7 +987,7 @@ function SetupToolbar({ settings, setSettings, fitInfo, suggestedPaper, onChoose
 }
 
 function CardPool({
-  pool,
+  customUploadedCards,
   selected,
   placedIds,
   images,
@@ -982,9 +1021,7 @@ function CardPool({
   onFetchedCardAdd,
 }) {
   const searchActive = Boolean(searchQuery.trim() || selectedSet);
-  const customUploadedCards = pool
-    .filter((item) => item.source !== 'tcgdex')
-    .map((item) => ({ ...item, localUrlDataString: images[item.id] || item.src || '' }));
+  const customCards = customUploadedCards.map((item) => ({ ...item, localUrlDataString: images[item.id] || item.src || '' }));
   const handleLocalUploadEvent = (event) => {
     onFiles(event.target.files);
     event.target.value = '';
@@ -1002,10 +1039,7 @@ function CardPool({
       onDrop={onDrop}
       onClick={(event) => { if (event.target === event.currentTarget) onClearSelection(); }}
     >
-      <div className="flex flex-wrap items-center justify-between gap-2 px-4 pb-2 pt-3">
-        <div><h2 className="text-sm font-semibold tracking-tight text-white">Card Pool</h2><p className="mt-0.5 text-[11px] text-neutral-400">{plural(pool.length, 'card')} · {selected.length} selected</p></div>
-      </div>
-      <nav aria-label="Card source" className="px-4 pb-3">
+      <nav aria-label="Card source" className="px-4 pb-3 pt-3">
         <div className="grid grid-cols-2 rounded-lg border border-white/[0.06] bg-neutral-950 p-0.5 shadow-inner">
           {[
             { id: 'tcgdex', label: 'Cards', icon: 'layers' },
@@ -1048,7 +1082,7 @@ function CardPool({
           </div>
 
           <div role="listbox" aria-label="Custom uploaded cards" aria-multiselectable="true" className="scroll-area grid grid-cols-3 gap-2 overflow-y-auto max-h-[calc(100vh-320px)] scrollbar-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden p-0.5" onClick={(event) => { if (event.target === event.currentTarget) onClearSelection(); }}>
-            {customUploadedCards.map((localCard) => {
+            {customCards.map((localCard) => {
               const selectionIndex = selected.indexOf(localCard.id);
               const placed = placedIds.has(localCard.id);
               return (
@@ -1062,7 +1096,7 @@ function CardPool({
                   tabIndex={0}
                   draggable="true"
                   title={`${localCard.name || 'Custom Art'} · drag to a binder slot`}
-                  onClick={(event) => onPoolClick(event, localCard.id, customUploadedCards)}
+                  onClick={(event) => onPoolClick(event, localCard.id, customCards)}
                   onDoubleClick={() => onPoolDoubleClick(localCard.id)}
                   onKeyDown={(event) => { if (event.key === 'Enter') onPoolDoubleClick(localCard.id); }}
                   onDragStart={(event) => onPoolDragStart(event, localCard.id)}
@@ -1121,7 +1155,7 @@ function CardPool({
 
           {searchActive ? (
             <section aria-label="TCGdex search results" className="flex min-h-0 flex-1 flex-col px-3 pb-4">
-              <div className="flex items-center justify-between px-1 py-1.5 border-b border-white/[0.04] mb-2">
+              <div className="flex items-center justify-between w-full px-1 py-1 border-b border-white/[0.04] mb-2">
                 <span aria-live="polite" className="text-[10px] font-mono text-neutral-400 bg-neutral-800 px-1.5 py-0.5 rounded border border-white/[0.04]">{isLoading ? 'Loading…' : plural(fetchedCards.length, 'item')}</span>
                 <button
                   type="button"
@@ -1133,8 +1167,9 @@ function CardPool({
                 </button>
               </div>
               {searchError && <div role="alert" className="mx-1 mb-2 rounded-md border border-red-500/20 bg-red-950/30 px-2.5 py-2 text-[10px] leading-relaxed text-red-300">{searchError}</div>}
-              <div data-tcgdex-results role="listbox" aria-label="Pokémon card search results" aria-busy={isLoading} className="scroll-area grid grid-cols-2 gap-3 p-1 overflow-y-auto max-h-[calc(100vh-280px)] scrollbar-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden group">
-                {isLoading && !fetchedCards.length && Array.from({ length: 6 }, (_, index) => <span key={index} aria-hidden="true" className="aspect-[245/337] animate-pulse rounded-lg border border-white/[0.04] bg-neutral-900" />)}
+              <div className="px-2 py-1">
+                <div data-tcgdex-results role="listbox" aria-label="Pokémon card search results" aria-busy={isLoading} className="scroll-area grid grid-cols-2 gap-3 p-1 overflow-y-auto max-h-[calc(100vh-280px)] scrollbar-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden group rounded-md border border-white/[0.04]">
+                  {isLoading && !fetchedCards.length && Array.from({ length: 6 }, (_, index) => <span key={index} aria-hidden="true" className="aspect-[245/337] animate-pulse rounded-lg border border-white/[0.04] bg-neutral-900" />)}
                 {fetchedCards.map((item) => {
                   const fullImageUrl = item.image ? `${item.image}/low.jpg` : '/placeholder.png';
                   const highResImageUrl = item.image ? `${item.image}/high.jpg` : '/placeholder.png';
@@ -1159,7 +1194,8 @@ function CardPool({
                     </div>
                   );
                 })}
-                {!isLoading && !searchError && !fetchedCards.length && <div className="col-span-2 text-center py-12 text-xs text-neutral-500 font-mono tracking-wide">No matching Pokémon cards found.</div>}
+                  {!isLoading && !searchError && !fetchedCards.length && <div className="col-span-2 text-center py-12 text-xs text-neutral-500 font-mono tracking-wide">No matching Pokémon cards found.</div>}
+                </div>
               </div>
               <p className="mt-2 px-1 text-center text-[9px] leading-relaxed text-neutral-600">Drag to a slot or double-click to add · Powered by TCGdex</p>
             </section>
@@ -1254,6 +1290,9 @@ function BinderSpine({ view }) {
 
 export default function CardBinder() {
   const boot = useMemo(loadPersisted, []);
+  useEffect(() => {
+    document.title = "MichiBinder";
+  }, []);
   const [sheets, setSheets] = useState(() => sheetsFromPages(boot.pages));
   const pages = useMemo(() => pagesFromSheets(sheets), [sheets]);
   const setPages = useCallback((updater) => {
@@ -1348,16 +1387,19 @@ export default function CardBinder() {
   const placedIds = useMemo(() => new Set(visible.map((assignment) => assignment.id)), [visible]);
   const visiblePool = useMemo(() => pool.filter((item) => !settings.hidePlaced || !placedIds.has(item.id)), [pool, settings.hidePlaced, placedIds]);
   const selectedOrdered = useMemo(() => pool.filter((item) => selected.includes(item.id)).map((item) => item.id), [pool, selected]);
-  const printEligibleIds = useMemo(() => new Set(pool
-    .filter((item) => printScope === 'all' || item.source !== 'tcgdex')
-    .map((item) => item.id)), [pool, printScope]);
-  const printPages = useMemo(() => pages
-    .map((page) => {
-      const slots = Object.fromEntries(Object.entries(page.slots).filter(([, id]) => printEligibleIds.has(id)));
-      const crops = Object.fromEntries(Object.entries(page.crops || {}).filter(([key, crop]) => slots[key] === crop.img));
-      return { ...page, slots, crops };
-    })
-    .filter((page) => !settings.skipEmptyPages || getSlots(page, dims).some((slot) => page.slots[slot.key])), [pages, settings.skipEmptyPages, dims, printEligibleIds]);
+  const customUploadedCards = useMemo(() => pool.filter((item) => item.source !== 'tcgdex'), [pool]);
+  const customUploadedIds = useMemo(() => new Set(customUploadedCards.map((item) => item.id)), [customUploadedCards]);
+  const allPoolIds = useMemo(() => new Set(pool.map((item) => item.id)), [pool]);
+  const printPages = useMemo(() => {
+    if (printScope === 'custom') return compactCustomPrintPages(pages, dims, customUploadedIds);
+    return pages
+      .map((page) => {
+        const slots = Object.fromEntries(Object.entries(page.slots).filter(([, id]) => allPoolIds.has(id)));
+        const crops = Object.fromEntries(Object.entries(page.crops || {}).filter(([key, crop]) => slots[key] === crop.img));
+        return { ...page, slots, crops };
+      })
+      .filter((page) => !settings.skipEmptyPages || getSlots(page, dims).some((slot) => page.slots[slot.key]));
+  }, [pages, settings.skipEmptyPages, dims, printScope, customUploadedIds, allPoolIds]);
 
   useEffect(() => { layoutIdRef.current = settings.layout; }, [settings.layout]);
   useEffect(() => { dimsRef.current = dims; }, [dims]);
@@ -1609,7 +1651,7 @@ export default function CardBinder() {
         return [];
       }
     }
-    notify(`${plural(entries.length, 'image')} added to the Card Pool.`, 'success');
+    notify(`${plural(entries.length, 'image')} added to MichiBinder.`, 'success');
     return entries.map((entry) => entry.id);
   }, [notify, pool.length, storageMode]);
 
@@ -2761,7 +2803,7 @@ export default function CardBinder() {
     const label = group.length === 1 ? `Page ${pageNumbers[0]}` : `Pages ${pageNumbers[0]}–${pageNumbers[1]}`;
     return (
       <div key={group.join('-')} data-page-group={pageNumbers.join('-')} className={`relative flex shrink-0 flex-col items-center gap-2 pb-1 text-[10px] font-medium whitespace-nowrap ${active ? 'text-red-400' : 'text-neutral-500'}`}>
-        <div className={`flex items-center gap-0.5 p-2 ${active ? 'ring-2 ring-red-500 ring-offset-4 ring-offset-neutral-950 rounded-md scale-105 transition-transform duration-200' : 'rounded-md transition-transform duration-200'}`}>{group.map((pageIndex) => renderThumbnailLeaf(pages[pageIndex], pageIndex))}</div>
+        <div className={`flex items-center gap-0.5 p-2 ${active ? 'ring-2 ring-red-500 ring-offset-4 ring-offset-neutral-950 rounded-md scale-105 duration-200 transition-transform' : 'rounded-md duration-200 transition-transform'}`}>{group.map((pageIndex) => renderThumbnailLeaf(pages[pageIndex], pageIndex))}</div>
         <span>{label}</span>
       </div>
     );
@@ -3028,7 +3070,7 @@ export default function CardBinder() {
         />
         <div className="flex min-h-0 flex-1 pb-7">
           <CardPool
-            pool={pool}
+            customUploadedCards={customUploadedCards}
             selected={selected}
             placedIds={placedIds}
             images={images}
@@ -3070,6 +3112,16 @@ export default function CardBinder() {
               onDragOver={(event) => { if (!combineMode && (['pool', 'remote'].includes(dragRef.current?.kind) || hasFiles(event.dataTransfer))) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; } }}
               onDrop={handleStageDrop}
             >
+              <div data-workspace-metrics className="absolute bottom-4 left-4 z-25 flex items-center gap-2 select-none pointer-events-none">
+                <div className="flex items-center gap-1.5 px-2 py-1 bg-neutral-900/80 backdrop-blur-sm border border-white/[0.06] rounded-md shadow-sm">
+                  <span className="text-[9px] font-bold tracking-widest text-neutral-500 uppercase">Database</span>
+                  <span className="text-[10px] font-mono font-medium text-neutral-200">{fetchedCards.length} items</span>
+                </div>
+                <div className="flex items-center gap-1.5 px-2 py-1 bg-neutral-950/80 backdrop-blur-sm border border-white/[0.06] rounded-md shadow-sm">
+                  <span className="text-[9px] font-bold tracking-widest text-neutral-500 uppercase">Custom</span>
+                  <span className="text-[10px] font-mono font-medium text-red-400">{customUploadedCards.length} uploaded</span>
+                </div>
+              </div>
               {settings.view === 'binder' && (
                 <span
                   data-binder-bed
@@ -3111,12 +3163,16 @@ export default function CardBinder() {
               </div>
             </div>
             {showBottomPreview && (
-              <footer data-page-tray className="no-print scroll-area relative shrink-0 overflow-x-auto border-t border-white/5 bg-neutral-950/65 py-4 backdrop-blur-md before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white/10 before:to-transparent">
-                <div data-page-tray-inner className="mx-auto flex w-max items-end gap-5 px-6">
+              <footer data-page-tray className="no-print scroll-area w-full border-t border-white/[0.04] bg-neutral-900/30 backdrop-blur-sm py-4 px-6 relative flex justify-center items-center shrink-0 overflow-x-auto">
+                <div data-page-tray-inner className="mx-auto flex w-max items-end justify-center gap-4 h-full pb-2">
                   {spreadGroups.map(renderThumbnailGroup)}
-                  <div className="flex shrink-0 flex-col items-center justify-start gap-1 pb-1">
-                    <button type="button" onClick={addPage} aria-label="Add page" className="flex aspect-[1/1.414] w-14 shrink-0 items-center justify-center rounded-sm border border-dashed border-neutral-700 text-neutral-500 transition-colors hover:border-neutral-500 hover:bg-neutral-900 hover:text-neutral-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="plus" size="lg" /></button>
-                    <span className="text-[10px] font-medium whitespace-nowrap text-neutral-500">Add page</span>
+                  <div className="flex shrink-0 flex-col items-center gap-2 pb-1 text-[10px] font-medium whitespace-nowrap text-neutral-500">
+                    <div className="flex items-center rounded-md p-2 duration-200 transition-transform">
+                      <button type="button" onClick={addPage} aria-label="Add page" className="group shrink-0 bg-transparent p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500">
+                        <span className="flex aspect-[1/1.414] w-14 items-center justify-center overflow-hidden rounded-sm border border-dashed border-neutral-700 text-neutral-500 transition-colors group-hover:border-neutral-500 group-hover:bg-neutral-900 group-hover:text-neutral-200"><Icon name="plus" size="lg" /></span>
+                      </button>
+                    </div>
+                    <span>Add page</span>
                   </div>
                 </div>
               </footer>
@@ -3137,7 +3193,7 @@ export default function CardBinder() {
           {toasts.map((toast) => <div key={toast.id} role="status" className={`animate-toast pointer-events-auto flex max-w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-[12px] shadow-2xl shadow-black/40 ${toastTones[toast.tone] || toastTones.info}`}><span className="leading-relaxed">{toast.message}</span>{toast.action && <button type="button" onClick={() => { setToasts((value) => value.filter((item) => item.id !== toast.id)); toast.action.onClick(); }} className="shrink-0 rounded-md bg-white/10 px-2 py-1 font-semibold text-white hover:bg-white/20">{toast.action.label}</button>}<button type="button" title="Dismiss" aria-label="Dismiss notification" onClick={() => setToasts((value) => value.filter((item) => item.id !== toast.id))} className="grid size-6 shrink-0 place-items-center rounded-md text-current hover:bg-white/10"><Icon name="x" size="sm" /></button></div>)}
         </div>
       </div>
-      <div className="portrait-guard"><Icon name="rotate" size="2xl" className="text-red-400" /><h2 className="text-xl font-semibold text-white">Rotate to landscape</h2><p className="max-w-sm text-sm text-zinc-400">Digital Card Binder is designed as a desktop, landscape workspace.</p></div>
+      <div className="portrait-guard"><Icon name="rotate" size="2xl" className="text-red-400" /><h2 className="text-xl font-semibold text-white">Rotate to landscape</h2><p className="max-w-sm text-sm text-zinc-400">MichiBinder is designed as a desktop, landscape workspace.</p></div>
       {printTree}
     </>
   );

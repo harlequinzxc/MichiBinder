@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "Digital Card Binder",
-  "short_name": "Card Binder",
+  "name": "MichiBinder",
+  "short_name": "MichiBinder",
   "description": "Lay out trading-card binder pages and print them at true physical size.",
   "start_url": "/?source=pwa",
   "scope": "/",
@@ -31,7 +31,7 @@
     { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "screenshots": [
-    { "src": "/screenshots/desktop-wide.png", "sizes": "1600x900", "type": "image/png", "form_factor": "wide", "label": "Digital Card Binder workspace" }
+    { "src": "/screenshots/desktop-wide.png", "sizes": "1600x900", "type": "image/png", "form_factor": "wide", "label": "MichiBinder workspace" }
   ],
   "shortcuts": [
     { "name": "Open binder", "short_name": "Binder", "url": "/", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }

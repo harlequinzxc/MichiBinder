@@ -1,10 +1,10 @@
-# Digital Card Binder
+# MichiBinder
 
-Digital Card Binder is a private, desktop-first card-layout workspace for arranging trading-card images into printable binder pages. It is a client-only React PWA: images stay on the device, layouts save automatically, and the browser's print engine creates true-size PDFs.
+MichiBinder is a private, desktop-first card-layout workspace for arranging trading-card images into printable binder pages. It is a client-only React PWA: images stay on the device, layouts save automatically, and the browser's print engine creates true-size PDFs.
 
 ## Features
 
-- Upload PNG, JPG, WEBP, GIF, and AVIF card images into a reusable Card Pool.
+- Upload PNG, JPG, WEBP, GIF, and AVIF card images into the reusable Michi library.
 - Search the free TCGdex catalogue in real time, browse chronologically sorted sets with pagination, and drag Pokémon cards directly into binder pockets.
 - Select and drag one card or a batch into binder pockets.
 - Use 4-pocket (2 × 2), 9-pocket (3 × 3), or 12-pocket (4 × 3) layouts.
@@ -22,7 +22,7 @@ Digital Card Binder is a private, desktop-first card-layout workspace for arrang
 | --- | --- |
 | App bar | Page navigation, installation, shortcuts, print settings, and Print / PDF |
 | Sizing toolbar | Card dimensions, scale, pocket layout, preview mode, and true-size status |
-| Card Pool | Local image upload, multi-selection, batch fill, and image deletion |
+| Cards / Michi sidebar | TCGdex browsing, local image upload, multi-selection, batch fill, and image deletion |
 | Canvas toolbar | Combine mode, Merge, Unmerge, reset layout, and clear page |
 | Binder / Paper canvas | Arrange cards, merge pockets, inspect DPI, and reposition crops |
 | Page tray | Switch pages, drop cards onto another page, duplicate workflows, or add pages |
@@ -42,13 +42,13 @@ The true-size badge reports whether the selected grid fits inside the current pa
 5. Turn **Background graphics** on.
 6. Confirm that the paper size matches Print Setup.
 
-Do not use the print dialog's “Fit to page” option; Digital Card Binder has already calculated the correct physical scale.
+Do not use the print dialog's “Fit to page” option; MichiBinder has already calculated the correct physical scale.
 
 ## Keyboard shortcuts
 
 | Shortcut | Action |
 | --- | --- |
-| `Ctrl/⌘ + A` | Select all visible Card Pool images |
+| `Ctrl/⌘ + A` | Select all visible library images |
 | `Esc` | Cancel the current operation, close a panel, or clear selection |
 | `Delete` / `Backspace` | Delete selected pool images |
 | `M` | Toggle Combine mode |
