@@ -2586,7 +2586,11 @@ export default function CardBinder() {
                 data-spread
                 data-flip-active={pageFlip.animating ? '' : undefined}
                 className={`relative grid grid-cols-2 gap-6 [transform-style:preserve-3d] ${pageFlip.animating ? 'pointer-events-none' : ''}`}
-                style={{ width: spreadWidth, height: frameHeight }}
+                style={{
+                  width: spreadWidth,
+                  height: frameHeight,
+                  clipPath: pageFlip.animating ? 'inset(0 -100% 0 -100%)' : undefined,
+                }}
               >
                 {(activeSpread.length === 2 || pageFlip.animating) && <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-1/2 z-30 w-px -translate-x-1/2 bg-black/90 shadow-[-12px_0_20px_-8px_rgba(0,0,0,0.9),12px_0_20px_-8px_rgba(0,0,0,0.9)]" />}
                 {pageFlip.animating && pageFlip.plan ? (
