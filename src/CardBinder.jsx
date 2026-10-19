@@ -60,6 +60,9 @@ const CUSTOM_MAX_MM = 150;
 const DEFAULT_CARD_SIZE = { preset: 'pokemon', scale: 1, customWmm: 65, customHmm: 90 };
 const PRINT_SAFE_MARGIN_IN = 0.125;
 const DRAG_MIME = 'application/x-card-binder';
+const TCGDEX_SEARCH_ENDPOINT = 'https://api.tcgdex.net/v2/en/cards?name=';
+const TCGDEX_ASSET_CDN = 'https://assets.tcgdex.net';
+const TCGDEX_RESULT_LIMIT = 40;
 const IDB_NAME = 'digital-card-binder';
 const IDB_STORE = 'images';
 const IDB_VERSION = 1;
@@ -100,6 +103,30 @@ const uid = (prefix = 'id') => `${prefix}-${Date.now().toString(36)}-${Math.rand
 const keyOf = (row, col) => `${row}-${col}`;
 const isEditableTarget = (element) => Boolean(element?.matches?.('input, textarea, select, [contenteditable="true"]'));
 const hasFiles = (dataTransfer) => Array.from(dataTransfer?.types || []).includes('Files');
+const tcgdexImageBase = (image) => {
+  const value = typeof image === 'string' ? image.trim().replace(/\/$/, '') : '';
+  if (!value) return '';
+  if (/^https?:\/\//i.test(value)) {
+    try {
+      const url = new URL(value);
+      return url.origin === TCGDEX_ASSET_CDN ? url.href.replace(/\/$/, '') : '';
+    } catch { return ''; }
+  }
+  return `${TCGDEX_ASSET_CDN}${value.startsWith('/') ? '' : '/'}${value}`;
+};
+const normalizeTcgdexCards = (payload) => {
+  const items = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [];
+  return items
+    .filter((item) => item && item.id)
+    .slice(0, TCGDEX_RESULT_LIMIT)
+    .map((item) => ({
+      id: String(item.id),
+      name: String(item.name || item.id),
+      localId: item.localId == null ? '' : String(item.localId),
+      image: tcgdexImageBase(item.image),
+    }));
+};
+const safeFileName = (value) => String(value || 'pokemon-card').replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim() || 'pokemon-card';
 const emptyPage = (sheetId = null, face = null) => ({
   id: uid('page'),
   merges: [],
@@ -928,7 +955,16 @@ function CardPool({
   onDragOver,
   onDragLeave,
   onDrop,
+  searchQuery,
+  setSearchQuery,
+  fetchedCards,
+  isLoading,
+  searchError,
+  onSearchSubmit,
+  onFetchedCardDragStart,
+  onFetchedCardAdd,
 }) {
+  const searchActive = Boolean(searchQuery.trim());
   return (
     <aside
       className={`no-print relative flex w-[340px] shrink-0 flex-col border-r border-white/5 bg-neutral-950/80 shadow-[8px_0_28px_rgba(0,0,0,0.18)] ${sidebarDropActive ? 'ring-2 ring-inset ring-red-600' : ''}`}
@@ -949,20 +985,82 @@ function CardPool({
           <span>Unplaced only</span>
         </button>
       </div>
-      <div className="px-4 pb-3"><UploadZone empty={!pool.length} active={sidebarDropActive && !slotDropActive} inputRef={inputRef} onFiles={onFiles} /></div>
-      {pool.length > 0 && (
-        <div role="toolbar" aria-label="Pool actions" className="grid grid-cols-[0.6fr_1.1fr_1fr_1.2fr] gap-1 px-4 pb-3">
-          <ToolButton icon="selectAll" label="All" dense onClick={onSelectAll} disabled={!visiblePool.length} disabledReason="No visible cards" className="w-full px-1 text-[11px]" />
-          <ToolButton icon="x" label={selected.length ? `None (${selected.length})` : 'None'} dense onClick={onClearSelection} disabled={!selected.length} className={`w-full px-1 text-[11px] ${selected.length ? 'text-zinc-200' : 'pointer-events-none opacity-40'}`} />
-          <ToolButton icon="wand" label={selected.length ? `Fill (${selected.length})` : 'Fill'} dense variant={selected.length ? 'primary' : 'ghost'} onClick={onFill} disabled={!selected.length} className={`w-full px-1 text-[11px] ${selected.length ? '' : 'pointer-events-none opacity-40'}`} />
-          <ToolButton icon="trash" label={selected.length ? `Delete (${selected.length})` : 'Delete'} dense variant="danger" onClick={onDeleteSelected} disabled={!selected.length} className={`w-full px-1 text-[11px] ${selected.length ? '' : 'pointer-events-none opacity-40'}`} />
+      <div className="px-4 pb-3">
+        <form
+          role="search"
+          className="relative"
+          onSubmit={(event) => { event.preventDefault(); onSearchSubmit(); }}
+        >
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            aria-label="Search Pokémon cards"
+            placeholder="Search Pokémon cards…"
+            autoComplete="off"
+            className="w-full px-3 py-1.5 bg-neutral-950 border border-white/[0.06] rounded-md text-xs font-medium text-neutral-200 placeholder-neutral-500 focus:outline-none focus:ring-1 focus:ring-red-500/50 transition-all"
+          />
+          {isLoading && <span aria-hidden="true" className="absolute right-8 top-1/2 size-3.5 -translate-y-1/2 animate-spin rounded-full border border-neutral-600 border-t-red-500" />}
+        </form>
+        <div className="mt-1.5 flex items-center justify-between px-0.5 text-[9px] font-medium tracking-wide text-neutral-600 uppercase">
+          <span>TCGdex search</span>
+          {searchActive && <span>{isLoading ? 'Searching…' : plural(fetchedCards.length, 'result')}</span>}
         </div>
-      )}
-      <div role="listbox" aria-multiselectable="true" className="scroll-area grid flex-1 auto-rows-max grid-cols-3 content-start gap-2 px-4 pb-4" onClick={(event) => { if (event.target === event.currentTarget) onClearSelection(); }}>
-        {visiblePool.map((item, visibleIndex) => <PoolCard key={item.id} item={item} index={visibleIndex} selectionIndex={selected.indexOf(item.id)} placed={placedIds.has(item.id)} src={images[item.id] || item.src} onClick={onPoolClick} onDoubleClick={onPoolDoubleClick} onDragStart={onPoolDragStart} onDragEnd={onDragEnd} />)}
-        {!pool.length && <div className="col-span-3 mt-4 text-center text-[11px] leading-relaxed text-zinc-500">Images stay on this device and save automatically.</div>}
-        {pool.length > 0 && !visiblePool.length && <div className="col-span-3 mt-8 text-center text-[12px] text-zinc-500">Every card is placed. Turn off “Unplaced only” to see them.</div>}
       </div>
+      {searchActive ? (
+        <section aria-label="TCGdex search results" className="flex min-h-0 flex-1 flex-col px-3 pb-4">
+          {searchError && <div role="alert" className="mx-1 mb-2 rounded-md border border-red-500/20 bg-red-950/30 px-2.5 py-2 text-[10px] leading-relaxed text-red-300">{searchError}</div>}
+          <div data-tcgdex-results role="listbox" aria-label="Pokémon card search results" className="scroll-area grid grid-cols-2 gap-2 p-1 overflow-y-auto max-h-[calc(100vh-220px)] scrollbar-thin">
+            {isLoading && !fetchedCards.length && Array.from({ length: 6 }, (_, index) => <span key={index} aria-hidden="true" className="aspect-[245/337] animate-pulse rounded-lg border border-white/[0.04] bg-neutral-900" />)}
+            {fetchedCards.map((item) => {
+              const fullImageUrl = item.image ? `${item.image}/low.jpg` : '/placeholder.png';
+              const highResImageUrl = item.image ? `${item.image}/high.jpg` : '/placeholder.png';
+              return (
+                <div
+                  key={item.id}
+                  data-tcgdex-card={item.id}
+                  role="option"
+                  aria-selected="false"
+                  aria-label={`${item.name}, drag to binder`}
+                  tabIndex={0}
+                  draggable="true"
+                  title={`${item.name} · drag to a binder slot`}
+                  onDragStart={(event) => onFetchedCardDragStart(event, item, highResImageUrl)}
+                  onDragEnd={onDragEnd}
+                  onDoubleClick={() => onFetchedCardAdd(item, highResImageUrl)}
+                  onKeyDown={(event) => { if (event.key === 'Enter') onFetchedCardAdd(item, highResImageUrl); }}
+                  className="group relative aspect-[245/337] cursor-grab overflow-hidden rounded-lg border border-white/[0.06] bg-neutral-900 outline-none transition-all duration-200 hover:-translate-y-0.5 hover:border-white/15 hover:shadow-lg hover:shadow-black/50 active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-red-500"
+                >
+                  <img src={fullImageUrl} alt="" draggable={false} loading="lazy" className="size-full object-cover" onError={(event) => { if (!event.currentTarget.src.endsWith('/placeholder.png')) event.currentTarget.src = '/placeholder.png'; }} />
+                  <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent px-2 pb-1.5 pt-7">
+                    <span className="block truncate text-[10px] font-semibold text-white">{item.name}</span>
+                    <span className="mt-0.5 block truncate font-mono text-[8px] tracking-wide text-neutral-400 uppercase">{item.id}</span>
+                  </span>
+                </div>
+              );
+            })}
+            {!isLoading && !searchError && !fetchedCards.length && <div className="col-span-2 px-4 py-10 text-center text-[11px] leading-relaxed text-neutral-500">No matching Pokémon cards found.</div>}
+          </div>
+          <p className="mt-2 px-1 text-center text-[9px] leading-relaxed text-neutral-600">Drag to a slot or double-click to add · Powered by TCGdex</p>
+        </section>
+      ) : (
+        <>
+          <div className="px-4 pb-3"><UploadZone empty={!pool.length} active={sidebarDropActive && !slotDropActive} inputRef={inputRef} onFiles={onFiles} /></div>
+          {pool.length > 0 && (
+            <div role="toolbar" aria-label="Pool actions" className="grid grid-cols-[0.6fr_1.1fr_1fr_1.2fr] gap-1 px-4 pb-3">
+              <ToolButton icon="selectAll" label="All" dense onClick={onSelectAll} disabled={!visiblePool.length} disabledReason="No visible cards" className="w-full px-1 text-[11px]" />
+              <ToolButton icon="x" label={selected.length ? `None (${selected.length})` : 'None'} dense onClick={onClearSelection} disabled={!selected.length} className={`w-full px-1 text-[11px] ${selected.length ? 'text-zinc-200' : 'pointer-events-none opacity-40'}`} />
+              <ToolButton icon="wand" label={selected.length ? `Fill (${selected.length})` : 'Fill'} dense variant={selected.length ? 'primary' : 'ghost'} onClick={onFill} disabled={!selected.length} className={`w-full px-1 text-[11px] ${selected.length ? '' : 'pointer-events-none opacity-40'}`} />
+              <ToolButton icon="trash" label={selected.length ? `Delete (${selected.length})` : 'Delete'} dense variant="danger" onClick={onDeleteSelected} disabled={!selected.length} className={`w-full px-1 text-[11px] ${selected.length ? '' : 'pointer-events-none opacity-40'}`} />
+            </div>
+          )}
+          <div role="listbox" aria-multiselectable="true" className="scroll-area grid flex-1 auto-rows-max grid-cols-3 content-start gap-2 px-4 pb-4" onClick={(event) => { if (event.target === event.currentTarget) onClearSelection(); }}>
+            {visiblePool.map((item, visibleIndex) => <PoolCard key={item.id} item={item} index={visibleIndex} selectionIndex={selected.indexOf(item.id)} placed={placedIds.has(item.id)} src={images[item.id] || item.src} onClick={onPoolClick} onDoubleClick={onPoolDoubleClick} onDragStart={onPoolDragStart} onDragEnd={onDragEnd} />)}
+            {!pool.length && <div className="col-span-3 mt-4 text-center text-[11px] leading-relaxed text-zinc-500">Images stay on this device and save automatically.</div>}
+            {pool.length > 0 && !visiblePool.length && <div className="col-span-3 mt-8 text-center text-[12px] text-zinc-500">Every card is placed. Turn off “Unplaced only” to see them.</div>}
+          </div>
+        </>
+      )}
       {slotDropActive && <div className="pointer-events-none absolute inset-0 z-40 grid place-items-center bg-red-950/80 p-6 text-center text-sm font-semibold text-red-100 backdrop-blur-sm"><span className="flex items-center gap-2 rounded-xl border border-red-400/30 bg-red-500/15 px-4 py-3"><Icon name="trash" />Drop to remove from binder</span></div>}
     </aside>
   );
@@ -1056,6 +1154,10 @@ export default function CardBinder() {
   }, []);
   const [currentPage, setCurrentPage] = useState(boot.currentPage);
   const [pool, setPool] = useState(boot.pool);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [fetchedCards, setFetchedCards] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [searchError, setSearchError] = useState('');
   const [settings, setSettings] = useState(boot.settings);
   const [images, setImages] = useState(() => Object.fromEntries(boot.pool.filter((item) => item.src).map((item) => [item.id, item.src])));
   const [imageDims, setImageDims] = useState({});
@@ -1082,6 +1184,8 @@ export default function CardBinder() {
   const inputRef = useRef(null);
   const panelRootRef = useRef(null);
   const dragRef = useRef(null);
+  const searchAbortRef = useRef(null);
+  const searchDebounceRef = useRef(null);
   const marqueeRef = useRef(null);
   const selBoxRef = useRef(selBox);
   const selectionPageIdRef = useRef(selectionPageId);
@@ -1138,6 +1242,59 @@ export default function CardBinder() {
     const id = uid('toast');
     setToasts((items) => [...items.slice(-3), { id, message, tone, action }]);
     window.setTimeout(() => setToasts((items) => items.filter((item) => item.id !== id)), action ? 6500 : 3400);
+  }, []);
+
+  const fetchCards = useCallback(async (rawQuery) => {
+    const query = String(rawQuery || '').trim();
+    if (!query) {
+      setFetchedCards([]);
+      setSearchError('');
+      setIsLoading(false);
+      return;
+    }
+    searchAbortRef.current?.abort();
+    const controller = new AbortController();
+    searchAbortRef.current = controller;
+    setIsLoading(true);
+    setSearchError('');
+    try {
+      const endpoint = `${TCGDEX_SEARCH_ENDPOINT}${encodeURIComponent(query)}&pagination:page=1&pagination:itemsPerPage=${TCGDEX_RESULT_LIMIT}`;
+      const response = await fetch(endpoint, { signal: controller.signal, headers: { Accept: 'application/json' } });
+      if (!response.ok) throw new Error(`TCGdex returned ${response.status}`);
+      const payload = await response.json();
+      if (searchAbortRef.current !== controller) return;
+      setFetchedCards(normalizeTcgdexCards(payload));
+    } catch (error) {
+      if (error?.name === 'AbortError' || searchAbortRef.current !== controller) return;
+      setFetchedCards([]);
+      setSearchError('TCGdex search is unavailable right now. Check your connection and try again.');
+    } finally {
+      if (searchAbortRef.current === controller) setIsLoading(false);
+    }
+  }, []);
+
+  const submitCardSearch = useCallback(() => {
+    window.clearTimeout(searchDebounceRef.current);
+    fetchCards(searchQuery);
+  }, [fetchCards, searchQuery]);
+
+  useEffect(() => {
+    window.clearTimeout(searchDebounceRef.current);
+    searchAbortRef.current?.abort();
+    const query = searchQuery.trim();
+    if (!query) {
+      setFetchedCards([]);
+      setSearchError('');
+      setIsLoading(false);
+      return undefined;
+    }
+    searchDebounceRef.current = window.setTimeout(() => fetchCards(query), 350);
+    return () => window.clearTimeout(searchDebounceRef.current);
+  }, [searchQuery, fetchCards]);
+
+  useEffect(() => () => {
+    window.clearTimeout(searchDebounceRef.current);
+    searchAbortRef.current?.abort();
   }, []);
 
   useEffect(() => {
@@ -1282,6 +1439,29 @@ export default function CardBinder() {
     notify(`${plural(entries.length, 'image')} added to the Card Pool.`, 'success');
     return entries.map((entry) => entry.id);
   }, [notify, pool.length, storageMode]);
+
+  const importFetchedCard = useCallback(async (item, highResImageUrl) => {
+    const requestedSource = highResImageUrl || (item.image ? `${item.image}/high.jpg` : '/placeholder.png');
+    const source = requestedSource === '/placeholder.png' || requestedSource.startsWith(`${TCGDEX_ASSET_CDN}/`) ? requestedSource : '/placeholder.png';
+    try {
+      const response = await fetch(source);
+      if (!response.ok) throw new Error(`Image download returned ${response.status}`);
+      const blob = await response.blob();
+      if (!blob.type?.startsWith('image/')) throw new Error('TCGdex returned a non-image asset');
+      const file = new File([blob], `${safeFileName(item.name)} · ${safeFileName(item.id)}.jpg`, { type: blob.type || 'image/jpeg' });
+      const ids = await addFiles([file]);
+      if (ids.length) return ids;
+    } catch {
+      // Some privacy extensions block cross-origin blob downloads. The live CDN URL
+      // still remains a valid, persistable source for the binder and print views.
+    }
+    const id = uid('tcgdex');
+    sessionIdsRef.current.add(id);
+    setImages((value) => ({ ...value, [id]: source }));
+    setPool((value) => [...value, { id, name: item.name || 'Pokémon card', src: source }]);
+    notify(`${item.name || 'Pokémon card'} added from TCGdex.`, 'success');
+    return [id];
+  }, [addFiles, notify]);
 
   useEffect(() => {
     if (!('launchQueue' in window)) return undefined;
@@ -1508,6 +1688,11 @@ export default function CardBinder() {
     });
   }, [commitEditing, applyCanvasChange, notify]);
 
+  const addFetchedCardToPage = useCallback(async (item, highResImageUrl) => {
+    const ids = await importFetchedCard(item, highResImageUrl);
+    placeCards(ids, currentPageRef.current, null);
+  }, [importFetchedCard, placeCards]);
+
   const fillSelection = useCallback(() => {
     const ids = selectedOrdered;
     if (!ids.length) return;
@@ -1619,6 +1804,23 @@ export default function CardBinder() {
     requestAnimationFrame(() => setDragInfo(payload));
   }, [commitEditing, selectedOrdered, makeDragGhost]);
 
+  const startFetchedCardDrag = useCallback((event, item, highResImageUrl) => {
+    commitEditing();
+    const payload = {
+      kind: 'remote',
+      card: { id: item.id, name: item.name, image: item.image },
+      url: highResImageUrl,
+    };
+    dragRef.current = payload;
+    try {
+      event.dataTransfer.setData(DRAG_MIME, JSON.stringify(payload));
+      event.dataTransfer.setData('text/uri-list', highResImageUrl);
+      event.dataTransfer.setData('text/plain', highResImageUrl);
+    } catch { /* The live ref remains authoritative for in-app drops. */ }
+    event.dataTransfer.effectAllowed = 'copy';
+    requestAnimationFrame(() => setDragInfo(payload));
+  }, [commitEditing]);
+
   const startSlotDrag = useCallback((event, pageId, key, imgId) => {
     commitEditing();
     const pageIndex = pagesRef.current.findIndex((page) => page.id === pageId);
@@ -1666,9 +1868,12 @@ export default function CardBinder() {
       const ids = await addFiles(event.dataTransfer.files);
       placeCards(ids, pageIndex, slot.key);
     } else if (payload?.kind === 'pool') placeCards(payload.ids, pageIndex, slot.key);
-    else if (payload?.kind === 'slot') moveSlotCard(payload, pageIndex, slot.key);
+    else if (payload?.kind === 'remote') {
+      const ids = await importFetchedCard(payload.card, payload.url);
+      placeCards(ids, pageIndex, slot.key);
+    } else if (payload?.kind === 'slot') moveSlotCard(payload, pageIndex, slot.key);
     resetDrag();
-  }, [getPayload, activateCanvasPage, addFiles, placeCards, moveSlotCard, resetDrag]);
+  }, [getPayload, activateCanvasPage, addFiles, importFetchedCard, placeCards, moveSlotCard, resetDrag]);
 
   const handleStageDrop = useCallback(async (event) => {
     if (combineMode || editingRef.current) return;
@@ -1678,19 +1883,24 @@ export default function CardBinder() {
       const ids = await addFiles(event.dataTransfer.files);
       placeCards(ids, currentPageRef.current, null);
     } else if (payload?.kind === 'pool') placeCards(payload.ids, currentPageRef.current, null);
+    else if (payload?.kind === 'remote') {
+      const ids = await importFetchedCard(payload.card, payload.url);
+      placeCards(ids, currentPageRef.current, null);
+    }
     resetDrag();
-  }, [combineMode, getPayload, addFiles, placeCards, resetDrag]);
+  }, [combineMode, getPayload, addFiles, importFetchedCard, placeCards, resetDrag]);
 
   const handleSidebarDrop = useCallback(async (event) => {
     event.preventDefault();
     const payload = getPayload(event);
     if (hasFiles(event.dataTransfer)) await addFiles(event.dataTransfer.files);
+    else if (payload?.kind === 'remote') await importFetchedCard(payload.card, payload.url);
     else if (payload?.kind === 'slot') {
       removeSlotCard(payload.pageId, payload.key);
       notify('Card removed from the binder.', 'info');
     }
     resetDrag();
-  }, [getPayload, addFiles, removeSlotCard, notify, resetDrag]);
+  }, [getPayload, addFiles, importFetchedCard, removeSlotCard, notify, resetDrag]);
 
   const handleThumbDrop = useCallback(async (event, pageIndex) => {
     event.preventDefault();
@@ -1700,9 +1910,12 @@ export default function CardBinder() {
       const ids = await addFiles(event.dataTransfer.files);
       placeCards(ids, pageIndex, null);
     } else if (payload?.kind === 'pool') placeCards(payload.ids, pageIndex, null);
-    else if (payload?.kind === 'slot') moveSlotCard(payload, pageIndex, null);
+    else if (payload?.kind === 'remote') {
+      const ids = await importFetchedCard(payload.card, payload.url);
+      placeCards(ids, pageIndex, null);
+    } else if (payload?.kind === 'slot') moveSlotCard(payload, pageIndex, null);
     resetDrag();
-  }, [getPayload, addFiles, placeCards, moveSlotCard, resetDrag]);
+  }, [getPayload, addFiles, importFetchedCard, placeCards, moveSlotCard, resetDrag]);
 
   const performMerge = useCallback((box, pageIndex = currentPageRef.current) => {
     if (!box || box.rs * box.cs <= 1) return;
@@ -2644,6 +2857,14 @@ export default function CardBinder() {
             onDragOver={(event) => { if (dragRef.current || hasFiles(event.dataTransfer)) { event.preventDefault(); setSidebarDropActive(true); event.dataTransfer.dropEffect = dragRef.current?.kind === 'slot' ? 'move' : 'copy'; } }}
             onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setSidebarDropActive(false); }}
             onDrop={handleSidebarDrop}
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            fetchedCards={fetchedCards}
+            isLoading={isLoading}
+            searchError={searchError}
+            onSearchSubmit={submitCardSearch}
+            onFetchedCardDragStart={startFetchedCardDrag}
+            onFetchedCardAdd={addFetchedCardToPage}
           />
           <main className="flex min-w-0 flex-1 flex-col">
             <div
@@ -2651,7 +2872,7 @@ export default function CardBinder() {
               className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-neutral-950 bg-[radial-gradient(ellipse_at_center,rgba(82,82,91,0.18),transparent_65%)]"
               onPointerMove={moveMarquee}
               onPointerDown={(event) => { if (event.target === event.currentTarget && combineMode) { setSelBox(null); setSelectionPageId(null); } }}
-              onDragOver={(event) => { if (!combineMode && (dragRef.current?.kind === 'pool' || hasFiles(event.dataTransfer))) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; } }}
+              onDragOver={(event) => { if (!combineMode && (['pool', 'remote'].includes(dragRef.current?.kind) || hasFiles(event.dataTransfer))) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; } }}
               onDrop={handleStageDrop}
             >
               {settings.view === 'binder' && (

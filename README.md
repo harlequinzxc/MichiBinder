@@ -5,6 +5,7 @@ Digital Card Binder is a private, desktop-first card-layout workspace for arrang
 ## Features
 
 - Upload PNG, JPG, WEBP, GIF, and AVIF card images into a reusable Card Pool.
+- Search the free TCGdex catalogue in real time and drag Pokémon cards directly into binder pockets.
 - Select and drag one card or a batch into binder pockets.
 - Use 4-pocket (2 × 2), 9-pocket (3 × 3), or 12-pocket (4 × 3) layouts.
 - Combine adjacent pockets into oversized frames and split them again.
@@ -79,7 +80,7 @@ Vite serves development on `0.0.0.0:5173` and preview on `0.0.0.0:4173`.
 
 ## Storage and privacy
 
-There is no backend and the app makes no API calls. Images are stored as blobs in IndexedDB and displayed through local object URLs. Layout metadata is saved in `localStorage`. If IndexedDB is unavailable, image data URLs are stored in the local layout record instead. Reset Binder in Print Setup removes both stores.
+There is no application backend. Local uploads are stored as blobs in IndexedDB and displayed through local object URLs; layout metadata is saved in `localStorage`. Pokémon searches send the entered query directly to the free TCGdex API, and result previews load from the TCGdex asset CDN. When a result is added, the app downloads and stores the high-resolution image locally when the browser permits it, using the CDN URL as a fallback if that download is blocked. If IndexedDB is unavailable, image data URLs are stored in the local layout record instead. Reset Binder in Print Setup removes the app's local stores.
 
 ## Deployment
 
