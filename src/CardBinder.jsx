@@ -512,7 +512,7 @@ function ToolButton({ icon, label, onClick, disabled = false, disabledReason, ac
       aria-pressed={active === undefined ? undefined : active}
       aria-label={label || title || disabledReason}
       title={!disabled ? title : undefined}
-      className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:pointer-events-none disabled:text-zinc-500 ${variant === 'primary' ? 'font-semibold' : 'font-normal'} ${dense ? 'h-7 min-w-7 px-1.5 text-[12px]' : 'h-8 px-2.5 text-[13px]'} ${variants[variant]} ${className}`}
+      className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:pointer-events-none disabled:text-zinc-500 ${variant === 'primary' ? 'font-semibold' : 'font-medium'} ${dense ? 'h-7 min-w-7 px-1.5 text-[12px]' : 'h-8 px-3 py-1.5 text-xs'} ${variants[variant]} ${className}`}
     >
       {icon && <Icon name={icon} size={dense ? 'sm' : 'md'} />}
       {label && <span>{label}</span>}
@@ -579,7 +579,7 @@ function SegmentedControl({ value, onChange, options, ariaLabel, dense = false, 
           title={option.title}
           tabIndex={index === currentIndex ? 0 : -1}
           onClick={() => onChange(option.value)}
-          className={`relative z-10 inline-flex w-auto min-w-fit items-center justify-center gap-1 font-medium whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${previewStyle ? 'rounded-md' : 'rounded-full'} ${dense ? 'px-2.5 text-[11px]' : 'px-3 text-[12px]'} ${index === currentIndex ? (previewStyle ? 'text-white' : 'text-red-400') : 'text-zinc-400 hover:text-zinc-100'}`}
+          className={`relative z-10 inline-flex w-auto min-w-fit items-center justify-center gap-1 font-medium whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${previewStyle ? 'rounded-md' : 'rounded-full'} ${dense ? 'px-2.5 text-xs' : 'px-3 text-xs'} ${index === currentIndex ? (previewStyle ? 'text-white' : 'text-red-400') : 'text-zinc-400 hover:text-zinc-100'}`}
         >
           {option.icon && <Icon name={option.icon} size="sm" />}
           <span>{option.label}</span>
@@ -670,6 +670,7 @@ function HeaderCardControls({ settings, setSettings }) {
     <div role="group" aria-label="Card configuration" className="flex min-w-0 items-center gap-2">
       <div className="flex h-8 min-w-0 items-center gap-1.5 rounded-md border border-white/[0.06] bg-neutral-950/45 px-2">
         <Icon name="ruler" size="sm" className="text-neutral-500" />
+        <span className="hidden text-[10px] font-bold tracking-wider whitespace-nowrap text-neutral-500 uppercase min-[1500px]:inline">Card size</span>
         <select
           value={custom ? 'custom' : cleanSize.preset}
           aria-label="Card size"
@@ -677,7 +678,7 @@ function HeaderCardControls({ settings, setSettings }) {
             if (event.target.value === 'custom') setCardSize({ preset: 'custom', customWmm: base.w, customHmm: base.h });
             else setCardSize({ preset: event.target.value });
           }}
-          className="h-7 w-[210px] min-w-0 truncate bg-transparent text-xs font-normal text-neutral-200 outline-none max-[1499px]:w-[155px] focus-visible:ring-2 focus-visible:ring-red-500"
+          className="h-7 w-[170px] min-w-0 truncate bg-transparent text-xs font-medium text-neutral-200 outline-none max-[1499px]:w-[155px] focus-visible:ring-2 focus-visible:ring-red-500"
         >
           {CARD_PRESETS.map((preset) => <option key={preset.id} value={preset.id}>{preset.label.replace(' TCG', '')} · {preset.wMm} × {preset.hMm} mm</option>)}
           <option value="custom">Custom…</option>
@@ -697,7 +698,7 @@ function HeaderCardControls({ settings, setSettings }) {
           className="w-20 shrink-0 rounded-full accent-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 min-[1500px]:w-24"
         />
         <datalist id="scale-ticks"><option value="100" /></datalist>
-        <strong className="min-w-[4ch] text-right text-[11px] font-medium text-neutral-300">{Math.round(cleanSize.scale * 100)}%</strong>
+        <strong className="min-w-[4ch] text-right text-xs font-medium text-neutral-200">{Math.round(cleanSize.scale * 100)}%</strong>
       </div>
     </div>
   );
@@ -837,7 +838,7 @@ function SetupToolbar({ settings, setSettings, fitInfo, suggestedPaper, onChoose
       <div className="flex shrink-0 items-center gap-2 text-xs font-medium text-neutral-400">
         {custom && (
           <div className="flex h-8 shrink-0 items-center gap-2 rounded-lg border border-white/5 bg-neutral-900/60 px-2">
-            <span className="text-[11px] font-medium tracking-wide text-neutral-400 uppercase">Custom size</span>
+            <span className="text-[10px] font-bold tracking-wider text-neutral-500 uppercase">Custom size</span>
             <MmField label="W" value={cleanSize.customWmm} onCommit={(customWmm) => setCardSize({ customWmm })} />
             <span className="text-zinc-500">×</span>
             <MmField label="H" value={cleanSize.customHmm} onCommit={(customHmm) => setCardSize({ customHmm })} />
@@ -845,7 +846,7 @@ function SetupToolbar({ settings, setSettings, fitInfo, suggestedPaper, onChoose
           </div>
         )}
         <div className="flex h-8 shrink-0 items-center gap-2 rounded-lg border border-white/5 bg-neutral-900/60 px-2">
-          <span className="shrink-0 text-[11px] font-medium tracking-wide text-neutral-400 uppercase">Grid</span>
+          <span className="shrink-0 text-[10px] font-bold tracking-wider text-neutral-500 uppercase">Grid</span>
           <SegmentedControl
             ariaLabel="Pocket layout"
             value={settings.layout}
@@ -856,7 +857,7 @@ function SetupToolbar({ settings, setSettings, fitInfo, suggestedPaper, onChoose
         </div>
       </div>
       <div className="ml-auto flex shrink-0 items-center gap-2">
-        <span className="hidden shrink-0 text-[11px] font-medium tracking-wide text-neutral-400 uppercase min-[1380px]:inline">Preview</span>
+        <span className="hidden shrink-0 text-[10px] font-bold tracking-wider text-neutral-500 uppercase min-[1380px]:inline">Preview</span>
         <SegmentedControl ariaLabel="Preview" value={settings.view} onChange={onViewChange} options={[{ value: 'binder', label: 'Binder' }, { value: 'paper', label: 'Paper' }]} dense={custom} appearance="preview" />
         <PrintFitBadge fitInfo={fitInfo} paperKey={settings.paper} suggestedPaper={suggestedPaper} onUsePaper={(paper) => setSettings((value) => ({ ...value, paper }))} />
       </div>
@@ -875,7 +876,7 @@ function UploadZone({ empty, active, inputRef, onFiles }) {
       <span className={`${empty ? 'size-10' : 'size-8'} grid shrink-0 place-items-center rounded-lg border border-white/5 bg-neutral-800 text-neutral-300 transition-colors group-hover:bg-neutral-700 group-hover:text-white ${active ? 'border-red-500/30 bg-red-950/70 text-red-300' : ''}`}><Icon name="upload" size={empty ? 'lg' : 'md'} /></span>
       <span>
         <span className="block text-xs font-semibold text-neutral-200">{empty ? 'Drop card images here' : 'Add more cards'}</span>
-        {empty && <><span className="mt-1 block text-[11px] font-normal text-neutral-400">or click to browse</span><span className="mt-1 block font-mono text-[10px] tracking-normal text-neutral-500">PNG, JPG, WEBP, AVIF · multiple files</span></>}
+        {empty && <><span className="mt-1 block text-[11px] font-normal text-neutral-400">or click to browse</span><span className="mt-1.5 block font-mono text-[9px] tracking-normal text-neutral-500">PNG, JPG, WEBP, AVIF · multiple files</span></>}
       </span>
     </label>
   );
@@ -942,7 +943,7 @@ function CardPool({
           type="button"
           aria-pressed={settings.hidePlaced}
           onClick={() => setSettings((value) => ({ ...value, hidePlaced: !value.hidePlaced }))}
-          className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${settings.hidePlaced ? 'border-red-800/60 bg-red-950/50 text-red-300' : 'border-white/[0.05] bg-neutral-800 text-neutral-300 hover:bg-neutral-700 hover:text-white'}`}
+          className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-white/[0.06] bg-neutral-900 px-2.5 py-0.5 text-[11px] font-medium transition-colors hover:bg-neutral-800 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${settings.hidePlaced ? 'text-neutral-100' : 'text-neutral-400'}`}
         >
           <Icon name={settings.hidePlaced ? 'eyeOff' : 'eye'} size="sm" />
           <span>Unplaced only</span>
@@ -2234,7 +2235,7 @@ export default function CardBinder() {
             className={`group grid size-full cursor-pointer place-items-center overflow-hidden rounded-md border outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-red-500 ${settings.view === 'binder' ? 'border-white/[0.03] bg-neutral-900/50 text-neutral-300 shadow-inner hover:border-white/[0.08] hover:bg-neutral-900/80 hover:text-neutral-100' : 'border-dashed border-zinc-400 bg-white/30 text-zinc-700 hover:border-red-500 hover:text-red-800'} ${previewIndex >= 0 ? '!border-red-500 !bg-red-950/20 !shadow-[inset_0_0_0_2px_rgba(239,68,68,0.25),0_0_20px_rgba(220,38,38,0.18)]' : ''}`}
             style={{ borderRadius: radius }}
           >
-            {labelVisible && <span className="flex flex-col items-center gap-1.5"><Icon name="plus" size="sm" className="text-neutral-600 transition-colors group-hover:text-neutral-400" /><span className="font-mono text-[10px] font-normal tracking-wider text-neutral-500 uppercase transition-colors group-hover:text-neutral-400">{slot.cs * slot.rs > 1 ? `${boxDims(slot)} frame` : `Slot ${slotIndex + 1}`}</span></span>}
+            {labelVisible && <span className="flex flex-col items-center gap-1.5"><Icon name="plus" size="sm" className="text-neutral-600 transition-colors group-hover:text-neutral-400" /><span className="font-mono text-[9px] font-medium tracking-widest text-neutral-500 uppercase transition-colors group-hover:text-neutral-400">{slot.cs * slot.rs > 1 ? `${boxDims(slot)} frame` : `Slot ${slotIndex + 1}`}</span></span>}
             {previewIndex >= 0 && <span className="absolute left-1.5 top-1.5 grid size-5 place-items-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-lg shadow-red-950/60">{previewIndex + 1}</span>}
           </button>
           {slotActions}
@@ -2355,7 +2356,7 @@ export default function CardBinder() {
     const label = group.length === 1 ? `Page ${pageNumbers[0]}` : `Pages ${pageNumbers[0]}–${pageNumbers[1]}`;
     return (
       <div key={group.join('-')} data-page-group={pageNumbers.join('-')} className={`relative flex shrink-0 flex-col items-center gap-2 pb-1 text-[10px] font-medium whitespace-nowrap ${active ? 'text-red-400' : 'text-neutral-500'}`}>
-        <div className={`flex items-center gap-0.5 rounded-md p-1 transition-transform duration-200 ${active ? 'scale-105 ring-2 ring-red-500 ring-offset-4 ring-offset-neutral-950' : ''}`}>{group.map((pageIndex) => renderThumbnailLeaf(pages[pageIndex], pageIndex))}</div>
+        <div className={`flex items-center gap-0.5 rounded-md p-2 transition-transform duration-200 ${active ? 'scale-105 ring-2 ring-red-500 ring-offset-4 ring-offset-neutral-950' : ''}`}>{group.map((pageIndex) => renderThumbnailLeaf(pages[pageIndex], pageIndex))}</div>
         <span>{label}</span>
       </div>
     );
@@ -2430,7 +2431,7 @@ export default function CardBinder() {
       key={`cover-${side}`}
       data-cover-layer={side}
       aria-hidden="true"
-      className={`relative overflow-hidden border border-white/[0.03] bg-neutral-900 shadow-[inset_0_4px_12px_rgba(0,0,0,0.6),inset_0_0_70px_rgba(0,0,0,0.55),0_25px_60px_-15px_rgba(0,0,0,0.85)] ${side === 'left' ? 'rounded-l-lg rounded-r-sm' : 'rounded-l-sm rounded-r-lg'}`}
+      className={`relative overflow-hidden bg-neutral-950 ${side === 'left' ? 'rounded-l-lg border-r border-white/[0.04] shadow-[inset_-18px_0_30px_-18px_rgba(0,0,0,0.95),inset_0_4px_12px_rgba(0,0,0,0.65),0_25px_60px_-15px_rgba(0,0,0,0.85)]' : 'rounded-r-lg border-l border-white/[0.04] shadow-[inset_18px_0_30px_-18px_rgba(0,0,0,0.95),inset_0_4px_12px_rgba(0,0,0,0.65),0_25px_60px_-15px_rgba(0,0,0,0.85)]'}`}
       style={{ width: frameWidth, height: frameHeight, gridColumn: side === 'left' ? 1 : 2, gridRow: 1 }}
     >
       <span className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.025),transparent_34%,rgba(0,0,0,0.2))]" />
@@ -2691,7 +2692,7 @@ export default function CardBinder() {
                 )}
               </div>
             </div>
-            <footer data-page-tray className="no-print scroll-area shrink-0 overflow-x-auto border-t border-white/5 bg-neutral-950/65 py-4 backdrop-blur-md">
+            <footer data-page-tray className="no-print scroll-area relative shrink-0 overflow-x-auto border-t border-white/5 bg-neutral-950/65 py-4 backdrop-blur-md before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white/10 before:to-transparent">
               <div data-page-tray-inner className="mx-auto flex w-max items-end gap-5 px-6">
                 {spreadGroups.map(renderThumbnailGroup)}
                 <div className="flex shrink-0 flex-col items-center justify-start gap-1 pb-1">
