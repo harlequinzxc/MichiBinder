@@ -638,7 +638,7 @@ function SheetGrid({ page, card, gap, unit, dims, animate = false, renderSlot, g
   );
 }
 
-function SaveStatus({ status, storageMode }) {
+function SaveStatus({ status }) {
   const config = status === 'error'
     ? { dot: 'bg-red-400', text: 'Save failed' }
     : status === 'saving'
@@ -648,7 +648,6 @@ function SaveStatus({ status, storageMode }) {
     <div className="flex shrink-0 items-center gap-1.5 text-[11px] text-zinc-400" aria-live="polite">
       <span className={`size-1.5 rounded-full ${config.dot}`} />
       <span>{config.text}</span>
-      <span className="hidden min-[1500px]:inline">· {storageMode === 'indexeddb' ? 'IndexedDB' : 'browser storage'}</span>
     </div>
   );
 }
@@ -662,7 +661,51 @@ function PopoverShell({ title, icon, children }) {
   );
 }
 
+function HeaderCardControls({ settings, setSettings }) {
+  const cleanSize = settings.cardSize;
+  const base = baseCardSizeMm(cleanSize);
+  const custom = cleanSize.preset === 'custom';
+  const setCardSize = (patch) => setSettings((value) => ({ ...value, cardSize: sanitizeCardSize({ ...value.cardSize, ...patch }) }));
+  return (
+    <div role="group" aria-label="Card configuration" className="flex min-w-0 items-center gap-2">
+      <div className="flex h-8 min-w-0 items-center gap-1.5 rounded-md border border-white/[0.06] bg-neutral-950/45 px-2">
+        <Icon name="ruler" size="sm" className="text-neutral-500" />
+        <select
+          value={custom ? 'custom' : cleanSize.preset}
+          aria-label="Card size"
+          onChange={(event) => {
+            if (event.target.value === 'custom') setCardSize({ preset: 'custom', customWmm: base.w, customHmm: base.h });
+            else setCardSize({ preset: event.target.value });
+          }}
+          className="h-7 w-[210px] min-w-0 truncate bg-transparent text-[11px] font-medium text-neutral-200 outline-none max-[1499px]:w-[155px] focus-visible:ring-2 focus-visible:ring-red-500"
+        >
+          {CARD_PRESETS.map((preset) => <option key={preset.id} value={preset.id}>{preset.label.replace(' TCG', '')} · {preset.wMm} × {preset.hMm} mm</option>)}
+          <option value="custom">Custom…</option>
+        </select>
+      </div>
+      <div className="flex h-8 shrink-0 items-center gap-2 rounded-md border border-white/[0.06] bg-neutral-950/45 px-2">
+        <input
+          type="range"
+          min={80}
+          max={125}
+          step={1}
+          value={Math.round(cleanSize.scale * 100)}
+          aria-label="Card scale"
+          list="scale-ticks"
+          onChange={(event) => setCardSize({ scale: Number(event.target.value) / 100 })}
+          onDoubleClick={() => setCardSize({ scale: 1 })}
+          className="w-20 shrink-0 rounded-full accent-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 min-[1500px]:w-24"
+        />
+        <datalist id="scale-ticks"><option value="100" /></datalist>
+        <strong className="min-w-[4ch] text-right text-[10px] font-semibold text-neutral-200">{Math.round(cleanSize.scale * 100)}%</strong>
+      </div>
+    </div>
+  );
+}
+
 function AppBar({
+  settings,
+  setSettings,
   pageLabel,
   canPrevious,
   canNext,
@@ -673,7 +716,6 @@ function AppBar({
   onDelete,
   canDelete,
   saveStatus,
-  storageMode,
   installPrompt,
   onInstall,
   openPanel,
@@ -683,35 +725,34 @@ function AppBar({
   shortcuts,
 }) {
   return (
-    <header className="titlebar no-print flex items-center justify-between border-b border-white/[0.06] bg-neutral-900/80 px-6 py-2.5 shadow-[0_1px_0_rgba(255,255,255,0.02)] backdrop-blur-md">
+    <header className="titlebar no-print flex items-center justify-between border-b border-white/[0.06] bg-neutral-900/90 px-6 py-2.5 shadow-[0_1px_0_rgba(255,255,255,0.02)] backdrop-blur-md">
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-lg border border-white/[0.06] bg-neutral-900 shadow-lg shadow-black/40"><img src="/icons/icon.svg" alt="" className="size-9" /></span>
-        <div className="flex min-w-0 items-baseline gap-3">
-          <h1 className="shrink-0 text-[15px] font-semibold tracking-tight text-white">Digital Card Binder</h1>
-          <SaveStatus status={saveStatus} storageMode={storageMode} />
+        <div className="flex min-w-0 items-baseline gap-2">
+          <h1 className="shrink-0 text-[15px] font-semibold tracking-tight text-white max-[1180px]:hidden">Digital Card Binder</h1>
+          <SaveStatus status={saveStatus} />
         </div>
         <ToolbarDivider />
-        <div aria-label="Page actions" className="flex shrink-0 items-center gap-1">
-          <ToolButton icon="plus" label="Add Page" variant="primary" onClick={onAdd} title="Insert a new two-page physical sheet" className="max-[1420px]:[&>span]:hidden" />
-          <ToolButton icon="copy" onClick={onDuplicate} title="Duplicate physical sheet" />
-          <ToolButton icon="trash" label="Delete" variant="danger" onClick={onDelete} disabled={!canDelete} disabledReason="Keep at least one physical sheet" className="max-[1540px]:[&>span]:hidden" />
-        </div>
+        <HeaderCardControls settings={settings} setSettings={setSettings} />
       </div>
 
-      <nav aria-label="Pages" className="flex shrink-0 items-center justify-center">
-        <div className="flex h-8 items-center rounded-md border border-white/[0.08] bg-neutral-950/65 pl-3 pr-1 shadow-inner shadow-black/30">
-          <span className="min-w-[112px] text-center text-[11px] font-medium tracking-wide text-neutral-200">{pageLabel}</span>
-          <i aria-hidden="true" className="mx-1 h-4 w-px bg-white/[0.08]" />
-          <button type="button" aria-label="Previous page" title="Previous spread" onClick={onPrevious} disabled={!canPrevious} className="grid size-6 place-items-center rounded text-neutral-400 transition-colors hover:bg-white/10 hover:text-white disabled:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="chevronLeft" size="sm" /></button>
-          <button type="button" aria-label="Next page" title="Next spread" onClick={onNext} disabled={!canNext} className="grid size-6 place-items-center rounded text-neutral-400 transition-colors hover:bg-white/10 hover:text-white disabled:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="chevronRight" size="sm" /></button>
+      <nav aria-label="Pages" className="flex shrink-0 items-center justify-center px-3">
+        <div className="flex h-8 items-center rounded-md border border-white/[0.08] bg-neutral-950/65 p-0.5 shadow-inner shadow-black/30">
+          <button type="button" aria-label="Previous page" title="Previous spread" onClick={onPrevious} disabled={!canPrevious} className="grid size-7 place-items-center rounded text-neutral-400 transition-colors hover:bg-white/10 hover:text-white disabled:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="chevronLeft" size="sm" /></button>
+          <span className="min-w-[118px] px-2 text-center text-[11px] font-medium tracking-wide text-neutral-200">{pageLabel}</span>
+          <button type="button" aria-label="Next page" title="Next spread" onClick={onNext} disabled={!canNext} className="grid size-7 place-items-center rounded text-neutral-400 transition-colors hover:bg-white/10 hover:text-white disabled:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="chevronRight" size="sm" /></button>
         </div>
       </nav>
 
       <div className="relative flex min-w-0 flex-1 items-center justify-end gap-1.5">
         {installPrompt && <ToolButton icon="install" variant="outline" onClick={onInstall} title="Install App" />}
-        <ToolButton icon="keyboard" onClick={() => setOpenPanel(openPanel === 'shortcuts' ? null : 'shortcuts')} active={openPanel === 'shortcuts'} title="Keyboard shortcuts" className="hidden min-[1320px]:inline-flex" />
+        <ToolButton icon="keyboard" onClick={() => setOpenPanel(openPanel === 'shortcuts' ? null : 'shortcuts')} active={openPanel === 'shortcuts'} title="Keyboard shortcuts" className="hidden min-[1500px]:inline-flex" />
+        <ToolButton icon="plus" label="Add Page" variant="primary" onClick={onAdd} title="Insert a new two-page physical sheet" className="max-[1420px]:[&>span]:hidden" />
+        <ToolButton icon="copy" onClick={onDuplicate} title="Duplicate physical sheet" className="max-[1180px]:hidden" />
+        <ToolButton icon="trash" label="Delete" onClick={onDelete} disabled={!canDelete} disabledReason="Keep at least one physical sheet" title="Delete physical sheet" className="[&>span]:hidden !text-neutral-500 hover:!bg-red-500/10 hover:!text-red-300" />
+        <ToolbarDivider />
         <ToolButton icon="sliders" label="Print Setup" onClick={() => setOpenPanel(openPanel === 'print' ? null : 'print')} active={openPanel === 'print'} className="max-[1400px]:[&>span]:hidden" />
-        <ToolButton icon="printer" label="Print / PDF" variant="outline" onClick={onPrint} className="shadow-sm" />
+        <ToolButton icon="printer" label="Print / PDF" variant="outline" onClick={onPrint} className="shadow-sm max-[1180px]:[&>span]:hidden" />
         {openPanel === 'print' && printSetup}
         {openPanel === 'shortcuts' && shortcuts}
       </div>
@@ -789,53 +830,22 @@ function PrintFitBadge({ fitInfo, paperKey, suggestedPaper, onUsePaper }) {
 
 function SetupToolbar({ settings, setSettings, fitInfo, suggestedPaper, onChooseLayout, onViewChange }) {
   const cleanSize = settings.cardSize;
-  const base = baseCardSizeMm(cleanSize);
-  const resolved = resolveCardSize(cleanSize);
   const custom = cleanSize.preset === 'custom';
   const setCardSize = (patch) => setSettings((value) => ({ ...value, cardSize: sanitizeCardSize({ ...value.cardSize, ...patch }) }));
   return (
-    <div role="toolbar" aria-label="Card sizing" className="no-print flex w-full shrink-0 items-center justify-between gap-3 overflow-x-auto border-b border-white/5 bg-neutral-950/80 px-4 py-1.5 shadow-[0_1px_0_rgba(255,255,255,0.02)] backdrop-blur-xl">
+    <div role="toolbar" aria-label="Card sizing" className="no-print flex w-full shrink-0 items-center justify-between gap-3 overflow-x-auto border-b border-white/5 bg-neutral-950/80 px-6 py-1.5 shadow-[0_1px_0_rgba(255,255,255,0.02)] backdrop-blur-xl">
       <div className="flex shrink-0 items-center gap-2 text-xs font-medium text-neutral-400">
+        {custom && (
+          <div className="flex h-8 shrink-0 items-center gap-2 rounded-lg border border-white/5 bg-neutral-900/60 px-2">
+            <span className="text-[11px] text-neutral-400">Custom size</span>
+            <MmField label="W" value={cleanSize.customWmm} onCommit={(customWmm) => setCardSize({ customWmm })} />
+            <span className="text-zinc-500">×</span>
+            <MmField label="H" value={cleanSize.customHmm} onCommit={(customHmm) => setCardSize({ customHmm })} />
+            <span className="text-[11px] text-zinc-400">mm</span>
+          </div>
+        )}
         <div className="flex h-8 shrink-0 items-center gap-2 rounded-lg border border-white/5 bg-neutral-900/60 px-2">
-          <Icon name="ruler" className="text-neutral-400" />
-          <span className={`${custom ? 'hidden min-[1600px]:inline' : 'hidden xl:inline'} shrink-0 text-[11px] font-medium text-neutral-400`}>Card size</span>
-          <select
-            value={custom ? 'custom' : cleanSize.preset}
-            aria-label="Card size"
-            onChange={(event) => {
-              if (event.target.value === 'custom') setCardSize({ preset: 'custom', customWmm: base.w, customHmm: base.h });
-              else setCardSize({ preset: event.target.value });
-            }}
-            className="h-7 w-auto min-w-fit shrink-0 rounded-md border border-neutral-700 bg-neutral-900 px-2 text-[11px] font-medium text-neutral-200 outline-none transition-colors hover:border-neutral-600 focus-visible:ring-2 focus-visible:ring-red-500"
-          >
-            {CARD_PRESETS.map((preset) => <option key={preset.id} value={preset.id}>{preset.label} · {preset.hint}</option>)}
-            <option value="custom">Custom…</option>
-          </select>
-          {custom && <div className="flex shrink-0 items-center gap-1"><MmField label="W" value={cleanSize.customWmm} onCommit={(customWmm) => setCardSize({ customWmm })} /><span className="text-zinc-500">×</span><MmField label="H" value={cleanSize.customHmm} onCommit={(customHmm) => setCardSize({ customHmm })} /><span className="text-[11px] text-zinc-400">mm</span></div>}
-        </div>
-        <ToolbarDivider />
-        <div className="flex h-8 shrink-0 items-center gap-2 rounded-lg border border-white/5 bg-neutral-900/60 px-2">
-          <span className={`${custom ? 'hidden min-[1600px]:inline' : ''} shrink-0 text-[11px] font-medium text-neutral-400`}>Scale</span>
-          <input
-            type="range"
-            min={80}
-            max={125}
-            step={1}
-            value={Math.round(cleanSize.scale * 100)}
-            aria-label="Card scale"
-            list="scale-ticks"
-            onChange={(event) => setCardSize({ scale: Number(event.target.value) / 100 })}
-            onDoubleClick={() => setCardSize({ scale: 1 })}
-            className={`${custom ? 'w-20 min-[1600px]:w-24' : 'w-24'} shrink-0 rounded-full accent-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-900`}
-          />
-          <datalist id="scale-ticks"><option value="100" /></datalist>
-          <strong className="w-auto min-w-[5ch] shrink-0 whitespace-nowrap text-right text-[11px] font-semibold text-neutral-100">{Math.round(cleanSize.scale * 100)}%</strong>
-          {cleanSize.scale !== 1 && <button type="button" title="Reset scale" aria-label="Reset scale" onClick={() => setCardSize({ scale: 1 })} className="grid size-7 shrink-0 place-items-center rounded-md text-zinc-400 hover:bg-white/10 hover:text-white"><Icon name="reset" size="sm" /></button>}
-          <span className={`${custom ? 'hidden min-[1700px]:inline' : 'hidden min-[1440px]:inline'} w-auto min-w-fit shrink-0 whitespace-nowrap text-[11px] text-zinc-400`}>{fmtMm(resolved.w)} × {fmtMm(resolved.h)} mm</span>
-        </div>
-        <ToolbarDivider />
-        <div className="flex h-8 shrink-0 items-center gap-2 rounded-lg border border-white/5 bg-neutral-900/60 px-2">
-          <span className={`${custom ? 'hidden min-[1600px]:inline' : ''} shrink-0 text-[11px] font-medium text-neutral-400`}>Grid</span>
+          <span className="shrink-0 text-[11px] font-medium text-neutral-400">Grid</span>
           <SegmentedControl
             ariaLabel="Pocket layout"
             value={settings.layout}
@@ -859,12 +869,12 @@ function UploadZone({ empty, active, inputRef, onFiles }) {
     <label
       tabIndex={0}
       onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); inputRef.current?.click(); } }}
-      className={`group flex cursor-pointer items-center justify-center rounded-lg border border-dashed border-neutral-700 bg-neutral-900/20 transition-all hover:border-neutral-600 hover:bg-neutral-900/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${empty ? 'min-h-32 flex-col gap-2.5 p-4 text-center' : 'gap-3 p-3'} ${active ? 'border-red-600 bg-red-950/30' : ''}`}
+      className={`group flex cursor-pointer items-center justify-center rounded-lg border border-dashed border-neutral-700 bg-neutral-900/30 transition-all hover:border-neutral-600 hover:bg-neutral-900/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${empty ? 'min-h-32 flex-col gap-2.5 p-6 text-center' : 'gap-3 p-3'} ${active ? 'border-red-600 bg-red-950/30' : ''}`}
     >
       <input ref={inputRef} type="file" accept="image/*" multiple className="sr-only" onChange={(event) => { onFiles(event.target.files); event.target.value = ''; }} />
       <span className={`${empty ? 'size-10' : 'size-8'} grid shrink-0 place-items-center rounded-lg border border-white/5 bg-neutral-800 text-neutral-300 transition-colors group-hover:bg-neutral-700 group-hover:text-white ${active ? 'border-red-500/30 bg-red-950/70 text-red-300' : ''}`}><Icon name="upload" size={empty ? 'lg' : 'md'} /></span>
       <span>
-        <span className="block text-xs font-semibold text-neutral-200">{empty ? 'Drop card images here' : 'Add more cards'}</span>
+        <span className="block text-xs font-medium text-neutral-200">{empty ? 'Drop card images here' : 'Add more cards'}</span>
         {empty && <><span className="mt-1 block text-[11px] text-neutral-400">or click to browse</span><span className="mt-1 block text-[10px] tracking-wide text-neutral-500">PNG, JPG, WEBP, AVIF · multiple files</span></>}
       </span>
     </label>
@@ -998,10 +1008,10 @@ function CanvasHelper({ editing, multiDrag, flowCount, combineMode, offsetX, onC
 
 function WorkspaceStatusBar() {
   return (
-    <footer data-workspace-status className="no-print pointer-events-none fixed bottom-0 left-0 right-0 z-50 flex select-none items-center justify-center gap-4 overflow-hidden border-t border-white/[0.05] bg-neutral-950/90 px-4 py-1 font-mono text-[10px] whitespace-nowrap text-neutral-400 backdrop-blur-md">
-      <span><kbd className="rounded border border-neutral-700 bg-neutral-800 px-1 font-sans text-neutral-200 shadow-sm">Ctrl/⌘</kbd> + Click to toggle selection</span>
+    <footer data-workspace-status className="no-print pointer-events-none fixed bottom-0 left-0 right-0 z-50 flex select-none items-center justify-center gap-4 overflow-hidden border-t border-white/[0.05] bg-neutral-950/90 px-4 py-1 font-mono text-[10px] whitespace-nowrap text-neutral-400 shadow-[0_-8px_24px_rgba(0,0,0,0.35)] backdrop-blur-md">
+      <span><kbd className="rounded border border-neutral-700 bg-neutral-800 px-1.5 py-0.5 font-sans text-[9px] text-neutral-200 shadow-sm">Ctrl / ⌘</kbd> + Click to toggle card selection</span>
       <span aria-hidden="true" className="text-neutral-700">|</span>
-      <span><kbd className="rounded border border-neutral-700 bg-neutral-800 px-1 font-sans text-neutral-200 shadow-sm">Shift</kbd> + Click for page ranges</span>
+      <span><kbd className="rounded border border-neutral-700 bg-neutral-800 px-1.5 py-0.5 font-sans text-[9px] text-neutral-200 shadow-sm">Shift</kbd> + Click for page ranges</span>
       <span aria-hidden="true" className="text-neutral-700">|</span>
       <span>Drag and drop assets directly onto active binder slots</span>
     </footer>
@@ -1014,8 +1024,9 @@ function BinderSpine({ view }) {
     <div
       data-binder-spine
       aria-hidden="true"
-      className={`pointer-events-none absolute inset-y-0 left-1/2 z-30 -translate-x-1/2 ${binderView ? 'w-8 bg-gradient-to-r from-black/50 via-transparent to-black/50 shadow-[inset_10px_0_18px_-12px_rgba(0,0,0,0.98),inset_-10px_0_18px_-12px_rgba(0,0,0,0.98)]' : 'w-px bg-black/70'}`}
+      className={`pointer-events-none absolute inset-y-0 left-1/2 z-30 -translate-x-1/2 ${binderView ? 'w-8 shadow-[inset_10px_0_18px_-12px_rgba(0,0,0,0.98),inset_-10px_0_18px_-12px_rgba(0,0,0,0.98)]' : 'w-px bg-black/70'}`}
     >
+      {binderView && <span data-spine-crease className="pointer-events-none absolute h-full w-full bg-gradient-to-r from-black/45 via-transparent to-black/45" />}
       <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-black/80" />
       {binderView && [0.17, 0.5, 0.83].map((position) => (
         <span
@@ -2220,7 +2231,7 @@ export default function CardBinder() {
               if (combineMode) { setSelectionPageId(page.id); setSelBox(expandBox(mergeBox(slot), pageMerges)); return; }
               if (selectedOrdered.length) placeCards(selectedOrdered, pageIndex, slot.key);
             }}
-            className={`group grid size-full cursor-pointer place-items-center overflow-hidden border outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-red-500 ${settings.view === 'binder' ? 'border-white/[0.03] bg-neutral-900/40 text-neutral-300 shadow-[inset_0_0_20px_rgba(0,0,0,0.32)] hover:border-white/[0.08] hover:bg-neutral-900/70 hover:text-neutral-100' : 'border-dashed border-zinc-400 bg-white/30 text-zinc-700 hover:border-red-500 hover:text-red-800'} ${previewIndex >= 0 ? '!border-red-500 !bg-red-950/20 !shadow-[inset_0_0_0_2px_rgba(239,68,68,0.25),0_0_20px_rgba(220,38,38,0.18)]' : ''}`}
+            className={`group grid size-full cursor-pointer place-items-center overflow-hidden rounded-md border outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-red-500 ${settings.view === 'binder' ? 'border-white/[0.03] bg-neutral-900/50 text-neutral-300 shadow-inner hover:border-white/[0.08] hover:bg-neutral-900/80 hover:text-neutral-100' : 'border-dashed border-zinc-400 bg-white/30 text-zinc-700 hover:border-red-500 hover:text-red-800'} ${previewIndex >= 0 ? '!border-red-500 !bg-red-950/20 !shadow-[inset_0_0_0_2px_rgba(239,68,68,0.25),0_0_20px_rgba(220,38,38,0.18)]' : ''}`}
             style={{ borderRadius: radius }}
           >
             {labelVisible && <span className="flex flex-col items-center gap-1 text-[11px] font-semibold"><Icon name="plus" size="lg" /><span>{slot.cs * slot.rs > 1 ? `${boxDims(slot)} frame` : `Slot ${slotIndex + 1}`}</span></span>}
@@ -2266,7 +2277,7 @@ export default function CardBinder() {
             }}
           />
         )}
-        <div className={`relative size-full overflow-hidden border bg-white transition-all duration-200 ${settings.view === 'binder' ? 'sleeve-sheen border-white/[0.03] bg-neutral-900/40 hover:border-white/[0.08] hover:bg-neutral-900/70' : 'border-transparent'} ${isEditing ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-zinc-900' : ''} ${previewIndex >= 0 ? 'ring-2 ring-inset ring-red-500 shadow-[0_0_20px_rgba(220,38,38,0.25)]' : ''}`} style={{ borderRadius: radius }}>
+        <div className={`relative size-full overflow-hidden border bg-white transition-all duration-200 ${settings.view === 'binder' ? 'sleeve-sheen rounded-md border-white/[0.03] bg-neutral-900/50 shadow-inner hover:border-white/[0.08] hover:bg-neutral-900/80' : 'border-transparent'} ${isEditing ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-zinc-900' : ''} ${previewIndex >= 0 ? 'ring-2 ring-inset ring-red-500 shadow-[0_0_20px_rgba(220,38,38,0.25)]' : ''}`} style={{ borderRadius: radius }}>
           {source ? <img
             data-img-id={imgId}
             src={source}
@@ -2397,7 +2408,7 @@ export default function CardBinder() {
         />}
         {settings.view === 'binder' ? (
           <div
-            className="sheet-frame relative flex size-full items-start justify-start overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-b from-neutral-800 to-neutral-800/90 shadow-[0_20px_50px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.05)]"
+            className="sheet-frame relative flex size-full items-start justify-start overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-b from-neutral-800 to-neutral-800/90 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.05)]"
             style={{ paddingTop: SHEET_PAD.top * ppi, paddingRight: (side === 'left' ? SHEET_PAD.left : SHEET_PAD.right) * ppi, paddingBottom: SHEET_PAD.bottom * ppi, paddingLeft: (side === 'left' ? SHEET_PAD.right : SHEET_PAD.left) * ppi }}
           >
             {[0.17, 0.5, 0.83].map((position) => <span key={position} aria-hidden="true" className={`absolute size-3 -translate-y-1/2 rounded-full border border-black/80 bg-neutral-900 ring-1 ring-white/10 shadow-[inset_0_2px_4px_rgba(0,0,0,0.95),0_1px_0_rgba(255,255,255,0.12)] ${side === 'left' ? 'translate-x-1/2' : '-translate-x-1/2'}`} style={{ [side === 'left' ? 'right' : 'left']: (SHEET_PAD.left * ppi) / 2, top: `${position * 100}%` }} />)}
@@ -2419,7 +2430,7 @@ export default function CardBinder() {
       key={`cover-${side}`}
       data-cover-layer={side}
       aria-hidden="true"
-      className="relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-neutral-900 via-neutral-950 to-black shadow-[inset_0_0_70px_rgba(0,0,0,0.9),0_20px_50px_rgba(0,0,0,0.8)]"
+      className="relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-neutral-900 via-neutral-950 to-black shadow-[inset_0_0_70px_rgba(0,0,0,0.9),0_25px_60px_-15px_rgba(0,0,0,0.85)]"
       style={{ width: frameWidth, height: frameHeight, gridColumn: side === 'left' ? 1 : 2, gridRow: 1 }}
     />
   );
@@ -2573,6 +2584,8 @@ export default function CardBinder() {
       <div className="app-shell flex flex-col bg-[#0B0B0C] text-zinc-200">
         <div ref={panelRootRef}>
           <AppBar
+            settings={settings}
+            setSettings={setSettings}
             pageLabel={activeSpread.length === 1 ? `Page ${activeSpread[0] + 1} / ${pages.length}` : `Pages ${activeSpread[0] + 1}–${activeSpread[1] + 1} / ${pages.length}`}
             canPrevious={activeSpreadIndex > 0}
             canNext={activeSpreadIndex < spreadGroups.length - 1}
@@ -2583,7 +2596,6 @@ export default function CardBinder() {
             onDelete={deletePage}
             canDelete={pages.length > 2}
             saveStatus={saveStatus}
-            storageMode={storageMode}
             installPrompt={installPrompt}
             onInstall={async () => { await installPrompt.prompt(); setInstallPrompt(null); }}
             openPanel={openPanel}
@@ -2601,7 +2613,7 @@ export default function CardBinder() {
           onChooseLayout={chooseLayout}
           onViewChange={(view) => { commitEditing(); setSettings((value) => ({ ...value, view })); }}
         />
-        <div className="flex min-h-0 flex-1 pb-6">
+        <div className="flex min-h-0 flex-1 pb-7">
           <CardPool
             pool={pool}
             visiblePool={visiblePool}
