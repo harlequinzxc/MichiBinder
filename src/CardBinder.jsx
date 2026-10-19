@@ -1012,16 +1012,27 @@ function CardPool({
   setsList,
   selectedSet,
   setSelectedSet,
-  apiPage,
-  setApiPage,
-  apiHasNext,
+  hasMoreCards,
   searchError,
   onSearchSubmit,
+  onClearFilters,
+  onLoadMore,
   onFetchedCardDragStart,
   onFetchedCardAdd,
 }) {
   const searchActive = Boolean(searchQuery.trim() || selectedSet);
   const customCards = customUploadedCards.map((item) => ({ ...item, localUrlDataString: images[item.id] || item.src || '' }));
+  const catalogScrollLockRef = useRef(false);
+  useEffect(() => {
+    if (!isLoading) catalogScrollLockRef.current = false;
+  }, [isLoading, fetchedCards.length]);
+  const handleCatalogScroll = (event) => {
+    const catalog = event.currentTarget;
+    const nearBottom = catalog.scrollHeight - catalog.scrollTop - catalog.clientHeight <= 100;
+    if (!nearBottom || isLoading || !hasMoreCards || catalogScrollLockRef.current) return;
+    catalogScrollLockRef.current = true;
+    onLoadMore();
+  };
   const handleLocalUploadEvent = (event) => {
     onFiles(event.target.files);
     event.target.value = '';
@@ -1124,7 +1135,7 @@ function CardPool({
               <input
                 type="search"
                 value={searchQuery}
-                onChange={(event) => { setSearchQuery(event.target.value); setApiPage(1); }}
+                onChange={(event) => setSearchQuery(event.target.value)}
                 aria-label="Search Pokémon cards"
                 placeholder="Search Pokémon cards…"
                 autoComplete="off"
@@ -1138,28 +1149,23 @@ function CardPool({
                 <select
                   value={selectedSet}
                   aria-label="Filter by Pokémon set"
-                  onChange={(event) => { setSelectedSet(event.target.value); setApiPage(1); }}
+                  onChange={(event) => setSelectedSet(event.target.value)}
                   className="w-full px-3 py-1.5 bg-neutral-950 border border-white/[0.06] rounded-md text-xs font-medium text-neutral-300 focus:outline-none cursor-pointer focus:ring-1 focus:ring-red-500/50"
                 >
                   <option value="">All sets</option>
                   {setsList.map((set) => <option key={set.id} value={set.id}>{set.name}{set.cardCount ? ` · ${set.cardCount}` : ''}</option>)}
                 </select>
               </label>
-              <div className="flex items-center justify-between mt-2 px-1 py-0.5 bg-neutral-950/60 border border-white/[0.04] rounded-md text-[11px] font-mono text-neutral-400">
-                <button type="button" aria-label="Previous API page" title="Previous result page" disabled={apiPage <= 1 || isLoading} onClick={() => setApiPage((value) => Math.max(1, value - 1))} className="grid size-6 place-items-center rounded text-neutral-500 transition-colors hover:text-neutral-200 disabled:pointer-events-none disabled:text-neutral-800 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-red-500/50"><Icon name="chevronLeft" size="xs" /></button>
-                <span>Page {apiPage}</span>
-                <button type="button" aria-label="Next API page" title="Next result page" disabled={!searchActive || !apiHasNext || isLoading} onClick={() => setApiPage((value) => value + 1)} className="grid size-6 place-items-center rounded text-neutral-500 transition-colors hover:text-neutral-200 disabled:pointer-events-none disabled:text-neutral-800 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-red-500/50"><Icon name="chevronRight" size="xs" /></button>
-              </div>
             </div>
           </div>
 
           {searchActive ? (
             <section aria-label="TCGdex search results" className="flex min-h-0 flex-1 flex-col px-3 pb-4">
               <div className="flex items-center justify-between w-full px-1 py-1 border-b border-white/[0.04] mb-2">
-                <span aria-live="polite" className="text-[10px] font-mono text-neutral-400 bg-neutral-800 px-1.5 py-0.5 rounded border border-white/[0.04]">{isLoading ? 'Loading…' : plural(fetchedCards.length, 'item')}</span>
+                <span aria-live="polite" className="text-[10px] font-mono text-neutral-400 bg-neutral-800 px-1.5 py-0.5 rounded border border-white/[0.04]">{isLoading && !fetchedCards.length ? 'Loading…' : plural(fetchedCards.length, 'item')}</span>
                 <button
                   type="button"
-                  onClick={() => { setSearchQuery(''); setSelectedSet(''); setApiPage(1); }}
+                  onClick={onClearFilters}
                   className="flex items-center gap-1 text-[10px] font-medium tracking-wide text-neutral-400 hover:text-neutral-200 transition-colors cursor-pointer select-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-red-500/50 rounded-sm"
                 >
                   <Icon name="x" size="xs" className="w-3 h-3" />
@@ -1168,33 +1174,42 @@ function CardPool({
               </div>
               {searchError && <div role="alert" className="mx-1 mb-2 rounded-md border border-red-500/20 bg-red-950/30 px-2.5 py-2 text-[10px] leading-relaxed text-red-300">{searchError}</div>}
               <div className="px-2 py-1">
-                <div data-tcgdex-results role="listbox" aria-label="Pokémon card search results" aria-busy={isLoading} className="scroll-area grid grid-cols-2 gap-3 p-1 overflow-y-auto max-h-[calc(100vh-280px)] scrollbar-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden group rounded-md border border-white/[0.04]">
+                <div
+                  data-tcgdex-results
+                  role="listbox"
+                  aria-label="Pokémon card search results"
+                  aria-busy={isLoading}
+                  onScroll={handleCatalogScroll}
+                  className="scroll-area grid grid-cols-2 gap-3 p-2 overflow-y-auto max-h-[calc(100vh-220px)] scrollbar-none will-change-transform [scrollbar-width:none] [&::-webkit-scrollbar]:hidden group rounded-md border border-white/[0.04]"
+                >
                   {isLoading && !fetchedCards.length && Array.from({ length: 6 }, (_, index) => <span key={index} aria-hidden="true" className="aspect-[245/337] animate-pulse rounded-lg border border-white/[0.04] bg-neutral-900" />)}
-                {fetchedCards.map((item) => {
-                  const fullImageUrl = item.image ? `${item.image}/low.jpg` : '/placeholder.png';
-                  const highResImageUrl = item.image ? `${item.image}/high.jpg` : '/placeholder.png';
-                  return (
-                    <div
-                      key={item.id}
-                      data-tcgdex-card={item.id}
-                      role="option"
-                      aria-selected="false"
-                      aria-label={`${item.name}, drag to binder`}
-                      tabIndex={0}
-                      draggable="true"
-                      title={`${item.name} · drag to a binder slot`}
-                      onDragStart={(event) => onFetchedCardDragStart(event, item, highResImageUrl)}
-                      onDragEnd={onDragEnd}
-                      onDoubleClick={() => onFetchedCardAdd(item, highResImageUrl)}
-                      onKeyDown={(event) => { if (event.key === 'Enter') onFetchedCardAdd(item, highResImageUrl); }}
-                      className="relative group/card aspect-[245/337] cursor-grab active:cursor-grabbing rounded-md overflow-hidden bg-neutral-900 border border-white/[0.03] shadow-sm outline-none transition-all hover:scale-[1.04] hover:shadow-xl hover:border-white/[0.1] hover:ring-1 hover:ring-red-500/30 focus-visible:ring-2 focus-visible:ring-red-500"
-                    >
-                      <img src={fullImageUrl} alt={item.name} draggable={false} loading="lazy" className="w-full h-auto object-contain bg-neutral-950 transition-opacity duration-200" onError={(event) => { if (!event.currentTarget.src.endsWith('/placeholder.png')) event.currentTarget.src = '/placeholder.png'; }} />
-                      <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover/card:opacity-100 group-focus-visible/card:opacity-100 transition-opacity p-2 flex items-end"><span className="text-[9px] font-mono font-medium tracking-wide text-neutral-200 truncate w-full">{item.name}</span></span>
-                    </div>
-                  );
-                })}
+                  {fetchedCards.map((item) => {
+                    const fullImageUrl = item.image ? `${item.image}/low.jpg` : '/placeholder.png';
+                    const highResImageUrl = item.image ? `${item.image}/high.jpg` : '/placeholder.png';
+                    return (
+                      <div
+                        key={item.id}
+                        data-tcgdex-card={item.id}
+                        role="option"
+                        aria-selected="false"
+                        aria-label={`${item.name}, drag to binder`}
+                        tabIndex={0}
+                        draggable="true"
+                        title={`${item.name} · drag to a binder slot`}
+                        onDragStart={(event) => onFetchedCardDragStart(event, item, highResImageUrl)}
+                        onDragEnd={onDragEnd}
+                        onDoubleClick={() => onFetchedCardAdd(item, highResImageUrl)}
+                        onKeyDown={(event) => { if (event.key === 'Enter') onFetchedCardAdd(item, highResImageUrl); }}
+                        className="relative group/card aspect-[245/337] cursor-grab active:cursor-grabbing rounded-md overflow-hidden bg-neutral-900 border border-white/[0.03] shadow-sm outline-none transition-all hover:scale-[1.04] hover:shadow-xl hover:border-white/[0.1] hover:ring-1 hover:ring-red-500/30 focus-visible:ring-2 focus-visible:ring-red-500"
+                      >
+                        <img src={fullImageUrl} alt={item.name} draggable={false} loading="lazy" className="w-full h-auto object-contain bg-neutral-950 transition-opacity duration-200" onError={(event) => { if (!event.currentTarget.src.endsWith('/placeholder.png')) event.currentTarget.src = '/placeholder.png'; }} />
+                        <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover/card:opacity-100 group-focus-visible/card:opacity-100 transition-opacity p-2 flex items-end"><span className="text-[9px] font-mono font-medium tracking-wide text-neutral-200 truncate w-full">{item.name}</span></span>
+                      </div>
+                    );
+                  })}
+                  {isLoading && fetchedCards.length > 0 && <div data-catalog-loading className="col-span-2 flex items-center justify-center gap-2 py-3 text-[10px] font-medium text-neutral-500"><span aria-hidden="true" className="size-3 animate-spin rounded-full border border-neutral-700 border-t-red-500" />Loading more cards…</div>}
                   {!isLoading && !searchError && !fetchedCards.length && <div className="col-span-2 text-center py-12 text-xs text-neutral-500 font-mono tracking-wide">No matching Pokémon cards found.</div>}
+                  {!isLoading && !searchError && !hasMoreCards && fetchedCards.length > 0 && <div data-catalog-end className="col-span-2 border-t border-white/[0.04] py-3 text-center text-[9px] font-mono tracking-widest text-neutral-600 uppercase">End of catalog</div>}
                 </div>
               </div>
               <p className="mt-2 px-1 text-center text-[9px] leading-relaxed text-neutral-600">Drag to a slot or double-click to add · Powered by TCGdex</p>
@@ -1311,8 +1326,8 @@ export default function CardBinder() {
   const [isLoading, setIsLoading] = useState(false);
   const [setsList, setSetsList] = useState([]);
   const [selectedSet, setSelectedSet] = useState('');
-  const [apiPage, setApiPage] = useState(1);
-  const [apiHasNext, setApiHasNext] = useState(false);
+  const [catalogPage, setCatalogPage] = useState(1);
+  const [hasMoreCards, setHasMoreCards] = useState(true);
   const [searchError, setSearchError] = useState('');
   const [settings, setSettings] = useState(boot.settings);
   const [images, setImages] = useState(() => Object.fromEntries(boot.pool.filter((item) => item.src).map((item) => [item.id, item.src])));
@@ -1430,13 +1445,40 @@ export default function CardBinder() {
     return () => controller.abort();
   }, []);
 
+  const resetCatalogState = useCallback(() => {
+    window.clearTimeout(searchDebounceRef.current);
+    searchAbortRef.current?.abort();
+    searchAbortRef.current = null;
+    setCatalogPage(1);
+    setHasMoreCards(true);
+    setFetchedCards([]);
+    setSearchError('');
+    setIsLoading(false);
+  }, []);
+
+  const updateSearchQuery = useCallback((value) => {
+    resetCatalogState();
+    setSearchQuery(value);
+  }, [resetCatalogState]);
+
+  const updateSelectedSet = useCallback((value) => {
+    resetCatalogState();
+    setSelectedSet(value);
+  }, [resetCatalogState]);
+
+  const clearCatalogFilters = useCallback(() => {
+    resetCatalogState();
+    setSearchQuery('');
+    setSelectedSet('');
+  }, [resetCatalogState]);
+
   const fetchCards = useCallback(async (rawQuery, setId, pageNumber) => {
     const query = String(rawQuery || '').trim();
     const activeSet = String(setId || '').trim();
     const nextPage = Math.max(1, Math.floor(Number(pageNumber) || 1));
     if (!query && !activeSet) {
       setFetchedCards([]);
-      setApiHasNext(false);
+      setHasMoreCards(false);
       setSearchError('');
       setIsLoading(false);
       return;
@@ -1463,7 +1505,7 @@ export default function CardBinder() {
         const start = (nextPage - 1) * TCGDEX_RESULT_LIMIT;
         const pageItems = matching.slice(start, start + TCGDEX_RESULT_LIMIT);
         normalized = normalizeTcgdexCards(pageItems);
-        hasNext = start + TCGDEX_RESULT_LIMIT < matching.length;
+        hasNext = normalized.length === TCGDEX_RESULT_LIMIT && start + normalized.length < matching.length;
       } else {
         const endpoint = `${TCGDEX_SEARCH_ENDPOINT}${encodeURIComponent(query)}&pagination:page=${nextPage}&pagination:itemsPerPage=${TCGDEX_RESULT_LIMIT}`;
         const response = await fetch(endpoint, { signal: controller.signal, headers: { Accept: 'application/json' } });
@@ -1472,12 +1514,12 @@ export default function CardBinder() {
         hasNext = normalized.length === TCGDEX_RESULT_LIMIT;
       }
       if (searchAbortRef.current !== controller) return;
-      setFetchedCards(normalized);
-      setApiHasNext(hasNext);
+      setFetchedCards((currentCards) => nextPage === 1 ? normalized : [...currentCards, ...normalized]);
+      setHasMoreCards(hasNext);
     } catch (error) {
       if (error?.name === 'AbortError' || searchAbortRef.current !== controller) return;
-      setFetchedCards([]);
-      setApiHasNext(false);
+      if (nextPage === 1) setFetchedCards([]);
+      setHasMoreCards(false);
       setSearchError('TCGdex search is unavailable right now. Check your connection and try again.');
     } finally {
       if (searchAbortRef.current === controller) setIsLoading(false);
@@ -1486,8 +1528,17 @@ export default function CardBinder() {
 
   const submitCardSearch = useCallback(() => {
     window.clearTimeout(searchDebounceRef.current);
-    fetchCards(searchQuery, selectedSet, apiPage);
-  }, [fetchCards, searchQuery, selectedSet, apiPage]);
+    searchAbortRef.current?.abort();
+    setCatalogPage(1);
+    setHasMoreCards(true);
+    setFetchedCards([]);
+    fetchCards(searchQuery, selectedSet, 1);
+  }, [fetchCards, searchQuery, selectedSet]);
+
+  const loadMoreCards = useCallback(() => {
+    if (isLoading || !hasMoreCards || (!searchQuery.trim() && !selectedSet)) return;
+    setCatalogPage((value) => value + 1);
+  }, [hasMoreCards, isLoading, searchQuery, selectedSet]);
 
   useEffect(() => {
     window.clearTimeout(searchDebounceRef.current);
@@ -1496,15 +1547,23 @@ export default function CardBinder() {
     const query = searchQuery.trim();
     if (!query && !selectedSet) {
       setFetchedCards([]);
-      setApiHasNext(false);
+      setHasMoreCards(false);
       setSearchError('');
       setIsLoading(false);
       return undefined;
     }
+    setHasMoreCards(true);
     setIsLoading(true);
-    searchDebounceRef.current = window.setTimeout(() => fetchCards(query, selectedSet, apiPage), query ? 350 : 0);
+    searchDebounceRef.current = window.setTimeout(() => fetchCards(query, selectedSet, 1), query ? 350 : 0);
     return () => window.clearTimeout(searchDebounceRef.current);
-  }, [searchQuery, selectedSet, apiPage, fetchCards]);
+  }, [searchQuery, selectedSet, fetchCards]);
+
+  useEffect(() => {
+    if (catalogPage <= 1 || !hasMoreCards) return;
+    const query = searchQuery.trim();
+    if (!query && !selectedSet) return;
+    fetchCards(query, selectedSet, catalogPage);
+  }, [catalogPage, fetchCards, hasMoreCards, searchQuery, selectedSet]);
 
   useEffect(() => () => {
     window.clearTimeout(searchDebounceRef.current);
@@ -3089,17 +3148,17 @@ export default function CardBinder() {
             activeTab={activeTab}
             setActiveTab={setActiveTab}
             searchQuery={searchQuery}
-            setSearchQuery={setSearchQuery}
+            setSearchQuery={updateSearchQuery}
             fetchedCards={fetchedCards}
             isLoading={isLoading}
             setsList={setsList}
             selectedSet={selectedSet}
-            setSelectedSet={setSelectedSet}
-            apiPage={apiPage}
-            setApiPage={setApiPage}
-            apiHasNext={apiHasNext}
+            setSelectedSet={updateSelectedSet}
+            hasMoreCards={hasMoreCards}
             searchError={searchError}
             onSearchSubmit={submitCardSearch}
+            onClearFilters={clearCatalogFilters}
+            onLoadMore={loadMoreCards}
             onFetchedCardDragStart={startFetchedCardDrag}
             onFetchedCardAdd={addFetchedCardToPage}
           />

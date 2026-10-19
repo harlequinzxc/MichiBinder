@@ -5,7 +5,7 @@ MichiBinder is a private, desktop-first card-layout workspace for arranging trad
 ## Features
 
 - Upload PNG, JPG, WEBP, GIF, and AVIF card images into the reusable Michi library.
-- Search the free TCGdex catalogue in real time, browse chronologically sorted sets with pagination, and drag Pokémon cards directly into binder pockets.
+- Search the free TCGdex catalogue in real time, browse chronologically sorted sets with seamless infinite scrolling, and drag Pokémon cards directly into binder pockets.
 - Select and drag one card or a batch into binder pockets.
 - Use 4-pocket (2 × 2), 9-pocket (3 × 3), or 12-pocket (4 × 3) layouts.
 - Combine adjacent pockets into oversized frames and split them again.
