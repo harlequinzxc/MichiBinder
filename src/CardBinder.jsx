@@ -60,7 +60,9 @@ const CUSTOM_MAX_MM = 150;
 const DEFAULT_CARD_SIZE = { preset: 'pokemon', scale: 1, customWmm: 65, customHmm: 90 };
 const PRINT_SAFE_MARGIN_IN = 0.125;
 const DRAG_MIME = 'application/x-card-binder';
-const TCGDEX_SEARCH_ENDPOINT = 'https://api.tcgdex.net/v2/en/cards?name=';
+const TCGDEX_API_BASE = 'https://api.tcgdex.net/v2/en';
+const TCGDEX_SEARCH_ENDPOINT = `${TCGDEX_API_BASE}/cards?name=`;
+const TCGDEX_SETS_ENDPOINT = `${TCGDEX_API_BASE}/sets`;
 const TCGDEX_ASSET_CDN = 'https://assets.tcgdex.net';
 const TCGDEX_RESULT_LIMIT = 40;
 const IDB_NAME = 'digital-card-binder';
@@ -125,6 +127,24 @@ const normalizeTcgdexCards = (payload) => {
       localId: item.localId == null ? '' : String(item.localId),
       image: tcgdexImageBase(item.image),
     }));
+};
+const normalizeTcgdexSets = (payload) => {
+  const items = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [];
+  return items
+    .filter((item) => item && item.id)
+    .map((item, index) => ({
+      id: String(item.id),
+      name: String(item.name || item.id),
+      releaseDate: typeof item.releaseDate === 'string' ? item.releaseDate : '',
+      seriesName: String(item.serie?.name || item.series?.name || ''),
+      cardCount: Math.max(0, Number(item.cardCount?.total) || 0),
+      sourceIndex: index,
+    }))
+    .sort((left, right) => {
+      if (left.releaseDate && right.releaseDate && left.releaseDate !== right.releaseDate) return right.releaseDate.localeCompare(left.releaseDate);
+      if (left.seriesName && right.seriesName && left.seriesName !== right.seriesName) return left.seriesName.localeCompare(right.seriesName);
+      return left.sourceIndex - right.sourceIndex;
+    });
 };
 const safeFileName = (value) => String(value || 'pokemon-card').replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim() || 'pokemon-card';
 const emptyPage = (sheetId = null, face = null) => ({
@@ -959,12 +979,18 @@ function CardPool({
   setSearchQuery,
   fetchedCards,
   isLoading,
+  setsList,
+  selectedSet,
+  setSelectedSet,
+  apiPage,
+  setApiPage,
+  apiHasNext,
   searchError,
   onSearchSubmit,
   onFetchedCardDragStart,
   onFetchedCardAdd,
 }) {
-  const searchActive = Boolean(searchQuery.trim());
+  const searchActive = Boolean(searchQuery.trim() || selectedSet);
   return (
     <aside
       className={`no-print relative flex w-[340px] shrink-0 flex-col border-r border-white/5 bg-neutral-950/80 shadow-[8px_0_28px_rgba(0,0,0,0.18)] ${sidebarDropActive ? 'ring-2 ring-inset ring-red-600' : ''}`}
@@ -994,7 +1020,7 @@ function CardPool({
           <input
             type="search"
             value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
+            onChange={(event) => { setSearchQuery(event.target.value); setApiPage(1); }}
             aria-label="Search Pokémon cards"
             placeholder="Search Pokémon cards…"
             autoComplete="off"
@@ -1002,15 +1028,48 @@ function CardPool({
           />
           {isLoading && <span aria-hidden="true" className="absolute right-8 top-1/2 size-3.5 -translate-y-1/2 animate-spin rounded-full border border-neutral-600 border-t-red-500" />}
         </form>
-        <div className="mt-1.5 flex items-center justify-between px-0.5 text-[9px] font-medium tracking-wide text-neutral-600 uppercase">
-          <span>TCGdex search</span>
-          {searchActive && <span>{isLoading ? 'Searching…' : plural(fetchedCards.length, 'result')}</span>}
+        <div className="mt-2">
+          <label className="block">
+            <span className="mb-1 block text-[10px] font-bold tracking-widest text-neutral-500 uppercase">Card set</span>
+            <select
+              value={selectedSet}
+              aria-label="Filter by Pokémon set"
+              onChange={(event) => { setSelectedSet(event.target.value); setApiPage(1); }}
+              className="w-full px-2.5 py-1.5 bg-neutral-950 border border-white/[0.06] rounded-md text-xs font-medium text-neutral-300 focus:outline-none cursor-pointer"
+            >
+              <option value="">All sets</option>
+              {setsList.map((set) => <option key={set.id} value={set.id}>{set.name}{set.cardCount ? ` · ${set.cardCount}` : ''}</option>)}
+            </select>
+          </label>
+          <div className="flex items-center justify-between mt-2 px-1 text-[11px] font-mono text-neutral-400">
+            <button
+              type="button"
+              aria-label="Previous API page"
+              title="Previous result page"
+              disabled={apiPage <= 1 || isLoading}
+              onClick={() => setApiPage((value) => Math.max(1, value - 1))}
+              className="grid size-6 place-items-center rounded text-neutral-500 transition-colors hover:text-neutral-200 disabled:pointer-events-none disabled:text-neutral-800 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-red-500/50"
+            ><Icon name="chevronLeft" size="xs" /></button>
+            <span>Page {apiPage}</span>
+            <button
+              type="button"
+              aria-label="Next API page"
+              title="Next result page"
+              disabled={!searchActive || !apiHasNext || isLoading}
+              onClick={() => setApiPage((value) => value + 1)}
+              className="grid size-6 place-items-center rounded text-neutral-500 transition-colors hover:text-neutral-200 disabled:pointer-events-none disabled:text-neutral-800 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-red-500/50"
+            ><Icon name="chevronRight" size="xs" /></button>
+          </div>
+          <div aria-live="polite" className="mt-1 flex items-center justify-between px-0.5 text-[9px] font-medium tracking-wide text-neutral-600 uppercase">
+            <span>TCGdex catalogue</span>
+            {searchActive && <span>{isLoading ? 'Loading…' : plural(fetchedCards.length, 'result')}</span>}
+          </div>
         </div>
       </div>
       {searchActive ? (
         <section aria-label="TCGdex search results" className="flex min-h-0 flex-1 flex-col px-3 pb-4">
           {searchError && <div role="alert" className="mx-1 mb-2 rounded-md border border-red-500/20 bg-red-950/30 px-2.5 py-2 text-[10px] leading-relaxed text-red-300">{searchError}</div>}
-          <div data-tcgdex-results role="listbox" aria-label="Pokémon card search results" className="scroll-area grid grid-cols-2 gap-2 p-1 overflow-y-auto max-h-[calc(100vh-220px)] scrollbar-thin">
+          <div data-tcgdex-results role="listbox" aria-label="Pokémon card search results" aria-busy={isLoading} className="scroll-area grid grid-cols-2 gap-2 p-1 overflow-y-auto max-h-[calc(100vh-220px)] scrollbar-thin">
             {isLoading && !fetchedCards.length && Array.from({ length: 6 }, (_, index) => <span key={index} aria-hidden="true" className="aspect-[245/337] animate-pulse rounded-lg border border-white/[0.04] bg-neutral-900" />)}
             {fetchedCards.map((item) => {
               const fullImageUrl = item.image ? `${item.image}/low.jpg` : '/placeholder.png';
@@ -1039,7 +1098,7 @@ function CardPool({
                 </div>
               );
             })}
-            {!isLoading && !searchError && !fetchedCards.length && <div className="col-span-2 px-4 py-10 text-center text-[11px] leading-relaxed text-neutral-500">No matching Pokémon cards found.</div>}
+            {!isLoading && !searchError && !fetchedCards.length && <div className="col-span-2 text-center py-12 text-xs text-neutral-500 font-mono tracking-wide">No matching Pokémon cards found.</div>}
           </div>
           <p className="mt-2 px-1 text-center text-[9px] leading-relaxed text-neutral-600">Drag to a slot or double-click to add · Powered by TCGdex</p>
         </section>
@@ -1157,6 +1216,10 @@ export default function CardBinder() {
   const [searchQuery, setSearchQuery] = useState('');
   const [fetchedCards, setFetchedCards] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [setsList, setSetsList] = useState([]);
+  const [selectedSet, setSelectedSet] = useState('');
+  const [apiPage, setApiPage] = useState(1);
+  const [apiHasNext, setApiHasNext] = useState(false);
   const [searchError, setSearchError] = useState('');
   const [settings, setSettings] = useState(boot.settings);
   const [images, setImages] = useState(() => Object.fromEntries(boot.pool.filter((item) => item.src).map((item) => [item.id, item.src])));
@@ -1186,6 +1249,7 @@ export default function CardBinder() {
   const dragRef = useRef(null);
   const searchAbortRef = useRef(null);
   const searchDebounceRef = useRef(null);
+  const setCardsCacheRef = useRef(new Map());
   const marqueeRef = useRef(null);
   const selBoxRef = useRef(selBox);
   const selectionPageIdRef = useRef(selectionPageId);
@@ -1244,10 +1308,29 @@ export default function CardBinder() {
     window.setTimeout(() => setToasts((items) => items.filter((item) => item.id !== id)), action ? 6500 : 3400);
   }, []);
 
-  const fetchCards = useCallback(async (rawQuery) => {
+  useEffect(() => {
+    const controller = new AbortController();
+    (async () => {
+      try {
+        const endpoint = `${TCGDEX_SETS_ENDPOINT}?sort:field=releaseDate&sort:order=DESC`;
+        let response = await fetch(endpoint, { signal: controller.signal, headers: { Accept: 'application/json' } });
+        if ([400, 422].includes(response.status)) response = await fetch(TCGDEX_SETS_ENDPOINT, { signal: controller.signal, headers: { Accept: 'application/json' } });
+        if (!response.ok) throw new Error(`TCGdex returned ${response.status}`);
+        setSetsList(normalizeTcgdexSets(await response.json()));
+      } catch (error) {
+        if (error?.name !== 'AbortError') setSetsList([]);
+      }
+    })();
+    return () => controller.abort();
+  }, []);
+
+  const fetchCards = useCallback(async (rawQuery, setId, pageNumber) => {
     const query = String(rawQuery || '').trim();
-    if (!query) {
+    const activeSet = String(setId || '').trim();
+    const nextPage = Math.max(1, Math.floor(Number(pageNumber) || 1));
+    if (!query && !activeSet) {
       setFetchedCards([]);
+      setApiHasNext(false);
       setSearchError('');
       setIsLoading(false);
       return;
@@ -1258,15 +1341,37 @@ export default function CardBinder() {
     setIsLoading(true);
     setSearchError('');
     try {
-      const endpoint = `${TCGDEX_SEARCH_ENDPOINT}${encodeURIComponent(query)}&pagination:page=1&pagination:itemsPerPage=${TCGDEX_RESULT_LIMIT}`;
-      const response = await fetch(endpoint, { signal: controller.signal, headers: { Accept: 'application/json' } });
-      if (!response.ok) throw new Error(`TCGdex returned ${response.status}`);
-      const payload = await response.json();
+      let normalized;
+      let hasNext;
+      if (activeSet) {
+        let setCards = setCardsCacheRef.current.get(activeSet);
+        if (!setCards) {
+          const response = await fetch(`${TCGDEX_SETS_ENDPOINT}/${encodeURIComponent(activeSet)}`, { signal: controller.signal, headers: { Accept: 'application/json' } });
+          if (!response.ok) throw new Error(`TCGdex returned ${response.status}`);
+          const payload = await response.json();
+          setCards = Array.isArray(payload?.cards) ? payload.cards : [];
+          setCardsCacheRef.current.set(activeSet, setCards);
+        }
+        const needle = query.toLocaleLowerCase();
+        const matching = needle ? setCards.filter((item) => String(item?.name || '').toLocaleLowerCase().includes(needle)) : setCards;
+        const start = (nextPage - 1) * TCGDEX_RESULT_LIMIT;
+        const pageItems = matching.slice(start, start + TCGDEX_RESULT_LIMIT);
+        normalized = normalizeTcgdexCards(pageItems);
+        hasNext = start + TCGDEX_RESULT_LIMIT < matching.length;
+      } else {
+        const endpoint = `${TCGDEX_SEARCH_ENDPOINT}${encodeURIComponent(query)}&pagination:page=${nextPage}&pagination:itemsPerPage=${TCGDEX_RESULT_LIMIT}`;
+        const response = await fetch(endpoint, { signal: controller.signal, headers: { Accept: 'application/json' } });
+        if (!response.ok) throw new Error(`TCGdex returned ${response.status}`);
+        normalized = normalizeTcgdexCards(await response.json());
+        hasNext = normalized.length === TCGDEX_RESULT_LIMIT;
+      }
       if (searchAbortRef.current !== controller) return;
-      setFetchedCards(normalizeTcgdexCards(payload));
+      setFetchedCards(normalized);
+      setApiHasNext(hasNext);
     } catch (error) {
       if (error?.name === 'AbortError' || searchAbortRef.current !== controller) return;
       setFetchedCards([]);
+      setApiHasNext(false);
       setSearchError('TCGdex search is unavailable right now. Check your connection and try again.');
     } finally {
       if (searchAbortRef.current === controller) setIsLoading(false);
@@ -1275,22 +1380,25 @@ export default function CardBinder() {
 
   const submitCardSearch = useCallback(() => {
     window.clearTimeout(searchDebounceRef.current);
-    fetchCards(searchQuery);
-  }, [fetchCards, searchQuery]);
+    fetchCards(searchQuery, selectedSet, apiPage);
+  }, [fetchCards, searchQuery, selectedSet, apiPage]);
 
   useEffect(() => {
     window.clearTimeout(searchDebounceRef.current);
     searchAbortRef.current?.abort();
+    searchAbortRef.current = null;
     const query = searchQuery.trim();
-    if (!query) {
+    if (!query && !selectedSet) {
       setFetchedCards([]);
+      setApiHasNext(false);
       setSearchError('');
       setIsLoading(false);
       return undefined;
     }
-    searchDebounceRef.current = window.setTimeout(() => fetchCards(query), 350);
+    setIsLoading(true);
+    searchDebounceRef.current = window.setTimeout(() => fetchCards(query, selectedSet, apiPage), query ? 350 : 0);
     return () => window.clearTimeout(searchDebounceRef.current);
-  }, [searchQuery, fetchCards]);
+  }, [searchQuery, selectedSet, apiPage, fetchCards]);
 
   useEffect(() => () => {
     window.clearTimeout(searchDebounceRef.current);
@@ -2861,6 +2969,12 @@ export default function CardBinder() {
             setSearchQuery={setSearchQuery}
             fetchedCards={fetchedCards}
             isLoading={isLoading}
+            setsList={setsList}
+            selectedSet={selectedSet}
+            setSelectedSet={setSelectedSet}
+            apiPage={apiPage}
+            setApiPage={setApiPage}
+            apiHasNext={apiHasNext}
             searchError={searchError}
             onSearchSubmit={submitCardSearch}
             onFetchedCardDragStart={startFetchedCardDrag}
