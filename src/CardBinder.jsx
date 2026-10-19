@@ -488,13 +488,13 @@ const ICONS = {
 };
 const ICON_SIZES = { xs: 'size-3', sm: 'size-3.5', md: 'size-4', lg: 'size-5', xl: 'size-8', '2xl': 'size-12' };
 
-function Icon({ name, size = 'md', className = '' }) {
+function Icon({ name, size = 'md', className = '', strokeWidth }) {
   const Component = ICONS[name];
   if (!Component) {
     if (import.meta.env.DEV) console.warn(`Unknown icon: ${name}`);
     return null;
   }
-  return <Component className={`${ICON_SIZES[size] || ICON_SIZES.md} shrink-0 ${className}`} strokeWidth={size === 'xl' || size === '2xl' ? 1.5 : 2} aria-hidden="true" />;
+  return <Component className={`${ICON_SIZES[size] || ICON_SIZES.md} shrink-0 ${className}`} strokeWidth={strokeWidth ?? (size === 'xl' || size === '2xl' ? 1.5 : 2)} aria-hidden="true" />;
 }
 
 function ToolButton({ icon, label, onClick, disabled = false, disabledReason, active, variant = 'ghost', title, kbd, className = '', dense = false, type = 'button' }) {
@@ -670,7 +670,7 @@ function HeaderCardControls({ settings, setSettings }) {
     <div role="group" aria-label="Card configuration" className="flex min-w-0 items-center gap-2">
       <div className="flex h-8 min-w-0 items-center gap-1.5 rounded-md border border-white/[0.06] bg-neutral-950/45 px-2">
         <Icon name="ruler" size="sm" className="text-neutral-500" />
-        <span className="hidden text-[10px] font-bold tracking-wider whitespace-nowrap text-neutral-500 uppercase min-[1500px]:inline">Card size</span>
+        <span className="hidden text-[10px] font-bold tracking-widest whitespace-nowrap text-neutral-500 uppercase min-[1500px]:inline">Card size</span>
         <select
           value={custom ? 'custom' : cleanSize.preset}
           aria-label="Card size"
@@ -846,7 +846,7 @@ function SetupToolbar({ settings, setSettings, fitInfo, suggestedPaper, onChoose
           </div>
         )}
         <div className="flex h-8 shrink-0 items-center gap-2 rounded-lg border border-white/5 bg-neutral-900/60 px-2">
-          <span className="shrink-0 text-[10px] font-bold tracking-wider text-neutral-500 uppercase">Grid</span>
+          <span className="shrink-0 text-[10px] font-bold tracking-widest text-neutral-500 uppercase">Grid</span>
           <SegmentedControl
             ariaLabel="Pocket layout"
             value={settings.layout}
@@ -968,9 +968,9 @@ function CardPool({
   );
 }
 
-function CanvasToolbar({ combineMode, setCombineMode, selBox, canMerge, mergeLabel, onMerge, selectedMergeCount, onUnmerge, onResetLayout, onClearPage, filled, total, mergedCount, layout }) {
+function CanvasToolbar({ combineMode, setCombineMode, selBox, canMerge, mergeLabel, onMerge, selectedMergeCount, onUnmerge, onResetLayout, onClearPage, filled, total, mergedCount, layout, pageNumber }) {
   return (
-    <div role="toolbar" aria-label="Grid tools" className="@container absolute inset-x-0 bottom-full z-40 mb-3 flex h-10 w-full max-w-full items-center justify-between rounded-xl border border-zinc-800 bg-[#121214]/95 px-1.5 shadow-xl shadow-black/40 backdrop-blur">
+    <div data-workspace-toolbar data-active-page={pageNumber} role="toolbar" aria-label={`Grid tools for page ${pageNumber}`} className="@container absolute inset-x-0 bottom-full z-40 mb-3 flex h-10 w-full max-w-full items-center justify-between rounded-xl border border-zinc-800 bg-[#121214]/95 px-1.5 shadow-xl shadow-black/40 backdrop-blur">
       <div className="flex shrink-0 items-center">
         <ToolButton icon="combine" dense active={combineMode} onClick={() => setCombineMode((value) => !value)} title="Combine Slots (M)" className="@[21rem]:hidden">
         </ToolButton>
@@ -981,6 +981,7 @@ function CanvasToolbar({ combineMode, setCombineMode, selBox, canMerge, mergeLab
         <ToolButton icon="split" label={selectedMergeCount > 1 ? `Unmerge ${selectedMergeCount}` : 'Unmerge'} dense onClick={onUnmerge} disabled={!selectedMergeCount} disabledReason="Select a merged frame to unmerge" className="[&>span]:hidden @[18rem]:[&>span]:inline" />
       </div>
       <div className="flex shrink-0 items-center">
+        <span className="mr-1 hidden text-[10px] font-bold tracking-widest whitespace-nowrap text-neutral-500 uppercase @[24rem]:inline">Page {pageNumber}</span>
         <ToolButton icon={layout.icon} dense title={`Reset ${layout.label} layout`} onClick={onResetLayout} disabled={!mergedCount} disabledReason="No merged frames to reset" />
         <ToolButton icon="eraser" dense variant="danger" title="Clear page" onClick={onClearPage} disabled={!filled} disabledReason="Page is already empty" />
         <ToolbarDivider slim />
@@ -1009,8 +1010,8 @@ function CanvasHelper({ editing, multiDrag, flowCount, combineMode, offsetX, onC
 
 function WorkspaceStatusBar() {
   return (
-    <footer data-workspace-status className="no-print pointer-events-none fixed bottom-0 left-0 right-0 z-50 flex select-none items-center justify-center gap-4 overflow-hidden border-t border-white/[0.05] bg-neutral-950/90 px-4 py-1 font-mono text-[10px] whitespace-nowrap text-neutral-400 shadow-[0_-8px_24px_rgba(0,0,0,0.35)] backdrop-blur-md">
-      <span><kbd className="rounded border border-neutral-700 bg-neutral-800 px-1.5 py-0.5 font-sans text-[9px] text-neutral-200 shadow-sm">Ctrl / ⌘</kbd> + Click to toggle card selection</span>
+    <footer data-workspace-status className="no-print pointer-events-none fixed bottom-0 left-0 right-0 z-50 flex select-none items-center justify-center gap-4 overflow-hidden border-t border-white/[0.05] bg-neutral-950/80 px-4 py-1.5 font-mono text-[10px] whitespace-nowrap text-neutral-400 shadow-[0_-8px_24px_rgba(0,0,0,0.35)] backdrop-blur-md">
+      <span><kbd className="rounded border border-neutral-700 bg-neutral-800 px-1.5 py-0.5 font-sans text-[9px] text-neutral-200 shadow-sm">Ctrl / ⌘</kbd> + Click to select multiple cards</span>
       <span aria-hidden="true" className="text-neutral-700">|</span>
       <span><kbd className="rounded border border-neutral-700 bg-neutral-800 px-1.5 py-0.5 font-sans text-[9px] text-neutral-200 shadow-sm">Shift</kbd> + Click for page ranges</span>
       <span aria-hidden="true" className="text-neutral-700">|</span>
@@ -1027,7 +1028,7 @@ function BinderSpine({ view }) {
       aria-hidden="true"
       className={`pointer-events-none absolute inset-y-0 left-1/2 z-30 -translate-x-1/2 ${binderView ? 'w-8 shadow-[inset_10px_0_18px_-12px_rgba(0,0,0,0.98),inset_-10px_0_18px_-12px_rgba(0,0,0,0.98)]' : 'w-px bg-black/70'}`}
     >
-      {binderView && <span data-spine-crease className="pointer-events-none absolute h-full w-full bg-gradient-to-r from-black/45 via-transparent to-black/45" />}
+      {binderView && <span data-spine-crease className="pointer-events-none absolute inset-0 h-full w-full bg-gradient-to-r from-black/50 via-transparent to-black/50" />}
       <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-black/80" />
       {binderView && [0.17, 0.5, 0.83].map((position) => (
         <span
@@ -2235,7 +2236,7 @@ export default function CardBinder() {
             className={`group grid size-full cursor-pointer place-items-center overflow-hidden rounded-md border outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-red-500 ${settings.view === 'binder' ? 'border-white/[0.03] bg-neutral-900/50 text-neutral-300 shadow-inner hover:border-white/[0.08] hover:bg-neutral-900/80 hover:text-neutral-100' : 'border-dashed border-zinc-400 bg-white/30 text-zinc-700 hover:border-red-500 hover:text-red-800'} ${previewIndex >= 0 ? '!border-red-500 !bg-red-950/20 !shadow-[inset_0_0_0_2px_rgba(239,68,68,0.25),0_0_20px_rgba(220,38,38,0.18)]' : ''}`}
             style={{ borderRadius: radius }}
           >
-            {labelVisible && <span className="flex flex-col items-center gap-1.5"><Icon name="plus" size="sm" className="text-neutral-600 transition-colors group-hover:text-neutral-400" /><span className="font-mono text-[9px] font-medium tracking-widest text-neutral-500 uppercase transition-colors group-hover:text-neutral-400">{slot.cs * slot.rs > 1 ? `${boxDims(slot)} frame` : `Slot ${slotIndex + 1}`}</span></span>}
+            {labelVisible && <span className="flex flex-col items-center gap-1.5"><Icon name="plus" size="xs" strokeWidth={1.5} className="text-neutral-600 transition-colors group-hover:text-neutral-400" /><span className="font-mono text-[9px] font-medium tracking-widest text-neutral-500 uppercase transition-colors group-hover:text-neutral-400">{slot.cs * slot.rs > 1 ? `${boxDims(slot)} frame` : `Slot ${slotIndex + 1}`}</span></span>}
             {previewIndex >= 0 && <span className="absolute left-1.5 top-1.5 grid size-5 place-items-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-lg shadow-red-950/60">{previewIndex + 1}</span>}
           </button>
           {slotActions}
@@ -2362,19 +2363,40 @@ export default function CardBinder() {
     );
   };
 
-  const renderCanvasLeaf = (pageIndex, options = {}) => {
+  const renderWorkspaceToolbar = () => {
+    const pageIndex = clamp(currentPage, 0, pages.length - 1);
     const page = pages[pageIndex];
     if (!page) return null;
-    const side = options.side || pageSide(pageIndex, pages.length);
-    const showChrome = options.showChrome !== false;
-    const showHelper = options.showHelper !== false;
     const pageSelBox = selectionPageId === page.id ? selBox : null;
     const pageMerges = activeMerges(page, dims);
     const pageSelectedMerges = pageSelBox ? pageMerges.filter((merge) => boxesIntersect(merge, pageSelBox)) : [];
     const pageExactMerge = pageMerges.some((merge) => sameBox(merge, pageSelBox));
     const pageCanMerge = Boolean(combineMode && pageSelBox && pageSelBox.rs * pageSelBox.cs > 1 && !pageExactMerge);
-    const pageSlots = getSlots(page, dims);
-    const pageFilled = pageSlots.filter((slot) => page.slots[slot.key]).length;
+    const pageFilled = getSlots(page, dims).filter((slot) => page.slots[slot.key]).length;
+    return <CanvasToolbar
+      combineMode={combineMode}
+      setCombineMode={setCombineMode}
+      selBox={pageSelBox}
+      canMerge={pageCanMerge}
+      mergeLabel={`Merge ${pageSelBox ? boxDims(pageSelBox) : ''}`}
+      onMerge={() => performMerge(pageSelBox, pageIndex)}
+      selectedMergeCount={pageSelectedMerges.length}
+      onUnmerge={() => unmergeBox(pageSelBox, pageIndex)}
+      onResetLayout={() => resetLayout(pageIndex)}
+      onClearPage={() => clearPage(pageIndex)}
+      filled={pageFilled}
+      total={layout.pockets}
+      mergedCount={pageMerges.length}
+      layout={layout}
+      pageNumber={pageIndex + 1}
+    />;
+  };
+
+  const renderCanvasLeaf = (pageIndex, options = {}) => {
+    const page = pages[pageIndex];
+    if (!page) return null;
+    const side = options.side || pageSide(pageIndex, pages.length);
+    const showHelper = options.showHelper !== false;
     return (
       <div
         key={options.renderKey || page.id}
@@ -2391,25 +2413,9 @@ export default function CardBinder() {
           ...(options.style || {}),
         }}
       >
-        {showChrome && <CanvasToolbar
-          combineMode={combineMode}
-          setCombineMode={(next) => { activateCanvasPage(pageIndex); setCombineMode(next); }}
-          selBox={pageSelBox}
-          canMerge={pageCanMerge}
-          mergeLabel={`Merge ${pageSelBox ? boxDims(pageSelBox) : ''}`}
-          onMerge={() => performMerge(pageSelBox, pageIndex)}
-          selectedMergeCount={pageSelectedMerges.length}
-          onUnmerge={() => unmergeBox(pageSelBox, pageIndex)}
-          onResetLayout={() => resetLayout(pageIndex)}
-          onClearPage={() => clearPage(pageIndex)}
-          filled={pageFilled}
-          total={layout.pockets}
-          mergedCount={pageMerges.length}
-          layout={layout}
-        />}
         {settings.view === 'binder' ? (
           <div
-            className="sheet-frame relative flex size-full items-start justify-start overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-b from-neutral-800 to-neutral-800/90 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.05)]"
+            className="sheet-frame relative flex size-full items-start justify-start overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-b from-neutral-800 to-neutral-800/90 shadow-[0_30px_70px_-15px_rgba(0,0,0,0.9),inset_0_1px_0_rgba(255,255,255,0.05)]"
             style={{ paddingTop: SHEET_PAD.top * ppi, paddingRight: (side === 'left' ? SHEET_PAD.left : SHEET_PAD.right) * ppi, paddingBottom: SHEET_PAD.bottom * ppi, paddingLeft: (side === 'left' ? SHEET_PAD.right : SHEET_PAD.left) * ppi }}
           >
             {[0.17, 0.5, 0.83].map((position) => <span key={position} aria-hidden="true" className={`absolute size-3 -translate-y-1/2 rounded-full border border-black/80 bg-neutral-900 ring-1 ring-white/10 shadow-[inset_0_2px_4px_rgba(0,0,0,0.95),0_1px_0_rgba(255,255,255,0.12)] ${side === 'left' ? 'translate-x-1/2' : '-translate-x-1/2'}`} style={{ [side === 'left' ? 'right' : 'left']: (SHEET_PAD.left * ppi) / 2, top: `${position * 100}%` }} />)}
@@ -2445,7 +2451,6 @@ export default function CardBinder() {
     return renderCanvasLeaf(pageIndex, {
       renderKey: `base-${side}-${pageId}`,
       side,
-      showChrome: false,
       showHelper: false,
       className: 'pointer-events-none',
       ariaHidden: true,
@@ -2517,7 +2522,6 @@ export default function CardBinder() {
           surface: true,
           dataCanvas: false,
           turnFace: 'front',
-          showChrome: false,
           showHelper: false,
           ariaHidden: true,
           className: 'absolute inset-0 z-20 [backface-visibility:hidden] [transform-style:preserve-3d]',
@@ -2535,7 +2539,6 @@ export default function CardBinder() {
           surface: true,
           dataCanvas: false,
           turnFace: 'back',
-          showChrome: false,
           showHelper: false,
           ariaHidden: true,
           className: 'absolute inset-0 z-10 [backface-visibility:hidden] [transform-style:preserve-3d]',
@@ -2645,7 +2648,7 @@ export default function CardBinder() {
           <main className="flex min-w-0 flex-1 flex-col">
             <div
               ref={stageRef}
-              className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-neutral-950 bg-[radial-gradient(ellipse_at_center,rgba(82,82,91,0.18),transparent_65%)] [perspective:1200px]"
+              className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-neutral-950 bg-[radial-gradient(ellipse_at_center,rgba(82,82,91,0.18),transparent_65%)]"
               onPointerMove={moveMarquee}
               onPointerDown={(event) => { if (event.target === event.currentTarget && combineMode) { setSelBox(null); setSelectionPageId(null); } }}
               onDragOver={(event) => { if (!combineMode && (dragRef.current?.kind === 'pool' || hasFiles(event.dataTransfer))) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; } }}
@@ -2659,37 +2662,36 @@ export default function CardBinder() {
                   style={{ width: spreadWidth + 48, height: frameHeight + 48 }}
                 />
               )}
-              <div
-                data-spread
-                data-flip-active={pageFlip.animating ? '' : undefined}
-                className={`relative grid grid-cols-2 gap-6 [transform-style:preserve-3d] ${pageFlip.animating ? 'pointer-events-none' : ''}`}
-                style={{
-                  width: spreadWidth,
-                  height: frameHeight,
-                  clipPath: pageFlip.animating ? 'inset(0 -100% 0 -100%)' : undefined,
-                }}
-              >
-                {(settings.view === 'binder' || activeSpread.length === 2 || pageFlip.animating) && <BinderSpine view={settings.view} />}
-                {pageFlip.animating && pageFlip.plan && (
-                  <span
-                    data-turn-cast-shadow
-                    data-turn-direction={pageFlip.direction > 0 ? 'forward' : 'backward'}
-                    data-turn-state={pageFlip.turned ? 'turning' : 'resting'}
-                    aria-hidden="true"
-                  />
-                )}
-                {pageFlip.animating && pageFlip.plan ? (
-                  <>
-                    {renderAnimationBase(pageFlip.plan.baseLeftPageId, 'left')}
-                    {renderAnimationBase(pageFlip.plan.baseRightPageId, 'right')}
-                    {renderTurningSheet()}
-                  </>
-                ) : (
-                  <>
-                    {settings.view === 'binder' && activeSpread.length === 1 && renderCoverLayer(activeSpread[0] === 0 ? 'left' : 'right')}
-                    {activeSpread.map((pageIndex) => renderCanvasLeaf(pageIndex))}
-                  </>
-                )}
+              <div data-workspace-frame className={`relative [perspective:1200px] ${pageFlip.animating ? '[&_[data-workspace-toolbar]]:pointer-events-none [&_[data-workspace-toolbar]]:opacity-60' : ''}`} style={{ width: spreadWidth, height: frameHeight }}>
+                {renderWorkspaceToolbar()}
+                <div
+                  data-spread
+                  data-flip-active={pageFlip.animating ? '' : undefined}
+                  className={`relative grid size-full grid-cols-2 gap-6 [transform-style:preserve-3d] ${pageFlip.animating ? 'pointer-events-none' : ''}`}
+                  style={{ clipPath: pageFlip.animating ? 'inset(0 -100% 0 -100%)' : undefined }}
+                >
+                  {(settings.view === 'binder' || activeSpread.length === 2 || pageFlip.animating) && <BinderSpine view={settings.view} />}
+                  {pageFlip.animating && pageFlip.plan && (
+                    <span
+                      data-turn-cast-shadow
+                      data-turn-direction={pageFlip.direction > 0 ? 'forward' : 'backward'}
+                      data-turn-state={pageFlip.turned ? 'turning' : 'resting'}
+                      aria-hidden="true"
+                    />
+                  )}
+                  {pageFlip.animating && pageFlip.plan ? (
+                    <>
+                      {renderAnimationBase(pageFlip.plan.baseLeftPageId, 'left')}
+                      {renderAnimationBase(pageFlip.plan.baseRightPageId, 'right')}
+                      {renderTurningSheet()}
+                    </>
+                  ) : (
+                    <>
+                      {settings.view === 'binder' && activeSpread.length === 1 && renderCoverLayer(activeSpread[0] === 0 ? 'left' : 'right')}
+                      {activeSpread.map((pageIndex) => renderCanvasLeaf(pageIndex))}
+                    </>
+                  )}
+                </div>
               </div>
             </div>
             <footer data-page-tray className="no-print scroll-area relative shrink-0 overflow-x-auto border-t border-white/5 bg-neutral-950/65 py-4 backdrop-blur-md before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white/10 before:to-transparent">
