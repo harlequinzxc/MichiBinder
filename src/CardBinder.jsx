@@ -51,7 +51,7 @@ const MAX_COLS = 4;
 const getLayout = (id) => GRID_LAYOUTS.find((layout) => layout.id === id) || GRID_LAYOUTS[1];
 const MM = 1 / 25.4;
 const STORAGE_KEY = 'digital-card-binder:v1';
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 const CARD_PRESETS = [{ id: 'pokemon', label: 'Pokémon TCG', hint: '65 × 90 mm', wMm: 65, hMm: 90 }];
 const SCALE_MIN = 0.8;
 const SCALE_MAX = 1.25;
@@ -444,7 +444,12 @@ function loadPersisted() {
     const parsed = JSON.parse(raw);
     if (!parsed || Number(parsed.version) > SCHEMA_VERSION) return fallback;
     const pages = normalizePhysicalPages(Array.isArray(parsed.pages) && parsed.pages.length ? parsed.pages.map(sanitizePage) : emptyPages());
-    const pool = Array.isArray(parsed.pool) ? parsed.pool.filter((item) => item && typeof item.id === 'string').map((item) => ({ id: item.id, name: String(item.name || 'Card image'), ...(typeof item.src === 'string' ? { src: item.src } : {}) })) : [];
+    const pool = Array.isArray(parsed.pool) ? parsed.pool.filter((item) => item && typeof item.id === 'string').map((item) => ({
+      id: item.id,
+      name: String(item.name || 'Card image'),
+      source: item.source === 'tcgdex' ? 'tcgdex' : 'upload',
+      ...(typeof item.src === 'string' ? { src: item.src } : {}),
+    })) : [];
     return {
       currentPage: clamp(Math.floor(Number(parsed.currentPage) || 0), 0, pages.length - 1),
       settings: sanitizeSettings(parsed.settings),
@@ -732,6 +737,7 @@ function HeaderCardControls({ settings, setSettings }) {
         </select>
       </div>
       <div className="flex h-8 shrink-0 items-center gap-2 rounded-md border border-white/[0.06] bg-neutral-950/45 px-2">
+        <span className="hidden text-[10px] font-bold tracking-widest uppercase text-neutral-500 min-[1500px]:inline">Scale</span>
         <input
           type="range"
           min={80}
@@ -768,16 +774,18 @@ function AppBar({
   onInstall,
   openPanel,
   setOpenPanel,
+  printScope,
+  setPrintScope,
   onPrint,
   printSetup,
   shortcuts,
 }) {
   return (
-    <header className="titlebar no-print flex items-center justify-between border-b border-white/[0.06] bg-neutral-900/90 px-6 py-2.5 shadow-[0_1px_0_rgba(255,255,255,0.02)] backdrop-blur-md">
+    <header className="titlebar no-print flex items-center justify-between px-6 py-2.5 bg-neutral-900/90 backdrop-blur-md border-b border-white/[0.06] shadow-[0_1px_0_rgba(255,255,255,0.02)]">
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-lg border border-white/[0.06] bg-neutral-900 shadow-lg shadow-black/40"><img src="/icons/icon.svg" alt="" className="size-9" /></span>
-        <div className="flex min-w-0 items-baseline gap-2">
-          <h1 className="shrink-0 text-[15px] font-semibold tracking-tight text-white max-[1180px]:hidden">Digital Card Binder</h1>
+        <div className="flex min-w-0 flex-col justify-center">
+          <h1 className="shrink-0 text-[14px] font-semibold leading-tight tracking-tight whitespace-nowrap text-white max-[1180px]:hidden">Digital Card Binder</h1>
           <SaveStatus status={saveStatus} />
         </div>
         <ToolbarDivider />
@@ -794,13 +802,38 @@ function AppBar({
 
       <div className="relative flex min-w-0 flex-1 items-center justify-end gap-1.5">
         {installPrompt && <ToolButton icon="install" variant="outline" onClick={onInstall} title="Install App" />}
-        <ToolButton icon="keyboard" onClick={() => setOpenPanel(openPanel === 'shortcuts' ? null : 'shortcuts')} active={openPanel === 'shortcuts'} title="Keyboard shortcuts" className="hidden min-[1500px]:inline-flex" />
+        <ToolButton icon="keyboard" onClick={() => setOpenPanel(openPanel === 'shortcuts' ? null : 'shortcuts')} active={openPanel === 'shortcuts'} title="Keyboard shortcuts" className="hidden min-[1560px]:inline-flex" />
         <ToolButton icon="plus" label="Add Page" variant="primary" onClick={onAdd} title="Insert a new two-page physical sheet" className="max-[1420px]:[&>span]:hidden" />
         <ToolButton icon="copy" onClick={onDuplicate} title="Duplicate physical sheet" className="max-[1180px]:hidden" />
         <ToolButton icon="trash" label="Delete" onClick={onDelete} disabled={!canDelete} disabledReason="Keep at least one physical sheet" title="Delete physical sheet" className="[&>span]:hidden !text-neutral-500 hover:!bg-red-500/10 hover:!text-red-300" />
-        <ToolbarDivider />
-        <ToolButton icon="sliders" label="Print Setup" onClick={() => setOpenPanel(openPanel === 'print' ? null : 'print')} active={openPanel === 'print'} className="max-[1400px]:[&>span]:hidden" />
-        <ToolButton icon="printer" label="Print / PDF" variant="outline" onClick={onPrint} className="shadow-sm max-[1180px]:[&>span]:hidden" />
+        <ToolButton icon="sliders" label="Print Setup" onClick={() => setOpenPanel(openPanel === 'print' ? null : 'print')} active={openPanel === 'print'} title="Print setup" className="[&>span]:hidden" />
+        <div className="flex items-center gap-4 border-l border-white/[0.06] pl-4 ml-2">
+          <div className="flex flex-col items-end gap-1">
+            <span className="text-[9px] font-bold tracking-widest text-neutral-500 uppercase select-none">Print Scope</span>
+            <div role="group" aria-label="Print scope" className="flex p-0.5 bg-neutral-950 border border-white/[0.06] rounded-md shadow-inner">
+              <button
+                type="button"
+                aria-pressed={printScope === 'all'}
+                onClick={() => setPrintScope('all')}
+                className={`px-2.5 py-0.5 text-[10px] font-medium transition-all duration-150 ${printScope === 'all' ? 'bg-neutral-800 text-neutral-200 rounded shadow-sm border border-white/[0.04]' : 'text-neutral-500 hover:text-neutral-300'}`}
+              >
+                Include All
+              </button>
+              <button
+                type="button"
+                aria-pressed={printScope === 'custom'}
+                onClick={() => setPrintScope('custom')}
+                className={`px-2.5 py-0.5 text-[10px] font-medium transition-all duration-150 ${printScope === 'custom' ? 'bg-neutral-800 text-neutral-200 rounded shadow-sm border border-white/[0.04]' : 'text-neutral-500 hover:text-neutral-300'}`}
+              >
+                Uploads Only
+              </button>
+            </div>
+          </div>
+          <button type="button" onClick={onPrint} className="h-8 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-white/[0.08] shadow-sm px-3 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 mt-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500">
+            <Icon name="printer" size="sm" className="opacity-70" />
+            <span className="max-[1240px]:hidden">Print / PDF</span>
+          </button>
+        </div>
         {openPanel === 'print' && printSetup}
         {openPanel === 'shortcuts' && shortcuts}
       </div>
@@ -917,14 +950,21 @@ function UploadZone({ empty, active, inputRef, onFiles }) {
     <label
       tabIndex={0}
       onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); inputRef.current?.click(); } }}
-      className={`group flex cursor-pointer items-center justify-center rounded-lg border border-dashed border-neutral-700 bg-neutral-900/30 transition-all hover:border-neutral-600 hover:bg-neutral-900/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${empty ? 'min-h-32 flex-col gap-2.5 p-6 text-center' : 'gap-3 p-3'} ${active ? 'border-red-600 bg-red-950/30' : ''}`}
+      className={`group cursor-pointer transition-all hover:border-neutral-600 hover:bg-neutral-900/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${empty ? 'flex min-h-32 flex-col items-center justify-center gap-2.5 rounded-lg border border-dashed border-neutral-700 bg-neutral-900/30 p-6 text-center' : 'border border-dashed border-neutral-800 bg-neutral-900/20 px-3 py-2 rounded-md flex items-center justify-between text-xs text-neutral-400'} ${active ? 'border-red-600 bg-red-950/30' : ''}`}
     >
       <input ref={inputRef} type="file" accept="image/*" multiple className="sr-only" onChange={(event) => { onFiles(event.target.files); event.target.value = ''; }} />
-      <span className={`${empty ? 'size-10' : 'size-8'} grid shrink-0 place-items-center rounded-lg border border-white/5 bg-neutral-800 text-neutral-300 transition-colors group-hover:bg-neutral-700 group-hover:text-white ${active ? 'border-red-500/30 bg-red-950/70 text-red-300' : ''}`}><Icon name="upload" size={empty ? 'lg' : 'md'} /></span>
-      <span>
-        <span className="block text-xs font-semibold text-neutral-200">{empty ? 'Drop card images here' : 'Add more cards'}</span>
-        {empty && <><span className="mt-1 block text-[11px] font-normal text-neutral-400">or click to browse</span><span className="mt-1.5 block font-mono text-[9px] tracking-normal text-neutral-500">PNG, JPG, WEBP, AVIF · multiple files</span></>}
-      </span>
+      {empty ? (
+        <>
+          <span className={`grid size-10 shrink-0 place-items-center rounded-lg border border-white/5 bg-neutral-800 text-neutral-300 transition-colors group-hover:bg-neutral-700 group-hover:text-white ${active ? 'border-red-500/30 bg-red-950/70 text-red-300' : ''}`}><Icon name="upload" size="lg" /></span>
+          <span>
+            <span className="block text-xs font-semibold text-neutral-200">Drop card images here</span>
+            <span className="mt-1 block text-[11px] font-normal text-neutral-400">or click to browse</span>
+            <span className="mt-1.5 block font-mono text-[9px] tracking-normal text-neutral-500">PNG, JPG, WEBP, AVIF · multiple files</span>
+          </span>
+        </>
+      ) : (
+        <><span className="font-medium text-neutral-300">Upload more images</span><Icon name="upload" size="sm" className="text-neutral-500 transition-colors group-hover:text-neutral-300" /></>
+      )}
     </label>
   );
 }
@@ -1035,13 +1075,13 @@ function CardPool({
               value={selectedSet}
               aria-label="Filter by Pokémon set"
               onChange={(event) => { setSelectedSet(event.target.value); setApiPage(1); }}
-              className="w-full px-2.5 py-1.5 bg-neutral-950 border border-white/[0.06] rounded-md text-xs font-medium text-neutral-300 focus:outline-none cursor-pointer"
+              className="w-full px-3 py-1.5 bg-neutral-950 border border-white/[0.06] rounded-md text-xs font-medium text-neutral-300 focus:outline-none cursor-pointer focus:ring-1 focus:ring-red-500/50"
             >
               <option value="">All sets</option>
               {setsList.map((set) => <option key={set.id} value={set.id}>{set.name}{set.cardCount ? ` · ${set.cardCount}` : ''}</option>)}
             </select>
           </label>
-          <div className="flex items-center justify-between mt-2 px-1 text-[11px] font-mono text-neutral-400">
+          <div className="flex items-center justify-between mt-2 px-1 py-0.5 bg-neutral-950/60 border border-white/[0.04] rounded-md text-[11px] font-mono text-neutral-400">
             <button
               type="button"
               aria-label="Previous API page"
@@ -1060,16 +1100,16 @@ function CardPool({
               className="grid size-6 place-items-center rounded text-neutral-500 transition-colors hover:text-neutral-200 disabled:pointer-events-none disabled:text-neutral-800 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-red-500/50"
             ><Icon name="chevronRight" size="xs" /></button>
           </div>
-          <div aria-live="polite" className="mt-1 flex items-center justify-between px-0.5 text-[9px] font-medium tracking-wide text-neutral-600 uppercase">
-            <span>TCGdex catalogue</span>
-            {searchActive && <span>{isLoading ? 'Loading…' : plural(fetchedCards.length, 'result')}</span>}
-          </div>
         </div>
       </div>
       {searchActive ? (
         <section aria-label="TCGdex search results" className="flex min-h-0 flex-1 flex-col px-3 pb-4">
+          <div className="flex items-center justify-between px-1 py-1.5 border-b border-white/[0.04] mb-2 select-none">
+            <span className="text-[10px] font-bold tracking-widest uppercase text-neutral-500">TCGdex Catalog</span>
+            <span aria-live="polite" className="text-[10px] font-mono text-neutral-400 bg-neutral-800 px-1.5 py-0.5 rounded-md border border-white/[0.04]">{isLoading ? 'Loading…' : plural(fetchedCards.length, 'item')}</span>
+          </div>
           {searchError && <div role="alert" className="mx-1 mb-2 rounded-md border border-red-500/20 bg-red-950/30 px-2.5 py-2 text-[10px] leading-relaxed text-red-300">{searchError}</div>}
-          <div data-tcgdex-results role="listbox" aria-label="Pokémon card search results" aria-busy={isLoading} className="scroll-area grid grid-cols-2 gap-2 p-1 overflow-y-auto max-h-[calc(100vh-220px)] scrollbar-thin">
+          <div data-tcgdex-results role="listbox" aria-label="Pokémon card search results" aria-busy={isLoading} className="scroll-area grid grid-cols-2 gap-3 p-1 overflow-y-auto max-h-[calc(100vh-280px)] scrollbar-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden group">
             {isLoading && !fetchedCards.length && Array.from({ length: 6 }, (_, index) => <span key={index} aria-hidden="true" className="aspect-[245/337] animate-pulse rounded-lg border border-white/[0.04] bg-neutral-900" />)}
             {fetchedCards.map((item) => {
               const fullImageUrl = item.image ? `${item.image}/low.jpg` : '/placeholder.png';
@@ -1088,12 +1128,11 @@ function CardPool({
                   onDragEnd={onDragEnd}
                   onDoubleClick={() => onFetchedCardAdd(item, highResImageUrl)}
                   onKeyDown={(event) => { if (event.key === 'Enter') onFetchedCardAdd(item, highResImageUrl); }}
-                  className="group relative aspect-[245/337] cursor-grab overflow-hidden rounded-lg border border-white/[0.06] bg-neutral-900 outline-none transition-all duration-200 hover:-translate-y-0.5 hover:border-white/15 hover:shadow-lg hover:shadow-black/50 active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-red-500"
+                  className="relative group/card aspect-[245/337] cursor-grab active:cursor-grabbing rounded-md overflow-hidden bg-neutral-900 border border-white/[0.03] shadow-sm outline-none transition-all hover:scale-[1.04] hover:shadow-xl hover:border-white/[0.1] hover:ring-1 hover:ring-red-500/30 focus-visible:ring-2 focus-visible:ring-red-500"
                 >
-                  <img src={fullImageUrl} alt="" draggable={false} loading="lazy" className="size-full object-cover" onError={(event) => { if (!event.currentTarget.src.endsWith('/placeholder.png')) event.currentTarget.src = '/placeholder.png'; }} />
-                  <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent px-2 pb-1.5 pt-7">
-                    <span className="block truncate text-[10px] font-semibold text-white">{item.name}</span>
-                    <span className="mt-0.5 block truncate font-mono text-[8px] tracking-wide text-neutral-400 uppercase">{item.id}</span>
+                  <img src={fullImageUrl} alt={item.name} draggable={false} loading="lazy" className="w-full h-auto object-contain bg-neutral-950 transition-opacity duration-200" onError={(event) => { if (!event.currentTarget.src.endsWith('/placeholder.png')) event.currentTarget.src = '/placeholder.png'; }} />
+                  <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover/card:opacity-100 group-focus-visible/card:opacity-100 transition-opacity p-2 flex items-end">
+                    <span className="text-[9px] font-mono font-medium tracking-wide text-neutral-200 truncate w-full">{item.name}</span>
                   </span>
                 </div>
               );
@@ -1167,7 +1206,7 @@ function CanvasHelper({ editing, multiDrag, flowCount, combineMode, offsetX, onC
 
 function WorkspaceStatusBar() {
   return (
-    <footer data-workspace-status className="no-print pointer-events-none fixed bottom-0 left-0 right-0 z-50 flex select-none items-center justify-center gap-4 overflow-hidden border-t border-white/[0.05] bg-neutral-950/80 px-4 py-1.5 font-mono text-[10px] whitespace-nowrap text-neutral-400 shadow-[0_-8px_24px_rgba(0,0,0,0.35)] backdrop-blur-md">
+    <footer data-workspace-status className="no-print fixed bottom-0 left-0 right-0 py-1 px-4 bg-neutral-950/90 border-t border-white/[0.05] backdrop-blur-md text-[10px] text-neutral-400 font-mono flex justify-center items-center gap-4 select-none pointer-events-none z-50 overflow-hidden whitespace-nowrap shadow-[0_-8px_24px_rgba(0,0,0,0.35)]">
       <span><kbd className="rounded border border-neutral-700 bg-neutral-800 px-1.5 py-0.5 font-sans text-[9px] text-neutral-200 shadow-sm">Ctrl / ⌘</kbd> + Click to select multiple cards</span>
       <span aria-hidden="true" className="text-neutral-700">|</span>
       <span><kbd className="rounded border border-neutral-700 bg-neutral-800 px-1.5 py-0.5 font-sans text-[9px] text-neutral-200 shadow-sm">Shift</kbd> + Click for page ranges</span>
@@ -1231,6 +1270,7 @@ export default function CardBinder() {
   const [hydrated, setHydrated] = useState(false);
   const [toasts, setToasts] = useState([]);
   const [openPanel, setOpenPanel] = useState(null);
+  const [printScope, setPrintScope] = useState('all');
   const [installPrompt, setInstallPrompt] = useState(null);
   const [combineMode, setCombineModeState] = useState(false);
   const [selBox, setSelBox] = useState(null);
@@ -1293,7 +1333,16 @@ export default function CardBinder() {
   const placedIds = useMemo(() => new Set(visible.map((assignment) => assignment.id)), [visible]);
   const visiblePool = useMemo(() => pool.filter((item) => !settings.hidePlaced || !placedIds.has(item.id)), [pool, settings.hidePlaced, placedIds]);
   const selectedOrdered = useMemo(() => pool.filter((item) => selected.includes(item.id)).map((item) => item.id), [pool, selected]);
-  const printPages = useMemo(() => pages.filter((page) => !settings.skipEmptyPages || getSlots(page, dims).some((slot) => page.slots[slot.key])), [pages, settings.skipEmptyPages, dims]);
+  const printEligibleIds = useMemo(() => new Set(pool
+    .filter((item) => printScope === 'all' || item.source !== 'tcgdex')
+    .map((item) => item.id)), [pool, printScope]);
+  const printPages = useMemo(() => pages
+    .map((page) => {
+      const slots = Object.fromEntries(Object.entries(page.slots).filter(([, id]) => printEligibleIds.has(id)));
+      const crops = Object.fromEntries(Object.entries(page.crops || {}).filter(([key, crop]) => slots[key] === crop.img));
+      return { ...page, slots, crops };
+    })
+    .filter((page) => !settings.skipEmptyPages || getSlots(page, dims).some((slot) => page.slots[slot.key])), [pages, settings.skipEmptyPages, dims, printEligibleIds]);
 
   useEffect(() => { layoutIdRef.current = settings.layout; }, [settings.layout]);
   useEffect(() => { dimsRef.current = dims; }, [dims]);
@@ -1422,7 +1471,7 @@ export default function CardBinder() {
         setPool((value) => {
           const present = new Set(value.map((item) => item.id));
           const kept = value.filter((item) => recordMap.has(item.id) || item.src || sessionIdsRef.current.has(item.id));
-          const orphans = records.filter((record) => !present.has(record.id)).sort((a, b) => (a.added || 0) - (b.added || 0)).map((record) => ({ id: record.id, name: record.name || 'Card image' }));
+          const orphans = records.filter((record) => !present.has(record.id)).sort((a, b) => (a.added || 0) - (b.added || 0)).map((record) => ({ id: record.id, name: record.name || 'Card image', source: record.source === 'tcgdex' ? 'tcgdex' : 'upload' }));
           const reconciled = [...kept, ...orphans];
           const valid = new Set(reconciled.map((item) => item.id));
           setPages((currentPages) => {
@@ -1498,18 +1547,19 @@ export default function CardBinder() {
     reader.readAsDataURL(file);
   });
 
-  const addFiles = useCallback(async (fileList) => {
+  const addFiles = useCallback(async (fileList, options = {}) => {
     const files = Array.from(fileList || []).filter((file) => file.type?.startsWith('image/'));
     if (!files.length) {
       notify('Choose PNG, JPG, WEBP, GIF, or AVIF image files.', 'warn');
       return [];
     }
+    const source = options.source === 'tcgdex' ? 'tcgdex' : 'upload';
     const added = Date.now();
-    const entries = files.map((file, index) => ({ id: uid('image'), name: file.name || `Card ${pool.length + index + 1}`, file, added: added + index }));
+    const entries = files.map((file, index) => ({ id: uid('image'), name: file.name || `Card ${pool.length + index + 1}`, file, source, added: added + index }));
     entries.forEach((entry) => sessionIdsRef.current.add(entry.id));
     if (storageMode === 'indexeddb') {
       try {
-        await idbPutMany(entries.map((entry) => ({ id: entry.id, name: entry.name, type: entry.file.type, blob: entry.file, added: entry.added })));
+        await idbPutMany(entries.map((entry) => ({ id: entry.id, name: entry.name, type: entry.file.type, blob: entry.file, source: entry.source, added: entry.added })));
         const nextImages = {};
         entries.forEach((entry) => {
           const url = URL.createObjectURL(entry.file);
@@ -1517,7 +1567,7 @@ export default function CardBinder() {
           nextImages[entry.id] = url;
         });
         setImages((value) => ({ ...value, ...nextImages }));
-        setPool((value) => [...value, ...entries.map(({ id, name }) => ({ id, name }))]);
+        setPool((value) => [...value, ...entries.map(({ id, name, source: entrySource }) => ({ id, name, source: entrySource }))]);
         if (!persistedRef.current) {
           persistedRef.current = true;
           navigator.storage?.persist?.().catch(() => {});
@@ -1527,7 +1577,7 @@ export default function CardBinder() {
         try {
           const urls = await Promise.all(entries.map((entry) => readFileAsDataUrl(entry.file)));
           setImages((value) => ({ ...value, ...Object.fromEntries(entries.map((entry, index) => [entry.id, urls[index]])) }));
-          setPool((value) => [...value, ...entries.map((entry, index) => ({ id: entry.id, name: entry.name, src: urls[index] }))]);
+          setPool((value) => [...value, ...entries.map((entry, index) => ({ id: entry.id, name: entry.name, source: entry.source, src: urls[index] }))]);
           notify('IndexedDB is unavailable. Images will use browser storage instead.', 'warn');
         } catch {
           notify('Could not read one or more images.', 'error');
@@ -1538,7 +1588,7 @@ export default function CardBinder() {
       try {
         const urls = await Promise.all(entries.map((entry) => readFileAsDataUrl(entry.file)));
         setImages((value) => ({ ...value, ...Object.fromEntries(entries.map((entry, index) => [entry.id, urls[index]])) }));
-        setPool((value) => [...value, ...entries.map((entry, index) => ({ id: entry.id, name: entry.name, src: urls[index] }))]);
+        setPool((value) => [...value, ...entries.map((entry, index) => ({ id: entry.id, name: entry.name, source: entry.source, src: urls[index] }))]);
       } catch {
         notify('Could not read one or more images.', 'error');
         return [];
@@ -1557,7 +1607,7 @@ export default function CardBinder() {
       const blob = await response.blob();
       if (!blob.type?.startsWith('image/')) throw new Error('TCGdex returned a non-image asset');
       const file = new File([blob], `${safeFileName(item.name)} · ${safeFileName(item.id)}.jpg`, { type: blob.type || 'image/jpeg' });
-      const ids = await addFiles([file]);
+      const ids = await addFiles([file], { source: 'tcgdex' });
       if (ids.length) return ids;
     } catch {
       // Some privacy extensions block cross-origin blob downloads. The live CDN URL
@@ -1566,7 +1616,7 @@ export default function CardBinder() {
     const id = uid('tcgdex');
     sessionIdsRef.current.add(id);
     setImages((value) => ({ ...value, [id]: source }));
-    setPool((value) => [...value, { id, name: item.name || 'Pokémon card', src: source }]);
+    setPool((value) => [...value, { id, name: item.name || 'Pokémon card', source: 'tcgdex', src: source }]);
     notify(`${item.name || 'Pokémon card'} added from TCGdex.`, 'success');
     return [id];
   }, [addFiles, notify]);
@@ -2273,10 +2323,13 @@ export default function CardBinder() {
 
   const handlePrint = useCallback(() => {
     commitEditing();
-    if (!printPages.length || !printPages.some((page) => Object.keys(page.slots).length)) { notify('Add at least one card before printing.', 'warn'); return; }
+    if (!printPages.length || !printPages.some((page) => Object.keys(page.slots).length)) {
+      notify(printScope === 'custom' ? 'No uploaded cards are placed in the current print scope.' : 'Add at least one card before printing.', 'warn');
+      return;
+    }
     setOpenPanel(null);
     window.setTimeout(() => window.print(), 50);
-  }, [commitEditing, printPages, notify]);
+  }, [commitEditing, printPages, printScope, notify]);
 
   const resetBinder = useCallback(async () => {
     if (!window.confirm('Reset the entire binder? This deletes every page and image from this device.')) return;
@@ -2557,7 +2610,7 @@ export default function CardBinder() {
             className={`group grid size-full cursor-pointer place-items-center overflow-hidden rounded-md border outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-red-500 ${settings.view === 'binder' ? 'border-white/[0.03] bg-neutral-900/50 text-neutral-300 shadow-inner hover:border-white/[0.08] hover:bg-neutral-900/80 hover:text-neutral-100' : 'border-dashed border-zinc-400 bg-white/30 text-zinc-700 hover:border-red-500 hover:text-red-800'} ${previewIndex >= 0 ? '!border-red-500 !bg-red-950/20 !shadow-[inset_0_0_0_2px_rgba(239,68,68,0.25),0_0_20px_rgba(220,38,38,0.18)]' : ''}`}
             style={{ borderRadius: radius }}
           >
-            {labelVisible && <span className="flex flex-col items-center gap-1.5"><Icon name="plus" size="xs" strokeWidth={1.5} className="text-neutral-600 transition-colors group-hover:text-neutral-400" /><span className="font-mono text-[9px] font-medium tracking-widest text-neutral-500 uppercase transition-colors group-hover:text-neutral-400">{slot.cs * slot.rs > 1 ? `${boxDims(slot)} frame` : `Slot ${slotIndex + 1}`}</span></span>}
+            {labelVisible && <span className="flex flex-col items-center gap-1.5"><span className="text-xs font-light text-neutral-600 transition-colors group-hover:text-neutral-400"><Icon name="plus" size="xs" strokeWidth={1.25} /></span><span className="text-[9px] font-mono font-medium tracking-widest text-neutral-500 uppercase transition-colors group-hover:text-neutral-400">{slot.cs * slot.rs > 1 ? `${boxDims(slot)} frame` : `Slot ${slotIndex + 1}`}</span></span>}
             {previewIndex >= 0 && <span className="absolute left-1.5 top-1.5 grid size-5 place-items-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-lg shadow-red-950/60">{previewIndex + 1}</span>}
           </button>
           {slotActions}
@@ -2678,7 +2731,7 @@ export default function CardBinder() {
     const label = group.length === 1 ? `Page ${pageNumbers[0]}` : `Pages ${pageNumbers[0]}–${pageNumbers[1]}`;
     return (
       <div key={group.join('-')} data-page-group={pageNumbers.join('-')} className={`relative flex shrink-0 flex-col items-center gap-2 pb-1 text-[10px] font-medium whitespace-nowrap ${active ? 'text-red-400' : 'text-neutral-500'}`}>
-        <div className={`flex items-center gap-0.5 rounded-md p-2 transition-transform duration-200 ${active ? 'scale-105 ring-2 ring-red-500 ring-offset-4 ring-offset-neutral-950' : ''}`}>{group.map((pageIndex) => renderThumbnailLeaf(pages[pageIndex], pageIndex))}</div>
+        <div className={`flex items-center gap-0.5 p-2 ${active ? 'ring-2 ring-red-500 ring-offset-4 ring-offset-neutral-950 rounded-md scale-105 transition-transform duration-200' : 'rounded-md transition-transform duration-200'}`}>{group.map((pageIndex) => renderThumbnailLeaf(pages[pageIndex], pageIndex))}</div>
         <span>{label}</span>
       </div>
     );
@@ -2736,7 +2789,7 @@ export default function CardBinder() {
       >
         {settings.view === 'binder' ? (
           <div
-            className="sheet-frame relative flex size-full items-start justify-start overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-b from-neutral-800 to-neutral-800/90 shadow-[0_30px_70px_-15px_rgba(0,0,0,0.9),inset_0_1px_0_rgba(255,255,255,0.05)]"
+            className="sheet-frame relative flex size-full items-start justify-start overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-b from-neutral-800 to-neutral-800/90 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.85),0_1px_0px_rgba(255,255,255,0.05)_inset]"
             style={{ paddingTop: SHEET_PAD.top * ppi, paddingRight: (side === 'left' ? SHEET_PAD.left : SHEET_PAD.right) * ppi, paddingBottom: SHEET_PAD.bottom * ppi, paddingLeft: (side === 'left' ? SHEET_PAD.right : SHEET_PAD.left) * ppi }}
           >
             {[0.17, 0.5, 0.83].map((position) => <span key={position} aria-hidden="true" className={`absolute size-3 -translate-y-1/2 rounded-full border border-black/80 bg-neutral-900 ring-1 ring-white/10 shadow-[inset_0_2px_4px_rgba(0,0,0,0.95),0_1px_0_rgba(255,255,255,0.12)] ${side === 'left' ? 'translate-x-1/2' : '-translate-x-1/2'}`} style={{ [side === 'left' ? 'right' : 'left']: (SHEET_PAD.left * ppi) / 2, top: `${position * 100}%` }} />)}
@@ -2758,7 +2811,7 @@ export default function CardBinder() {
       key={`cover-${side}`}
       data-cover-layer={side}
       aria-hidden="true"
-      className={`relative overflow-hidden bg-neutral-950 ${side === 'left' ? 'rounded-l-lg border-r border-white/[0.04] shadow-[inset_-18px_0_30px_-18px_rgba(0,0,0,0.95),inset_0_4px_12px_rgba(0,0,0,0.65),0_25px_60px_-15px_rgba(0,0,0,0.85)]' : 'rounded-r-lg border-l border-white/[0.04] shadow-[inset_18px_0_30px_-18px_rgba(0,0,0,0.95),inset_0_4px_12px_rgba(0,0,0,0.65),0_25px_60px_-15px_rgba(0,0,0,0.85)]'}`}
+      className={`relative overflow-hidden bg-neutral-950 ${side === 'left' ? 'border-r border-white/[0.02] shadow-[inset_-12px_0_30px_rgba(0,0,0,0.8)] rounded-l-xl' : 'border-l border-white/[0.02] shadow-[inset_12px_0_30px_rgba(0,0,0,0.8)] rounded-r-xl'}`}
       style={{ width: frameWidth, height: frameHeight, gridColumn: side === 'left' ? 1 : 2, gridRow: 1 }}
     >
       <span className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.025),transparent_34%,rgba(0,0,0,0.2))]" />
@@ -2928,6 +2981,8 @@ export default function CardBinder() {
             onInstall={async () => { await installPrompt.prompt(); setInstallPrompt(null); }}
             openPanel={openPanel}
             setOpenPanel={setOpenPanel}
+            printScope={printScope}
+            setPrintScope={setPrintScope}
             onPrint={handlePrint}
             printSetup={<PrintSetupPopover settings={settings} setSettings={setSettings} fitInfo={fitInfo} suggestedPaper={suggestedPaper} printCount={printPages.length} onReset={resetBinder} />}
             shortcuts={<ShortcutsPopover />}
