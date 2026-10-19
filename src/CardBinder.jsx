@@ -1017,7 +1017,7 @@ export default function CardBinder() {
   const [combineMode, setCombineModeState] = useState(false);
   const [selBox, setSelBox] = useState(null);
   const [selectionPageId, setSelectionPageId] = useState(null);
-  const [pageFlip, setPageFlip] = useState({ folded: false, animating: false, direction: 1, token: 0 });
+  const [pageFlip, setPageFlip] = useState({ animating: false, turned: false, direction: 1, token: 0, plan: null });
   const [marqueeActive, setMarqueeActive] = useState(false);
   const [dragInfo, setDragInfo] = useState(null);
   const [dropPreview, setDropPreview] = useState([]);
@@ -1240,24 +1240,42 @@ export default function CardBinder() {
     return () => { live = false; };
   }, [addFiles]);
 
-  const beginPageFlip = useCallback((fromPage, toPage, fromCount = pagesRef.current.length, toCount = fromCount) => {
-    const fromKey = binderViewForPage(fromPage, fromCount).join('-');
-    const toKey = binderViewForPage(toPage, toCount).join('-');
+  const beginPageFlip = useCallback((fromPage, toPage, options = {}) => {
+    const fromPages = options.fromPages || pagesRef.current;
+    const toPages = options.toPages || fromPages;
+    const fromGroup = binderViewForPage(fromPage, fromPages.length);
+    const toGroup = binderViewForPage(toPage, toPages.length);
     previousPageIndexRef.current = fromPage;
-    if (fromKey === toKey && fromCount === toCount) return;
+    if (fromGroup.join('-') === toGroup.join('-') && fromPages.length === toPages.length) return;
+
     pageFlipTimerRef.current.forEach((timer) => window.clearTimeout(timer));
     pageFlipTimerRef.current = [];
     const token = pageFlipTokenRef.current + 1;
     const direction = toPage > previousPageIndexRef.current ? 1 : -1;
+    const pageIdAt = (source, index) => source[index]?.id || null;
+    const plan = direction > 0 ? {
+      turnSide: 'right',
+      frontPageId: pageIdAt(fromPages, fromGroup[fromGroup.length - 1]),
+      backPageId: pageIdAt(toPages, toGroup[0]),
+      baseLeftPageId: fromGroup.length === 2 ? pageIdAt(fromPages, fromGroup[0]) : null,
+      baseRightPageId: toGroup.length === 2 ? pageIdAt(toPages, toGroup[1]) : null,
+    } : {
+      turnSide: 'left',
+      frontPageId: pageIdAt(fromPages, fromGroup[0]),
+      backPageId: pageIdAt(toPages, toGroup[toGroup.length - 1]),
+      baseLeftPageId: toGroup.length === 2 ? pageIdAt(toPages, toGroup[0]) : null,
+      baseRightPageId: fromGroup.length === 2 ? pageIdAt(fromPages, fromGroup[1]) : null,
+    };
+
     pageFlipTokenRef.current = token;
-    setPageFlip({ folded: true, animating: true, direction, token });
-    const openTimer = window.setTimeout(() => {
-      if (pageFlipTokenRef.current === token) setPageFlip((value) => value.token === token ? { ...value, folded: false } : value);
+    setPageFlip({ animating: true, turned: false, direction, token, plan });
+    const turnTimer = window.setTimeout(() => {
+      if (pageFlipTokenRef.current === token) setPageFlip((value) => value.token === token ? { ...value, turned: true } : value);
     }, 40);
     const finishTimer = window.setTimeout(() => {
-      if (pageFlipTokenRef.current === token) setPageFlip((value) => value.token === token ? { ...value, animating: false } : value);
+      if (pageFlipTokenRef.current === token) setPageFlip((value) => value.token === token ? { ...value, animating: false, turned: false, plan: null } : value);
     }, 560);
-    pageFlipTimerRef.current = [openTimer, finishTimer];
+    pageFlipTimerRef.current = [turnTimer, finishTimer];
   }, []);
 
   useEffect(() => () => {
@@ -1911,11 +1929,14 @@ export default function CardBinder() {
     const insertionIndex = Math.max(1, previousCount - 1);
     const nextPage = insertionIndex + 1;
     const sheet = emptySheet();
-    beginPageFlip(currentPageRef.current, nextPage, previousCount, previousCount + 2);
-    applyCanvasChange(
-      (value) => [...value.slice(0, insertionIndex), sheet.front, sheet.back, ...value.slice(insertionIndex)],
-      { currentPage: nextPage },
-    );
+    const nextPages = [
+      ...pagesRef.current.slice(0, insertionIndex),
+      sheet.front,
+      sheet.back,
+      ...pagesRef.current.slice(insertionIndex),
+    ];
+    beginPageFlip(currentPageRef.current, nextPage, { fromPages: pagesRef.current, toPages: nextPages });
+    applyCanvasChange(nextPages, { currentPage: nextPage });
     setSelBox(null);
     setSelectionPageId(null);
     notify(`New sheet inserted as pages ${insertionIndex + 1}–${insertionIndex + 2}.`, 'success');
@@ -1944,11 +1965,9 @@ export default function CardBinder() {
     const sourceBack = pagesRef.current.find((page) => page.sheetId === sourcePage.sheetId && page.face === 'back');
     if (!sourceFront || !sourceBack) return;
     const copies = [copyFace(sourceFront, 'front'), copyFace(sourceBack, 'back')];
-    beginPageFlip(sourceIndex, insertionIndex, pagesRef.current.length, pagesRef.current.length + 2);
-    applyCanvasChange(
-      (value) => [...value.slice(0, insertionIndex), ...copies, ...value.slice(insertionIndex)],
-      { currentPage: insertionIndex },
-    );
+    const nextPages = [...pagesRef.current.slice(0, insertionIndex), ...copies, ...pagesRef.current.slice(insertionIndex)];
+    beginPageFlip(sourceIndex, insertionIndex, { fromPages: pagesRef.current, toPages: nextPages });
+    applyCanvasChange(nextPages, { currentPage: insertionIndex });
     notify('Physical sheet duplicated.', 'success');
   }, [commitEditing, beginPageFlip, applyCanvasChange, notify]);
 
@@ -2286,10 +2305,12 @@ export default function CardBinder() {
     );
   };
 
-  const renderCanvasLeaf = (pageIndex) => {
+  const renderCanvasLeaf = (pageIndex, options = {}) => {
     const page = pages[pageIndex];
     if (!page) return null;
-    const side = pageSide(pageIndex, pages.length);
+    const side = options.side || pageSide(pageIndex, pages.length);
+    const showChrome = options.showChrome !== false;
+    const showHelper = options.showHelper !== false;
     const pageSelBox = selectionPageId === page.id ? selBox : null;
     const pageMerges = activeMerges(page, dims);
     const pageSelectedMerges = pageSelBox ? pageMerges.filter((merge) => boxesIntersect(merge, pageSelBox)) : [];
@@ -2297,23 +2318,23 @@ export default function CardBinder() {
     const pageCanMerge = Boolean(combineMode && pageSelBox && pageSelBox.rs * pageSelBox.cs > 1 && !pageExactMerge);
     const pageSlots = getSlots(page, dims);
     const pageFilled = pageSlots.filter((slot) => page.slots[slot.key]).length;
-    const foldedRotation = pageFlip.direction > 0 ? '-180deg' : '180deg';
-    const pageRotation = pageFlip.folded ? foldedRotation : '0deg';
-    const rotationClass = pageFlip.folded
-      ? (pageFlip.direction > 0 ? '[transform:rotateY(-180deg)]' : '[transform:rotateY(180deg)]')
-      : '[transform:rotateY(0deg)]';
-    const originClass = pageFlip.direction > 0 ? 'origin-left' : 'origin-right';
     return (
       <div
-        key={page.id}
-        data-canvas
+        key={options.renderKey || page.id}
+        data-canvas={options.dataCanvas === false ? undefined : ''}
         data-page-index={pageIndex}
         data-page-side={side}
-        data-flip-direction={pageFlip.direction > 0 ? 'forward' : 'backward'}
-        className={`relative transform-gpu transition-transform duration-500 ease-in-out [backface-visibility:hidden] [transform-style:preserve-3d] will-change-transform ${rotationClass} ${originClass} ${pageFlip.animating ? 'pointer-events-none' : ''}`}
-        style={{ transform: `rotateY(${pageRotation}) translateZ(0)`, width: frameWidth, height: frameHeight, gridColumn: side === 'left' ? 1 : 2 }}
+        data-turn-face={options.turnFace}
+        aria-hidden={options.ariaHidden}
+        className={`relative ${options.className || ''}`}
+        style={{
+          width: frameWidth,
+          height: frameHeight,
+          ...(options.surface ? {} : { gridColumn: side === 'left' ? 1 : 2 }),
+          ...(options.style || {}),
+        }}
       >
-        <CanvasToolbar
+        {showChrome && <CanvasToolbar
           combineMode={combineMode}
           setCombineMode={(next) => { activateCanvasPage(pageIndex); setCombineMode(next); }}
           selBox={pageSelBox}
@@ -2328,7 +2349,7 @@ export default function CardBinder() {
           total={layout.pockets}
           mergedCount={pageMerges.length}
           layout={layout}
-        />
+        />}
         {settings.view === 'binder' ? (
           <div
             className="sheet-frame relative flex size-full items-start justify-start overflow-hidden rounded-2xl bg-gradient-to-br from-[#1A1A1D] via-[#121214] to-[#0B0B0C] ring-1 ring-red-950/40 shadow-[0_28px_80px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.06)]"
@@ -2343,7 +2364,88 @@ export default function CardBinder() {
             {renderEditorGrid(page, pageIndex)}
           </div>
         )}
-        {pageIndex === currentPage && <CanvasHelper editing={editing} multiDrag={dragInfo?.kind === 'pool' ? dragInfo.ids.length : 0} flowCount={multiFlow} combineMode={combineMode} settings={settings} paper={paper} card={card} printFit={printFit} offsetX={side === 'left' ? -helperOffsetX : helperOffsetX} onCenter={() => { const value = editingRef.current; if (value) { const next = { ...value, x: 50, y: 50 }; editingRef.current = next; setEditing(next); } }} onCancel={cancelEditing} onDone={commitEditing} />}
+        {showHelper && pageIndex === currentPage && <CanvasHelper editing={editing} multiDrag={dragInfo?.kind === 'pool' ? dragInfo.ids.length : 0} flowCount={multiFlow} combineMode={combineMode} settings={settings} paper={paper} card={card} printFit={printFit} offsetX={side === 'left' ? -helperOffsetX : helperOffsetX} onCenter={() => { const value = editingRef.current; if (value) { const next = { ...value, x: 50, y: 50 }; editingRef.current = next; setEditing(next); } }} onCancel={cancelEditing} onDone={commitEditing} />}
+      </div>
+    );
+  };
+
+  const renderCoverLayer = (side) => (
+    <div
+      key={`cover-${side}`}
+      data-cover-layer={side}
+      aria-hidden="true"
+      className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#101012] via-[#09090B] to-black ring-1 ring-zinc-900 shadow-[inset_0_0_70px_rgba(0,0,0,0.9),0_28px_80px_rgba(0,0,0,0.5)]"
+      style={{ width: frameWidth, height: frameHeight, gridColumn: side === 'left' ? 1 : 2 }}
+    />
+  );
+
+  const renderAnimationBase = (pageId, side) => {
+    const pageIndex = pages.findIndex((page) => page.id === pageId);
+    if (pageIndex < 0) return renderCoverLayer(side);
+    return renderCanvasLeaf(pageIndex, {
+      renderKey: `base-${side}-${pageId}`,
+      side,
+      showChrome: false,
+      showHelper: false,
+      className: 'pointer-events-none',
+      ariaHidden: true,
+    });
+  };
+
+  const renderTurningSheet = () => {
+    const plan = pageFlip.plan;
+    if (!plan) return null;
+    const frontPageIndex = pages.findIndex((page) => page.id === plan.frontPageId);
+    const backPageIndex = pages.findIndex((page) => page.id === plan.backPageId);
+    if (frontPageIndex < 0 || backPageIndex < 0) return null;
+    const forward = pageFlip.direction > 0;
+    const rotation = pageFlip.turned ? (forward ? '-180deg' : '180deg') : '0deg';
+    const rotationClass = pageFlip.turned
+      ? (forward ? '[transform:rotateY(-180deg)]' : '[transform:rotateY(180deg)]')
+      : '[transform:rotateY(0deg)]';
+    const originClass = forward ? 'origin-left' : 'origin-right';
+    const frontSide = forward ? 'right' : 'left';
+    const backSide = forward ? 'left' : 'right';
+    return (
+      <div
+        data-turning-sheet
+        data-turn-direction={forward ? 'forward' : 'backward'}
+        data-turn-side={plan.turnSide}
+        data-front-page={frontPageIndex + 1}
+        data-back-page={backPageIndex + 1}
+        inert
+        className={`relative z-50 transform-gpu pointer-events-none transition-transform duration-500 ease-in-out [transform-style:preserve-3d] will-change-transform ${originClass} ${rotationClass}`}
+        style={{
+          width: frameWidth,
+          height: frameHeight,
+          gridColumn: plan.turnSide === 'left' ? 1 : 2,
+          transform: `rotateY(${rotation}) translateZ(1px)`,
+        }}
+      >
+        {renderCanvasLeaf(frontPageIndex, {
+          renderKey: `turn-front-${plan.frontPageId}`,
+          side: frontSide,
+          surface: true,
+          dataCanvas: false,
+          turnFace: 'front',
+          showChrome: false,
+          showHelper: false,
+          ariaHidden: true,
+          className: 'absolute inset-0 z-20 [backface-visibility:hidden] [transform-style:preserve-3d]',
+          style: { transform: 'rotateY(0deg) translateZ(0)' },
+        })}
+        {renderCanvasLeaf(backPageIndex, {
+          renderKey: `turn-back-${plan.backPageId}`,
+          side: backSide,
+          surface: true,
+          dataCanvas: false,
+          turnFace: 'back',
+          showChrome: false,
+          showHelper: false,
+          ariaHidden: true,
+          className: 'absolute inset-0 z-10 [backface-visibility:hidden] [transform:rotateY(180deg)] [transform-style:preserve-3d]',
+          style: { transform: 'rotateY(180deg) translateZ(0)' },
+        })}
       </div>
     );
   };
@@ -2432,7 +2534,7 @@ export default function CardBinder() {
           <main className="flex min-w-0 flex-1 flex-col">
             <div
               ref={stageRef}
-              className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-[#0B0B0C] bg-[radial-gradient(circle_at_center,rgba(220,38,38,0.055),transparent_52%)] [perspective:1500px]"
+              className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-[#0B0B0C] bg-[radial-gradient(circle_at_center,rgba(220,38,38,0.055),transparent_52%)] [perspective:1200px]"
               onPointerMove={moveMarquee}
               onPointerDown={(event) => { if (event.target === event.currentTarget && combineMode) { setSelBox(null); setSelectionPageId(null); } }}
               onDragOver={(event) => { if (!combineMode && (dragRef.current?.kind === 'pool' || hasFiles(event.dataTransfer))) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; } }}
@@ -2440,11 +2542,18 @@ export default function CardBinder() {
             >
               <div
                 data-spread
-                className="relative grid grid-cols-2 gap-6 [transform-style:preserve-3d]"
+                data-flip-active={pageFlip.animating ? '' : undefined}
+                className={`relative grid grid-cols-2 gap-6 [transform-style:preserve-3d] ${pageFlip.animating ? 'pointer-events-none' : ''}`}
                 style={{ width: spreadWidth, height: frameHeight }}
               >
-                {activeSpread.length === 2 && <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-1/2 z-30 w-px -translate-x-1/2 bg-black/90 shadow-[-12px_0_20px_-8px_rgba(0,0,0,0.9),12px_0_20px_-8px_rgba(0,0,0,0.9)]" />}
-                {activeSpread.map(renderCanvasLeaf)}
+                {(activeSpread.length === 2 || pageFlip.animating) && <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-1/2 z-30 w-px -translate-x-1/2 bg-black/90 shadow-[-12px_0_20px_-8px_rgba(0,0,0,0.9),12px_0_20px_-8px_rgba(0,0,0,0.9)]" />}
+                {pageFlip.animating && pageFlip.plan ? (
+                  <>
+                    {renderAnimationBase(pageFlip.plan.baseLeftPageId, 'left')}
+                    {renderAnimationBase(pageFlip.plan.baseRightPageId, 'right')}
+                    {renderTurningSheet()}
+                  </>
+                ) : activeSpread.map((pageIndex) => renderCanvasLeaf(pageIndex))}
               </div>
             </div>
             <footer data-page-tray className="no-print scroll-area shrink-0 overflow-x-auto border-t border-zinc-800 bg-zinc-900/40 py-4">
