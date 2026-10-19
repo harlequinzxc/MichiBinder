@@ -781,7 +781,7 @@ function AppBar({
   shortcuts,
 }) {
   return (
-    <header className="titlebar no-print flex items-center justify-between px-6 py-2.5 bg-neutral-900/90 backdrop-blur-md border-b border-white/[0.06] shadow-[0_1px_0_rgba(255,255,255,0.02)]">
+    <header className="titlebar no-print relative z-[70] flex items-center justify-between px-6 py-2.5 bg-neutral-900/90 backdrop-blur-md border-b border-white/[0.06] shadow-[0_1px_0_rgba(255,255,255,0.02)]">
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-lg border border-white/[0.06] bg-neutral-900 shadow-lg shadow-black/40"><img src="/icons/icon.svg" alt="" className="size-9" /></span>
         <div className="flex min-w-0 flex-col justify-center">
