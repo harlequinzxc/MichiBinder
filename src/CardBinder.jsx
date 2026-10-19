@@ -1253,18 +1253,24 @@ export default function CardBinder() {
     const token = pageFlipTokenRef.current + 1;
     const direction = toPage > previousPageIndexRef.current ? 1 : -1;
     const pageIdAt = (source, index) => source[index]?.id || null;
+    const leavingFirstPage = direction > 0 && fromGroup.length === 1 && fromGroup[0] === 0;
+    const returningToFirstPage = direction < 0 && toGroup.length === 1 && toGroup[0] === 0;
+    const movingToLastPage = direction > 0 && toGroup.length === 1 && toGroup[0] === toPages.length - 1;
+    const leavingLastPage = direction < 0 && fromGroup.length === 1 && fromGroup[0] === fromPages.length - 1;
     const plan = direction > 0 ? {
       turnSide: 'right',
       frontPageId: pageIdAt(fromPages, fromGroup[fromGroup.length - 1]),
       backPageId: pageIdAt(toPages, toGroup[0]),
       baseLeftPageId: fromGroup.length === 2 ? pageIdAt(fromPages, fromGroup[0]) : null,
       baseRightPageId: toGroup.length === 2 ? pageIdAt(toPages, toGroup[1]) : null,
+      boundary: leavingFirstPage ? 'front-cover' : (movingToLastPage ? 'back-cover' : 'spread'),
     } : {
       turnSide: 'left',
       frontPageId: pageIdAt(fromPages, fromGroup[0]),
       backPageId: pageIdAt(toPages, toGroup[toGroup.length - 1]),
       baseLeftPageId: toGroup.length === 2 ? pageIdAt(toPages, toGroup[0]) : null,
       baseRightPageId: fromGroup.length === 2 ? pageIdAt(fromPages, fromGroup[1]) : null,
+      boundary: returningToFirstPage ? 'front-cover' : (leavingLastPage ? 'back-cover' : 'spread'),
     };
 
     pageFlipTokenRef.current = token;
@@ -2330,7 +2336,7 @@ export default function CardBinder() {
         style={{
           width: frameWidth,
           height: frameHeight,
-          ...(options.surface ? {} : { gridColumn: side === 'left' ? 1 : 2 }),
+          ...(options.surface ? {} : { gridColumn: side === 'left' ? 1 : 2, gridRow: 1 }),
           ...(options.style || {}),
         }}
       >
@@ -2375,7 +2381,7 @@ export default function CardBinder() {
       data-cover-layer={side}
       aria-hidden="true"
       className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#101012] via-[#09090B] to-black ring-1 ring-zinc-900 shadow-[inset_0_0_70px_rgba(0,0,0,0.9),0_28px_80px_rgba(0,0,0,0.5)]"
-      style={{ width: frameWidth, height: frameHeight, gridColumn: side === 'left' ? 1 : 2 }}
+      style={{ width: frameWidth, height: frameHeight, gridColumn: side === 'left' ? 1 : 2, gridRow: 1 }}
     />
   );
 
@@ -2406,19 +2412,23 @@ export default function CardBinder() {
     const originClass = forward ? 'origin-left' : 'origin-right';
     const frontSide = forward ? 'right' : 'left';
     const backSide = forward ? 'left' : 'right';
+    const backRotation = forward ? '180deg' : '-180deg';
+    const backRotationClass = forward ? '[transform:rotateY(180deg)]' : '[transform:rotateY(-180deg)]';
     return (
       <div
         data-turning-sheet
         data-turn-direction={forward ? 'forward' : 'backward'}
         data-turn-side={plan.turnSide}
+        data-turn-boundary={plan.boundary}
         data-front-page={frontPageIndex + 1}
         data-back-page={backPageIndex + 1}
         inert
-        className={`relative z-50 transform-gpu pointer-events-none transition-transform duration-500 ease-in-out [transform-style:preserve-3d] will-change-transform ${originClass} ${rotationClass}`}
+        className={`absolute top-0 z-50 transform-gpu pointer-events-none transition-transform duration-500 ease-in-out [transform-style:preserve-3d] will-change-transform ${originClass} ${rotationClass}`}
         style={{
           width: frameWidth,
           height: frameHeight,
-          gridColumn: plan.turnSide === 'left' ? 1 : 2,
+          left: forward ? '50%' : undefined,
+          right: forward ? undefined : '50%',
           transform: `rotateY(${rotation}) translateZ(1px)`,
         }}
       >
@@ -2443,8 +2453,8 @@ export default function CardBinder() {
           showChrome: false,
           showHelper: false,
           ariaHidden: true,
-          className: 'absolute inset-0 z-10 [backface-visibility:hidden] [transform:rotateY(180deg)] [transform-style:preserve-3d]',
-          style: { transform: 'rotateY(180deg) translateZ(0)' },
+          className: `absolute inset-0 z-10 [backface-visibility:hidden] [transform-style:preserve-3d] ${backRotationClass}`,
+          style: { transform: `rotateY(${backRotation}) translateZ(0)` },
         })}
       </div>
     );
