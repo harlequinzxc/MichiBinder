@@ -110,6 +110,87 @@ img {
     padding 240ms cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
+/* 5. Page-turn depth cues. The geometry stays rigid while light, shadow, and
+   the exposed edge sell the movement without disturbing the center hinge. */
+[data-turn-face]::after {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  content: "";
+  pointer-events: none;
+  opacity: 0;
+  backface-visibility: hidden;
+  mix-blend-mode: multiply;
+}
+
+[data-turning-sheet][data-turn-view="binder"] [data-turn-face]::after {
+  border-radius: 1rem;
+}
+
+[data-turning-sheet][data-turn-direction="forward"] [data-turn-face]::after {
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.42), rgba(0, 0, 0, 0.08) 52%, rgba(0, 0, 0, 0.22));
+}
+
+[data-turning-sheet][data-turn-direction="backward"] [data-turn-face]::after {
+  background: linear-gradient(270deg, rgba(0, 0, 0, 0.42), rgba(0, 0, 0, 0.08) 52%, rgba(0, 0, 0, 0.22));
+}
+
+[data-turning-sheet][data-turn-state="turning"] [data-turn-face="front"]::after {
+  animation: page-turn-front-shade 500ms cubic-bezier(0.37, 0, 0.63, 1) both;
+}
+
+[data-turning-sheet][data-turn-state="turning"] [data-turn-face="back"]::after {
+  animation: page-turn-back-shade 500ms cubic-bezier(0.37, 0, 0.63, 1) both;
+}
+
+[data-turn-cast-shadow] {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 40;
+  width: 50%;
+  pointer-events: none;
+  opacity: 0;
+  will-change: opacity, transform;
+}
+
+[data-turn-cast-shadow][data-turn-direction="forward"] {
+  right: 50%;
+  transform-origin: right center;
+  background: linear-gradient(to left, rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0.22) 20%, transparent 72%);
+}
+
+[data-turn-cast-shadow][data-turn-direction="backward"] {
+  left: 50%;
+  transform-origin: left center;
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0.22) 20%, transparent 72%);
+}
+
+[data-turn-cast-shadow][data-turn-state="turning"] {
+  animation: page-turn-cast-shadow 500ms cubic-bezier(0.37, 0, 0.63, 1) both;
+}
+
+@keyframes page-turn-front-shade {
+  0% { opacity: 0; }
+  34% { opacity: 0.12; }
+  50% { opacity: 0.76; }
+  100% { opacity: 0.24; }
+}
+
+@keyframes page-turn-back-shade {
+  0% { opacity: 0.24; }
+  50% { opacity: 0.72; }
+  72% { opacity: 0.16; }
+  100% { opacity: 0; }
+}
+
+@keyframes page-turn-cast-shadow {
+  0% { opacity: 0; transform: scaleX(0.08); }
+  42% { opacity: 0.52; transform: scaleX(0.82); }
+  66% { opacity: 0.28; transform: scaleX(0.46); }
+  100% { opacity: 0; transform: scaleX(0.08); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -121,7 +202,7 @@ img {
   }
 }
 
-/* 5. Sleeve finish and toasts. */
+/* 6. Sleeve finish and toasts. */
 .sleeve-sheen::after {
   position: absolute;
   inset: 0;
@@ -140,7 +221,7 @@ img {
   animation: toast-in 180ms ease-out both;
 }
 
-/* 6. Window Controls Overlay. */
+/* 7. Window Controls Overlay. */
 @media (display-mode: window-controls-overlay) {
   .titlebar {
     padding-left: max(1rem, env(titlebar-area-x));
@@ -156,7 +237,7 @@ img {
   }
 }
 
-/* 7. Desktop app orientation guard. */
+/* 8. Desktop app orientation guard. */
 .portrait-guard {
   display: none;
 }
@@ -178,7 +259,7 @@ img {
   }
 }
 
-/* 8. Print one exact physical sheet per binder page. */
+/* 9. Print one exact physical sheet per binder page. */
 .print-root {
   display: none;
 }

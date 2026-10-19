@@ -2441,15 +2441,18 @@ export default function CardBinder() {
         data-turn-direction={forward ? 'forward' : 'backward'}
         data-turn-side={plan.turnSide}
         data-turn-boundary={plan.boundary}
+        data-turn-view={settings.view}
         data-front-page={frontPageIndex + 1}
         data-back-page={backPageIndex + 1}
+        data-turn-state={pageFlip.turned ? 'turning' : 'resting'}
         inert
-        className={`absolute top-0 z-50 transform-gpu pointer-events-none transition-transform duration-500 ease-in-out [transform-style:preserve-3d] will-change-transform ${originClass}`}
+        className={`absolute top-0 z-50 transform-gpu pointer-events-none transition-transform duration-500 [transition-timing-function:cubic-bezier(0.37,0,0.63,1)] [transform-style:preserve-3d] will-change-transform ${originClass}`}
         style={{
           width: frameWidth,
           height: frameHeight,
           // Enforce smooth tracking from the exact 50% midpoint line
-          left: forward ? '50%' : '0',
+          left: forward ? '50%' : undefined,
+          right: forward ? undefined : '50%',
           transform: `rotateY(${rotation}) translateZ(2px)`, // Lift z-index physically to avoid 3D clipping
         }}
       >
@@ -2488,6 +2491,17 @@ export default function CardBinder() {
             transform: `rotateY(${backRotation}) translateZ(0.5px)`,
           },
         })}
+
+        {/* A narrow edge is exposed around 90° so the leaf retains physical thickness. */}
+        <span
+          data-turn-edge
+          aria-hidden="true"
+          className="absolute inset-y-0 z-30 w-[2px] bg-zinc-300/80 shadow-[0_0_5px_rgba(255,255,255,0.22)] [backface-visibility:hidden]"
+          style={{
+            [forward ? 'right' : 'left']: '-1px',
+            transform: `rotateY(${forward ? '90deg' : '-90deg'})`,
+          }}
+        />
       </div>
     );
   };
@@ -2593,6 +2607,14 @@ export default function CardBinder() {
                 }}
               >
                 {(activeSpread.length === 2 || pageFlip.animating) && <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-1/2 z-30 w-px -translate-x-1/2 bg-black/90 shadow-[-12px_0_20px_-8px_rgba(0,0,0,0.9),12px_0_20px_-8px_rgba(0,0,0,0.9)]" />}
+                {pageFlip.animating && pageFlip.plan && (
+                  <span
+                    data-turn-cast-shadow
+                    data-turn-direction={pageFlip.direction > 0 ? 'forward' : 'backward'}
+                    data-turn-state={pageFlip.turned ? 'turning' : 'resting'}
+                    aria-hidden="true"
+                  />
+                )}
                 {pageFlip.animating && pageFlip.plan ? (
                   <>
                     {renderAnimationBase(pageFlip.plan.baseLeftPageId, 'left')}
