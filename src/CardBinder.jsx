@@ -2,8 +2,10 @@ import {
   AlertTriangle,
   BookOpen,
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Columns4,
   Copy,
   Eraser,
@@ -72,6 +74,7 @@ const IDB_STORE = 'images';
 const IDB_VERSION = 1;
 const HISTORY_LIMIT = 30;
 const SHEET_PAD = { top: 0.3, right: 0.3, bottom: 0.3, left: 0.62 };
+const THUMB_BOX = { w: 40, h: 40 * 1.414, pad: 3 };
 const PAPER_SIZES = {
   a4: { label: 'A4 (210 × 297 mm)', short: 'A4', w: '210mm', h: '297mm', wIn: 210 * MM, hIn: 297 * MM },
   letter: { label: 'US Letter (216 × 279 mm)', short: 'Letter', w: '8.5in', h: '11in', wIn: 8.5, hIn: 11 },
@@ -542,8 +545,10 @@ const ICONS = {
   alert: AlertTriangle,
   book: BookOpen,
   check: Check,
+  chevronDown: ChevronDown,
   chevronLeft: ChevronLeft,
   chevronRight: ChevronRight,
+  chevronUp: ChevronUp,
   combine: SquareDashedMousePointer,
   copy: Copy,
   eraser: Eraser,
@@ -877,10 +882,8 @@ function AppBar({
 }
 
 function FloatingNavigation({
-  databaseCount,
-  customCount,
-  filledCount,
-  capacity,
+  showBottomTimeline,
+  onToggleTimeline,
   canUndo,
   canRedo,
   onUndo,
@@ -907,16 +910,9 @@ function FloatingNavigation({
 }) {
   const historyButton = 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 p-1.5 rounded-md transition-all cursor-pointer disabled:pointer-events-none disabled:text-neutral-700 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500';
   return (
-    <div data-bottom-control-bar className="no-print w-full shrink-0 border-t border-white/[0.06] bg-neutral-900/60 px-6 py-3 backdrop-blur-md select-none">
+    <div data-bottom-control-bar className="no-print relative flex w-full shrink-0 items-center justify-center border-t border-white/[0.06] bg-neutral-900/60 px-6 py-3 backdrop-blur-md select-none">
       <div className="flex w-full items-center justify-center">
-        <div data-floating-navigation className="flex w-fit max-w-full items-center gap-2 overflow-x-auto rounded-xl border border-white/[0.06] bg-neutral-950 px-4 py-2 shadow-2xl scrollbar-none [scrollbar-width:none] min-[1281px]:gap-4 [&::-webkit-scrollbar]:hidden">
-          <div data-workspace-metrics aria-label={`Database ${databaseCount} items, Custom ${customCount} uploaded, Density ${filledCount} of ${capacity} filled`} className="flex shrink-0 items-center gap-3 border-r border-white/[0.06] pr-2 text-[10px] font-mono min-[1281px]:pr-4">
-            <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="font-bold tracking-widest text-neutral-500 uppercase max-[1439px]:sr-only">Database</span><strong className="font-medium text-neutral-200">{databaseCount} items</strong></span>
-            <span aria-hidden="true" className="h-3 w-px bg-white/[0.06]" />
-            <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="font-bold tracking-widest text-neutral-500 uppercase max-[1439px]:sr-only">Custom</span><strong className="font-medium text-red-400">{customCount} uploaded</strong></span>
-            <span aria-hidden="true" className="h-3 w-px bg-white/[0.06]" />
-            <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="font-bold tracking-widest text-neutral-500 uppercase max-[1439px]:sr-only">Density</span><strong className="font-medium text-neutral-200">{filledCount}/{capacity} filled</strong></span>
-          </div>
+        <div data-floating-navigation className="flex w-fit max-w-[calc(100%_-_10rem)] items-center gap-2 overflow-x-auto rounded-xl border border-white/[0.06] bg-neutral-950 px-4 py-2 shadow-2xl scrollbar-none [scrollbar-width:none] min-[1281px]:gap-4 [&::-webkit-scrollbar]:hidden">
           <div role="group" aria-label="History" className="flex shrink-0 items-center gap-1">
             <button type="button" onClick={onUndo} disabled={!canUndo} aria-label="Undo" title="Undo" className={historyButton}><Icon name="undo" size="sm" className="w-3.5 h-3.5" /></button>
             <button type="button" onClick={onRedo} disabled={!canRedo} aria-label="Redo" title="Redo" className={historyButton}><Icon name="redo" size="sm" className="w-3.5 h-3.5" /></button>
@@ -942,6 +938,17 @@ function FloatingNavigation({
           <button type="button" onClick={onDelete} disabled={!canDelete} aria-label="Delete active sheet" title={canDelete ? 'Delete active sheet' : 'Keep at least one physical sheet'} className="shrink-0 cursor-pointer rounded-md p-1.5 text-neutral-500 transition-all hover:bg-red-500/10 hover:text-red-400 disabled:pointer-events-none disabled:cursor-default disabled:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 min-[1281px]:ml-2"><Icon name="trash" size="sm" className="w-3.5 h-3.5" /></button>
         </div>
       </div>
+      <button
+        type="button"
+        aria-expanded={showBottomTimeline}
+        aria-controls="bottom-page-timeline"
+        onClick={onToggleTimeline}
+        className="absolute right-6 flex cursor-pointer items-center gap-1 rounded-md border border-white/[0.06] bg-neutral-950 p-1.5 text-[11px] font-medium text-neutral-400 shadow transition-all hover:bg-neutral-800 hover:text-neutral-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+        title={showBottomTimeline ? 'Collapse Timeline' : 'Expand Timeline'}
+      >
+        <span className="text-[10px] font-sans font-bold tracking-wider text-neutral-500 uppercase max-[1180px]:sr-only">Timeline</span>
+        <Icon name={showBottomTimeline ? 'chevronDown' : 'chevronUp'} size="sm" className="w-3.5 h-3.5" />
+      </button>
     </div>
   );
 }
@@ -1120,7 +1127,7 @@ function CardPool({
       <nav aria-label="Card source" className="px-4 pb-3 pt-3">
         <div className="grid grid-cols-2 rounded-lg border border-white/[0.06] bg-neutral-950 p-0.5 shadow-inner">
           {[
-            { id: 'tcgdex', label: 'Cards', icon: 'layers' },
+            { id: 'cards', label: 'Cards', icon: 'layers' },
             { id: 'michi', label: 'Michi', icon: 'sparkles' },
           ].map((tab) => (
             <button
@@ -1348,8 +1355,9 @@ export default function CardBinder() {
   }, []);
   const [currentPage, setCurrentPage] = useState(boot.currentPage);
   const [pool, setPool] = useState(boot.pool);
-  const [activeTab, setActiveTab] = useState('tcgdex');
+  const [activeTab, setActiveTab] = useState('cards');
   const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(true);
+  const [showBottomTimeline, setShowBottomTimeline] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [fetchedCards, setFetchedCards] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -2901,6 +2909,47 @@ export default function CardBinder() {
     </SheetGrid>
   );
 
+  const renderThumbnailLeaf = (page, pageIndex) => {
+    const unit = Math.min((THUMB_BOX.w - THUMB_BOX.pad * 2) / gridW, (THUMB_BOX.h - THUMB_BOX.pad * 2) / gridH);
+    const active = activeSpread.includes(pageIndex);
+    const currentLeaf = pageIndex === currentPage;
+    return (
+      <button
+        key={page.id}
+        type="button"
+        aria-label={`Page ${pageIndex + 1}`}
+        aria-current={currentLeaf ? 'page' : undefined}
+        onClick={() => switchPage(pageIndex)}
+        onDragOver={(event) => { if (dragRef.current || hasFiles(event.dataTransfer)) { event.preventDefault(); event.dataTransfer.dropEffect = dragRef.current?.kind === 'slot' ? 'move' : 'copy'; } }}
+        onDrop={(event) => handleThumbDrop(event, pageIndex)}
+        className="group shrink-0 bg-transparent p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+      >
+        <div className={`grid aspect-[1/1.414] w-10 place-items-center overflow-hidden rounded-sm border bg-neutral-950 transition-colors ${currentLeaf ? 'border-white/25' : active ? 'border-neutral-700' : 'border-neutral-800 group-hover:border-neutral-600'}`}>
+          <SheetGrid page={page} card={card} gap={settings.gap} unit={`${unit}px`} dims={dims} renderSlot={(slot) => {
+            const id = page.slots[slot.key];
+            const src = images[id] || pool.find((item) => item.id === id)?.src;
+            const crop = id ? getCrop(page, slot.key, id) : { x: 50, y: 50 };
+            return <div className="size-full overflow-hidden border border-zinc-800 bg-zinc-900">{src && <img src={src} alt="" className="size-full" style={{ objectFit: settings.fit, objectPosition: `${crop.x}% ${crop.y}%` }} />}</div>;
+          }} />
+        </div>
+      </button>
+    );
+  };
+
+  const renderThumbnailGroup = (group) => {
+    const active = group.some((pageIndex) => activeSpread.includes(pageIndex));
+    const pageNumbers = group.map((pageIndex) => pageIndex + 1);
+    const label = group.length === 1 ? `Page ${pageNumbers[0]}` : `Pages ${pageNumbers[0]}–${pageNumbers[1]}`;
+    return (
+      <div key={group.join('-')} data-page-group={pageNumbers.join('-')} className={`relative flex shrink-0 flex-col items-center gap-1 text-[10px] font-medium whitespace-nowrap ${active ? 'text-red-400' : 'text-neutral-500'}`}>
+        <div className={`flex items-center gap-0.5 p-1.5 ${active ? 'ring-2 ring-red-500 ring-offset-4 ring-offset-neutral-950 rounded-md scale-105 duration-200 transition-transform' : 'rounded-md duration-200 transition-transform'}`}>
+          {group.map((pageIndex) => renderThumbnailLeaf(pages[pageIndex], pageIndex))}
+        </div>
+        <span>{label}</span>
+      </div>
+    );
+  };
+
   const renderCanvasLeaf = (pageIndex, options = {}) => {
     const page = pages[pageIndex];
     if (!page) return null;
@@ -3164,13 +3213,20 @@ export default function CardBinder() {
           <main data-dynamic-workspace className="relative flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-neutral-950">
             <div
               ref={stageRef}
-              className="relative flex min-h-0 w-full flex-1 items-center justify-center overflow-auto bg-neutral-950 bg-[radial-gradient(ellipse_at_center,rgba(82,82,91,0.18),transparent_65%)] p-8"
+              className="relative flex min-h-0 w-full flex-1 items-center justify-center overflow-auto bg-neutral-950 bg-[radial-gradient(ellipse_at_center,rgba(82,82,91,0.18),transparent_65%)] p-6"
               onPointerMove={moveMarquee}
               onPointerDown={(event) => { if (event.target === event.currentTarget && combineMode) { setSelBox(null); setSelectionPageId(null); } }}
               onDragEnter={(event) => { if (!combineMode && (['pool', 'remote'].includes(dragRef.current?.kind) || hasFiles(event.dataTransfer))) event.preventDefault(); }}
               onDragOver={(event) => { if (!combineMode && (['pool', 'remote'].includes(dragRef.current?.kind) || hasFiles(event.dataTransfer))) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; } }}
               onDrop={handleStageDrop}
             >
+              <div data-workspace-metrics aria-label={`Database ${fetchedCards.length} items, Custom ${customUploadedCards.length} uploaded, Density ${currentFilledCount} of ${layout.pockets} filled`} className="pointer-events-none absolute bottom-3 left-6 z-40 flex items-center gap-3 rounded-md border border-white/[0.06] bg-neutral-950/85 px-2.5 py-1.5 text-[10px] font-mono shadow-lg backdrop-blur-sm select-none">
+                <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="font-bold tracking-widest text-neutral-500 uppercase">Database</span><strong className="font-medium text-neutral-200">{fetchedCards.length} items</strong></span>
+                <span aria-hidden="true" className="h-3 w-px bg-white/[0.08]" />
+                <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="font-bold tracking-widest text-neutral-500 uppercase">Custom</span><strong className="font-medium text-red-400">{customUploadedCards.length} uploaded</strong></span>
+                <span aria-hidden="true" className="h-3 w-px bg-white/[0.08]" />
+                <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="font-bold tracking-widest text-neutral-500 uppercase">Density</span><strong className="font-medium text-neutral-200">{currentFilledCount}/{layout.pockets} filled</strong></span>
+              </div>
               {settings.view === 'binder' && (
                 <span
                   data-binder-bed
@@ -3211,10 +3267,8 @@ export default function CardBinder() {
               </div>
             </div>
             <FloatingNavigation
-              databaseCount={fetchedCards.length}
-              customCount={customUploadedCards.length}
-              filledCount={currentFilledCount}
-              capacity={layout.pockets}
+              showBottomTimeline={showBottomTimeline}
+              onToggleTimeline={() => setShowBottomTimeline((value) => !value)}
               canUndo={pastRef.current.length > 0}
               canRedo={futureRef.current.length > 0}
               onUndo={undoAction}
@@ -3239,6 +3293,24 @@ export default function CardBinder() {
               onDelete={deletePage}
               canDelete={pages.length > 2}
             />
+            <footer
+              id="bottom-page-timeline"
+              data-page-timeline
+              aria-label="Page timeline"
+              aria-hidden={!showBottomTimeline}
+              inert={showBottomTimeline ? undefined : ''}
+              className={`no-print relative flex w-full shrink-0 items-center justify-center gap-4 bg-neutral-900/40 backdrop-blur-sm transition-all duration-300 ease-in-out select-none ${showBottomTimeline ? 'h-28 py-4 px-6 border-t border-white/[0.04] border-opacity-100 opacity-100 overflow-x-auto' : 'h-0 py-0 px-6 border-0 border-opacity-0 opacity-0 overflow-hidden pointer-events-none'}`}
+            >
+              <div data-page-timeline-inner className="mx-auto flex h-full w-max items-center justify-center gap-4">
+                {spreadGroups.map(renderThumbnailGroup)}
+                <div className="flex shrink-0 flex-col items-center gap-1 text-[10px] font-medium whitespace-nowrap text-neutral-500">
+                  <button type="button" onClick={addPage} aria-label="Add page" className="group shrink-0 rounded-md bg-transparent p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500">
+                    <span className="flex aspect-[1/1.414] w-10 items-center justify-center overflow-hidden rounded-sm border border-dashed border-neutral-700 text-neutral-500 transition-colors group-hover:border-neutral-500 group-hover:bg-neutral-900 group-hover:text-neutral-200"><Icon name="plus" size="md" /></span>
+                  </button>
+                  <span>Add page</span>
+                </div>
+              </div>
+            </footer>
           </main>
         </div>
         <div className="no-print pointer-events-none fixed bottom-10 right-5 z-[100] flex w-[360px] flex-col items-end gap-2">
