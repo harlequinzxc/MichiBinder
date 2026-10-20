@@ -11,11 +11,11 @@ import {
   Eraser,
   Eye,
   File,
+  FileSliders,
   Grid2X2,
   Grid3X3,
   Image as ImageIcon,
   Keyboard,
-  Layers,
   LayoutGrid,
   Maximize2,
   Minimize2,
@@ -28,7 +28,7 @@ import {
   RotateCcw,
   RotateCw,
   Ruler,
-  SlidersHorizontal,
+  RulerDimensionLine,
   Sparkles,
   SquareDashedMousePointer,
   TableCellsMerge,
@@ -559,6 +559,7 @@ const ICONS = {
   eraser: Eraser,
   eye: Eye,
   file: File,
+  fileSliders: FileSliders,
   grid: LayoutGrid,
   grid2x2: Grid2X2,
   grid3x3: Grid3X3,
@@ -566,7 +567,6 @@ const ICONS = {
   image: ImageIcon,
   install: MonitorDown,
   keyboard: Keyboard,
-  layers: Layers,
   maximize: Maximize2,
   merge: TableCellsMerge,
   menu: Menu,
@@ -578,8 +578,8 @@ const ICONS = {
   reset: RotateCcw,
   rotate: RotateCw,
   ruler: Ruler,
+  rulerDimension: RulerDimensionLine,
   selectAll: Check,
-  sliders: SlidersHorizontal,
   split: TableCellsSplit,
   sparkles: Sparkles,
   trash: Trash2,
@@ -817,7 +817,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
           aria-pressed={isZenMode}
           data-zen-mode-toggle
         >
-          <Icon name={isZenMode ? 'maximize' : 'minimize'} />
+          <Icon name={isZenMode ? 'minimize' : 'maximize'} />
         </button>
       </div>
     </header>
@@ -916,6 +916,12 @@ function RightControlRail({
               </RailPopover>
             )}
           </div>
+          <div className="relative flex">
+            <RailButton icon="fileSliders" label="Print setup" active={openPanel === 'print'} expanded={openPanel === 'print'} onClick={() => togglePanel('print')}>
+              <span className={`absolute right-1 top-1 size-1.5 rounded-full ${fitInfo.fitsTrueSize ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+            </RailButton>
+            {openPanel === 'print' && <RailPopover title="Print setup" icon="fileSliders"><PrintSetupContent settings={settings} setSettings={setSettings} fitInfo={fitInfo} suggestedPaper={suggestedPaper} printCount={printCount} onReset={onReset} /></RailPopover>}
+          </div>
         </div>
 
         <div data-rail-zone="layout" className="flex flex-col gap-3.5 items-center [@media(max-height:720px)]:gap-2">
@@ -972,20 +978,14 @@ function RightControlRail({
 
         <div data-rail-zone="material" className="flex flex-col items-center gap-2 [@media(max-height:720px)]:gap-1">
           <div className="relative flex">
-            <RailButton icon="layers" label={`Card size: ${custom ? 'Custom' : 'Pokémon'} ${round1(base.w)} × ${round1(base.h)} mm`} active={openPanel === 'card-size'} expanded={openPanel === 'card-size'} onClick={() => togglePanel('card-size')} />
+            <RailButton icon="rulerDimension" label="Card size" active={openPanel === 'card-size'} expanded={openPanel === 'card-size'} onClick={() => togglePanel('card-size')} />
             {openPanel === 'card-size' && (
-              <RailPopover title="Card material" icon="layers">
-                <label className="block"><span className="mb-1.5 block text-[9px] font-bold tracking-widest text-neutral-500 uppercase">Card archetype</span><select value={custom ? 'custom' : cleanSize.preset} aria-label="Card size" onChange={(event) => { if (event.target.value === 'custom') setCardSize({ preset: 'custom', customWmm: base.w, customHmm: base.h }); else setCardSize({ preset: event.target.value }); }} className="h-9 w-full rounded-lg border border-white/[0.08] bg-neutral-900 px-2 text-[11px] font-medium text-neutral-200 outline-none focus-visible:ring-2 focus-visible:ring-red-500">{CARD_PRESETS.map((preset) => <option key={preset.id} value={preset.id}>{preset.label} · {preset.wMm} × {preset.hMm} mm</option>)}<option value="custom">Custom dimensions…</option></select></label>
+              <RailPopover title="Card size" icon="rulerDimension">
+                <label className="block"><select value={custom ? 'custom' : cleanSize.preset} aria-label="Card size" onChange={(event) => { if (event.target.value === 'custom') setCardSize({ preset: 'custom', customWmm: base.w, customHmm: base.h }); else setCardSize({ preset: event.target.value }); }} className="h-9 w-full rounded-lg border border-white/[0.08] bg-neutral-900 px-2 text-[11px] font-medium text-neutral-200 outline-none focus-visible:ring-2 focus-visible:ring-red-500">{CARD_PRESETS.map((preset) => <option key={preset.id} value={preset.id}>{preset.label} · {preset.wMm} × {preset.hMm} mm</option>)}<option value="custom">Custom dimensions…</option></select></label>
                 {custom && <div className="flex items-center justify-between gap-1 rounded-lg border border-white/[0.06] bg-neutral-900/70 p-2"><MmField label="W" value={cleanSize.customWmm} onCommit={(customWmm) => setCardSize({ customWmm })} /><span className="text-neutral-600">×</span><MmField label="H" value={cleanSize.customHmm} onCommit={(customHmm) => setCardSize({ customHmm })} /></div>}
                 <div className="flex items-center justify-between border-t border-white/[0.06] pt-2 text-[9px] font-mono text-neutral-500"><span>Effective</span><strong className="text-neutral-200">{fmtMm(resolveCardSize(cleanSize).w)} × {fmtMm(resolveCardSize(cleanSize).h)} mm</strong></div>
               </RailPopover>
             )}
-          </div>
-          <div className="relative flex">
-            <RailButton icon="sliders" label="Print setup" active={openPanel === 'print'} expanded={openPanel === 'print'} onClick={() => togglePanel('print')}>
-              <span className={`absolute right-1 top-1 size-1.5 rounded-full ${fitInfo.fitsTrueSize ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-            </RailButton>
-            {openPanel === 'print' && <RailPopover title="Print setup" icon="sliders"><PrintSetupContent settings={settings} setSettings={setSettings} fitInfo={fitInfo} suggestedPaper={suggestedPaper} printCount={printCount} onReset={onReset} /></RailPopover>}
           </div>
           <div className="relative flex">
             <RailButton icon="keyboard" label="Keyboard shortcuts" active={openPanel === 'shortcuts'} expanded={openPanel === 'shortcuts'} onClick={() => togglePanel('shortcuts')} />

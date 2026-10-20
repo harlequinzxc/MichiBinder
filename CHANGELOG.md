@@ -490,6 +490,17 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Verified fixed thumbnail geometry, a two-pixel post-outline label gap, all seven absolute rail projections, bounded long-panel scrolling, Inter typography, divider placement, icon state, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.3.1.
 
+## [v4.3.2] — 2026-10-20
+
+### Improved
+
+- Restored the Zen Mode glyph mapping so standard view displays `Maximize2` and focused view displays `Minimize2`, without changing the centralized panel-state behavior or titles.
+- Recast the former Card material control as Card size with the exact Lucide `RulerDimensionLine` glyph on both trigger and dialog, a concise fixed title, and no redundant Card archetype caption above the accessible size selector.
+- Replaced the Print setup sliders glyph with Lucide `FileSliders` and moved its trigger directly between Print / PDF and Grid selection in the rail's visual order.
+- Advanced `lucide-react` from v0.468.0 to v0.525.0 to supply the requested ruler-dimension-line component while retaining the existing shared 16×16 `Icon` geometry.
+- Verified glyph identity and size, Card size labeling/content, exact rail ordering, bounded Print setup geometry, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
+- Advanced package and lockfile metadata to v4.3.2.
+
 ---
 
 ## Current architecture and engineering rationale
@@ -548,6 +559,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - The source sidebar consumes width when open; the right-side main tree receives the remainder.
 - The preview surface is one flex row containing the scrollable stage and detached rail. The stage stops at the rail's left edge, including the rail padding zone; the surface permits overflow so rail dialogs can overlay lower workspace bands while the main workspace remains the outer clip boundary.
 - The rail has no full-height edge divider and no `self-start`; its outer box is vertically centered against the **live preview surface**, not the complete main column. Collapsing the timeline changes preview height, so the rail's vertical center moves.
+- The rail begins with Print / PDF, Print setup, then Grid selection. Print setup uses `FileSliders`; Card size uses `RulerDimensionLine` and exposes its selector without a redundant archetype caption.
 - Every rail dialog is absolutely anchored at `right-full mr-3 top-0` relative to its trigger. Panels cap at 40vh and scroll internally when their content is longer.
 - Database/Custom/Density is absolutely anchored to the preview bottom edge. It uses the self-hosted Inter sans stack and is not part of the timeline or bottom controller flow.
 - The bottom controller owns Undo/Redo, Merge/Unmerge/reset/clear, spread navigation, Add, Duplicate, Delete, and timeline toggle. One-pixel dividers separate its History, Slot Structure, and Spread Navigation pockets.
