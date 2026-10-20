@@ -1,560 +1,615 @@
-# CHANGELOG — MichiBinder Project Memory
+# CHANGELOG — MichiBinder Project Memory and State Ledger
 
-This file is the project's historical and technical memory. It records what was built and why, the decisions that shaped the current implementation, known limitations and pitfalls, unfinished work, and the state a future maintainer inherits. It describes history and state; it is not a second set of project rules.
+This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current snapshot — v1.20.2
+## Current state — v4.2.3
 
-- **Date:** 2026-10-20
-- **Application release before this documentation round:** v1.20.1 at commit `58da341`
-- **Runtime:** static, client-only React 19 PWA built with Vite 6 and Tailwind CSS v4 through `@tailwindcss/vite`
-- **Runtime dependencies:** `react`, `react-dom`, and `lucide-react`
-- **Primary implementation:** `src/CardBinder.jsx`; the application intentionally remains mostly self-contained in this file
-- **Supporting UI/print styles:** `src/index.css`
-- **Persistence:** layout metadata in `localStorage`; image blobs in IndexedDB with a data-URL/local-storage fallback
-- **Remote data:** TCGdex REST API and asset CDN for the Cards catalogue; no application backend or required environment variables
-- **Deployment:** static `dist/` output on Vercel, configured by `vercel.json`
-- **Latest validation:** `npm run build` passed with 1,579 transformed modules. Chromium browser checks passed for the logo, menus, print scope, Binder/Paper preview switching, 32×32 controls, 16×16 Lucide icons, uploads, batch placement, duplication, Merge/Unmerge, Undo/Redo, timeline collapse, and timeline reveal after Add Page or Duplicate Page. Responsive checks covered 1600×1000, 1366×768, and 1200×700.
-- **Active implementation work:** none known at the time this file was created.
+- **Ledger date:** 2026-10-20
+- **Application state entering this documentation pass:** commit `69ad992` / retrospective v4.2.2
+- **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
+- **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
+- **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
+- **Primary source:** `src/CardBinder.jsx`, approximately 3,450 lines containing the data model, persistence, catalogue integration, interactions, print tree, and most UI components
+- **Supporting source:** `src/index.css` for Tailwind import, print media, page-turn depth, sleeve materials, portrait guard, and animations
+- **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
+- **Network boundary:** TCGdex REST/API assets only; no MichiBinder backend, account, telemetry, required secret, or environment variable
+- **Deployment:** static `dist/` output on Vercel through `vercel.json`
+- **Last functional change:** Add Page and Duplicate Physical Sheet deterministically reveal the newly created two-page group in long timelines
+- **Last verified behavior:** production build, logo/menu controls, print scope, Binder/Paper switching, uploads, remote/local batch placement, duplication, Merge/Unmerge, Undo/Redo, timeline collapse/reflow, and timeline reveal; Chromium geometry covered 1600×1000, 1366×768, and 1200×700
+- **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
-## Retrospective Semantic Version ledger
+## SemVer reconstruction
 
-The repository originally kept `package.json` at `1.0.0` and did not create Git tags for each round. The versions below are retrospective SemVer labels assigned from the actual commit history, beginning with v1.0.0 as requested. Package metadata was first brought forward to the ledger's current version in v1.20.2.
+Versions are assigned retrospectively to every commit because historical package metadata remained at `1.0.0` and no release tags were created. The package and lockfile were first synchronized with the reconstructed ledger in commit `69ad992`; this pass advances both to v4.2.3.
 
-The classification used here is:
+The classification reflects the requested strict release logic:
 
-- **MAJOR:** an intentionally incompatible persisted-data, deployment, or user contract change. No post-1.0 commit required one because migrations and compatibility paths were retained.
-- **MINOR:** a backward-compatible user capability or substantial workspace mode added.
-- **PATCH:** a compatible fix, visual refinement, asset update, documentation update, or hardening pass.
+- **PATCH** — compatible visual polish, spacing, alignment, typography, assets, race-condition fixes, and documentation.
+- **MINOR** — a backward-compatible functional feature or operational module.
+- **MAJOR** — a layout or rendering paradigm was replaced rather than extended.
 
-No historical Git tags were added by this documentation round; commit hashes remain the source-of-truth links for the earlier rounds.
+Three post-inception architectural breaks justify major releases:
+
+1. **v2.0.0:** the flat page viewport was replaced by the preserved 3D spread/rotation engine.
+2. **v3.0.0:** the toolbar/tray composition was dismantled and rebuilt as the four-area workspace with contextual bottom navigation.
+3. **v4.0.0:** top-heavy configuration controls were removed and replaced by the standalone right utility rail plus cohesive bottom structural controller.
+
+Historical entries are ordered from oldest to newest. Commit links, rather than nonexistent retrospective Git tags, are the immutable references.
 
 ---
-
-## [v1.20.2] — 2026-10-20
-
-### Added
-
-- Created this `CHANGELOG.md` as the consolidated history, architecture record, issue ledger, and handoff state.
-
-### Changed
-
-- Aligned `package.json` and `package-lock.json` with the retrospective current release version.
-
-### Why
-
-- The project had extensive implementation history in Git and conversation context but no durable in-repository handoff record.
-
-## [v1.20.1] — 2026-10-20 — [`58da341`](https://github.com/harlequinzxc/MichiBinder/commit/58da341f4c28e7013ca73144e83c87e6bcd0e46a)
-
-### Fixed
-
-- Made Add Page and Duplicate Physical Sheet explicitly remember the ID of the newly created page.
-- Added stable timeline page IDs and used the requested page's thumbnail group as the smooth-scroll target.
-- Preserved a reveal request while the timeline is collapsed so the new group is shown when the timeline reopens.
-
-### Why
-
-- Generic active-page centering was not sufficiently deterministic for newly inserted or duplicated sheets in long timelines.
-
-## [v1.20.0] — 2026-10-20 — [`51b25de`](https://github.com/harlequinzxc/MichiBinder/commit/51b25de31cb5ac8e9737b2f7ce5039ac144c52e9)
-
-### Added
-
-- Added boundary-aware smooth centering for the active timeline group.
-- Added a single Eye/Preview menu exposing Binder and Paper modes.
-- Added a unified Print / PDF menu containing print scope and the print-dialog action.
-- Added the real local MichiBinder logo at `/icons/icon-192.png` to the header.
-
-### Changed
-
-- Moved Duplicate Physical Sheet from the right rail to immediately left of Delete in the bottom controller.
-- Marked the active timeline group with `data-active="true"` and attached a timeline container ref.
-- Compacted the shortcuts menu so rail popovers remain visible at shorter tested viewport heights.
-
-### Why
-
-- The rail had accumulated related actions as separate buttons. Consolidating print and preview reduced rail density while moving structural page editing into one bottom controller.
-
-## [v1.19.3] — 2026-10-20 — [`7dd740e`](https://github.com/harlequinzxc/MichiBinder/commit/7dd740e4764c7d7a685d062f9aa478b947c3f4f3)
-
-### Changed
-
-- Put the utility rail inside the same preview-surface flex tree as the binder stage so the stage excludes the rail's padded width.
-- Expanded the timeline through the right viewport edge while keeping it under the dynamic workspace rather than under the sidebar.
-- Vertically centered the detached rail against the live preview surface and let it recenter when the timeline collapses.
-- Standardized right-rail and bottom-controller frames at 32×32 and retained the four-pixel active-thumbnail ring offset.
-- Added a temporary Lucide brand mark, replaced by the local logo in v1.20.0.
-
-### Fixed
-
-- Replaced ineffective Tailwind important-prefixed collapse classes with conditionally composed open/closed class sets, eliminating residual timeline padding and border.
-
-## [v1.19.2] — 2026-10-20 — [`576a4ac`](https://github.com/harlequinzxc/MichiBinder/commit/576a4ac5eb6694b32752e4e34c38dc1bff610006)
-
-### Changed
-
-- Centralized Lucide rendering so every icon is exactly 16×16 and size utilities passed by callers cannot override it.
-- Standardized control sizing and tightened rail spacing for short landscape viewports.
-- Made the header persistence status reactive: `Saved locally`, pulsing `Saving...`, and `Save failed`.
-- Added viewport-oriented placement for the larger Print Setup and Keyboard Shortcuts popovers.
-
-### Why
-
-- Mixed icon sizes and control frames were causing visible inconsistency and made geometry validation unreliable.
-
-## [v1.19.1] — 2026-10-20 — [`0727608`](https://github.com/harlequinzxc/MichiBinder/commit/0727608cfd5a48493d15744c2b03f73cf9a3e397)
-
-### Changed
-
-- Replaced the dock-like right edge with a detached rounded utility capsule.
-- Converted rail settings into consistent left-projecting dark-glass popovers with dialog semantics and `aria-expanded`/`aria-haspopup` state.
-- Consolidated grid choice, print scope, scale, card material, print setup, and shortcuts into compact menus.
-- Reworked shortcuts into compact rows suitable for the narrow `w-56` popover.
-
-### Why
-
-- The first rail implementation consumed too much horizontal space and presented inconsistent panel geometry.
-
-## [v1.19.0] — 2026-10-20 — [`268aac6`](https://github.com/harlequinzxc/MichiBinder/commit/268aac6a756c45a5e4fc1fd822d82f8e7fca829f)
-
-### Added
-
-- Added persisted per-page section names with editable labels in Binder and Paper previews.
-- Introduced the right-side control rail for layout, preview, scale, card material, printing, duplication, shortcuts, and installation.
-
-### Changed
-
-- Simplified the top bar to identity, sidebar control, and local-engine status.
-- Polished binder rings, sheet surfaces, boundary covers, workspace metrics, and paper shadows.
-- Corrected collapsed timeline `inert` handling.
-
-### Why
-
-- Configuration controls had outgrown the header; the rail made the workspace more focused and created room for page labels and material depth.
-
-## [v1.18.0] — 2026-10-20 — [`7c18131`](https://github.com/harlequinzxc/MichiBinder/commit/7c181310e21ac2f303b7fb9784de251087df0095)
-
-### Added
-
-- Unified Cards and Michi selection under state named `selectedCardIds`.
-- Added Shift-range and Ctrl/Command-toggle selection to TCGdex results as well as local cards.
-- Added remote batch drag/import and consecutive multi-card placement across pages.
-- Added ordered selection badges and shared drag feedback for local and remote batches.
-
-### Changed
-
-- Docked the timeline to the dynamic workspace so it no longer clips beneath the sidebar.
-- Added horizontal overscroll containment and stable minimum content width.
-
-## [v1.17.0] — 2026-10-20 — [`d0b6350`](https://github.com/harlequinzxc/MichiBinder/commit/d0b6350944357efcfc2c0bf3c15c9613c57a8b04)
-
-### Added
-
-- Restored a collapsible bottom page timeline with spread-group thumbnails, direct page switching, page drops, and page insertion.
-- Added the timeline toggle to the grounded control bar.
-- Established tab IDs `cards` and `michi`.
-
-### Changed
-
-- Returned Database/Custom/Density metrics to an absolute row at the bottom of the preview viewport.
-
-## [v1.16.0] — 2026-10-20 — [`11c6eb8`](https://github.com/harlequinzxc/MichiBinder/commit/11c6eb82f4bcab6001fc6760e20e6f156e4eb65d)
-
-### Added
-
-- Made the workspace fluidly resize when the sidebar opens and closes.
-- Converted the floating navigator into a grounded full-width bottom control track with horizontal overflow protection.
-
-### Changed
-
-- Integrated Database, Custom, and Density counts into the control track during this layout stage; they later returned to the preview surface in v1.17.0.
-
-## [v1.15.0] — 2026-10-20 — [`9c0c2ec`](https://github.com/harlequinzxc/MichiBinder/commit/9c0c2ecaf259691983684cf608271cf21b2e835d)
-
-### Changed
-
-- Rewrote the desktop workspace into four primary areas: top utility bar, collapsible source sidebar, dynamic preview, and bottom controls.
-- Moved Merge/Unmerge, reset, clear-page, history, and spread controls into one bottom navigation surface.
-- Added the sidebar toggle to the header and removed the separate canvas toolbar/status footer.
-
-### Why
-
-- The preceding layout had controls split across too many independent toolbars and overlays.
-
-## [v1.14.0] — 2026-10-20 — [`9e159bf`](https://github.com/harlequinzxc/MichiBinder/commit/9e159bfb667dff6cb00deedd2672bea097adaadd)
-
-### Added
-
-- Added a floating navigator for Undo, Redo, previous/next spread, Add Spread, and Delete Sheet.
-- Added native drag-target highlighting via slot data attributes.
-
-### Changed
-
-- Removed page navigation and destructive page actions from the crowded header.
-- Hardened drag cleanup so browser drop/end events do not leave stale visual state.
-
-## [v1.13.0] — 2026-10-19 — [`75c3f59`](https://github.com/harlequinzxc/MichiBinder/commit/75c3f59c0e7afb716a5b2e8dc3955632038b496a)
-
-### Added
-
-- Replaced manual TCGdex result paging with infinite scrolling.
-- Added loading-more and end-of-catalog states, near-bottom scroll locking, filter reset, and append-mode fetches.
-
-### Why
-
-- Catalogue browsing needed to remain continuous for large sets and search results.
-
-## [v1.12.0] — 2026-10-19 — [`57ada8c`](https://github.com/harlequinzxc/MichiBinder/commit/57ada8c0faead71786a97c65b4d6a54438e4a4b0)
-
-### Added
-
-- Added compact custom-upload-only print compilation, repacking private uploads into consecutive printable slots.
-- Added Database, Custom, and Density workspace metrics.
-
-### Changed
-
-- Rebranded the product and metadata from Digital Card Binder to MichiBinder.
-- Updated README, document metadata, manifest text, notifications, portrait guard, and sidebar terminology.
-- Refined the page tray and active thumbnail framing.
-
-## [v1.11.0] — 2026-10-19 — [`536ee2d`](https://github.com/harlequinzxc/MichiBinder/commit/536ee2dd4a9de9f51f22acb3326043fab019a3e3)
-
-### Added
-
-- Renamed the source tabs to Cards and Michi and added Lucide icons to both.
-- Added collapse/expand behavior for the page navigator.
-
-### Changed
-
-- Simplified sidebar filters and custom-card actions.
-- Standardized source tab identities that remain `cards` and `michi` in the current application.
-
-## [v1.10.0] — 2026-10-19 — [`78d500d`](https://github.com/harlequinzxc/MichiBinder/commit/78d500d55830fddd7b2002d325b5e01dacde0aa3)
-
-### Added
-
-- Added separate public-catalogue and private-upload workspaces in the sidebar.
-- Added local upload cards with source badges, shared selection behavior, custom drag payloads, and private-asset controls.
-- Preserved source metadata (`tcgdex` versus `upload`) in IndexedDB and fallback persistence.
-
-### Why
-
-- Remote catalogue browsing and private user art needed distinct but interoperable workflows.
-
-## [v1.9.1] — 2026-10-19 — [`41a802b`](https://github.com/harlequinzxc/MichiBinder/commit/41a802b6345e0c5de9ac6a4e8216363640604756)
-
-### Fixed
-
-- Raised the Print Setup popover stacking level so it renders above workspace surfaces.
-
-## [v1.9.0] — 2026-10-19 — [`71a8295`](https://github.com/harlequinzxc/MichiBinder/commit/71a82950b7e1ddaec308100e50944ca84654f990)
-
-### Added
-
-- Added print scope state for all cards versus user uploads only.
-- Tagged imported records by source so print filtering and storage reconciliation can distinguish TCGdex assets from private uploads.
-
-### Changed
-
-- Refined workspace spacing, preview materials, active timeline framing, and print-empty-state messaging.
-
-## [v1.8.0] — 2026-10-19 — [`849a14b`](https://github.com/harlequinzxc/MichiBinder/commit/849a14bbe6a4b1a1a6e5d99158e0d4553f677d2f)
-
-### Added
-
-- Added TCGdex set retrieval, chronological set sorting, set filters, result pagination, and per-set card caching.
-- Added resilient handling for both direct-array and `{ data }` API payloads and for endpoints that reject server-side sort parameters.
-
-## [v1.7.0] — 2026-10-19 — [`9228d40`](https://github.com/harlequinzxc/MichiBinder/commit/9228d40602bd1e074a877673e54b117662b1d476)
-
-### Added
-
-- Added debounced TCGdex card search, loading/error/empty states, low-resolution previews, and high-resolution imports.
-- Added drag, double-click, Enter-key, stage-drop, slot-drop, sidebar-drop, and timeline-drop paths for remote cards.
-- Added the local placeholder asset and moved the service-worker cache to `card-binder-v3`.
-
-### Technical decision
-
-- Imported cards are downloaded into local storage when CORS/browser policy allows; a validated TCGdex CDN URL remains as fallback when blob download fails.
-
-## [v1.6.10] — 2026-10-19 — [`0f862a3`](https://github.com/harlequinzxc/MichiBinder/commit/0f862a3e7f0811b1cedeb5776cd6ef5f4854f064)
-
-### Changed
-
-- Unified binder controls and moved page-specific structural actions into a shared workspace toolbar.
-- Deepened binder and paper surfaces while retaining a fixed 1200px 3D perspective.
-- Centralized icon sizing through the `Icon` abstraction and stabilized status/help surfaces.
-
-## [v1.6.9] — 2026-10-19 — [`87a15e0`](https://github.com/harlequinzxc/MichiBinder/commit/87a15e08125f95e59187cf214b12bbdcb341948a)
-
-### Changed
-
-- Applied toolbar, upload tray, slot-label, cover, and active-thumbnail micro-polish.
-- Tightened typography, padding, and responsive label visibility without changing the underlying workflows.
-
-## [v1.6.8] — 2026-10-19 — [`909614d`](https://github.com/harlequinzxc/MichiBinder/commit/909614d0a849fb8b3e1e07fa49065204bdbbb79c)
-
-### Added
-
-- Added a self-hosted static Inter variable-font asset and its license.
-
-### Changed
-
-- Applied Inter locally and refined typography, sleeve material, and binder surface details without adding a network font dependency.
-
-## [v1.6.7] — 2026-10-19 — [`2b4e52c`](https://github.com/harlequinzxc/MichiBinder/commit/2b4e52c3fd7c1d0a19a3a47088501cd222cda1e1)
-
-### Changed
-
-- Rebalanced the header controls and responsive visibility.
-- Deepened binder beds, sleeves, covers, and workspace surfaces while keeping print geometry unchanged.
-
-## [v1.6.6] — 2026-10-19 — [`7ff4dc6`](https://github.com/harlequinzxc/MichiBinder/commit/7ff4dc6e09abdbd5bad39091747744c4b486bfac)
-
-### Changed
-
-- Clarified hierarchy among global controls, page tools, status information, and binder materials.
-- Refined depth and contrast so controls remain readable over the dark workspace.
-
-## [v1.6.5] — 2026-10-19 — [`551ec39`](https://github.com/harlequinzxc/MichiBinder/commit/551ec394f30417531c7de05b422b7db685e3ad25)
-
-### Changed
-
-- Elevated the desktop visual hierarchy with structured header navigation, a sizing toolbar, source-pool controls, workspace status, and stronger binder depth cues.
-- Added explicit responsive hiding for lower-priority labels and actions.
-
-## [v1.6.4] — 2026-10-19 — [`3e510ee`](https://github.com/harlequinzxc/MichiBinder/commit/3e510ee0b66896f05f55c7574f045bcf86389bb1)
-
-### Changed
-
-- Added page thickness, face shading, cast shadows, and cubic-bezier depth cues to physical page turns.
-- Kept turn geometry rigid while using light and shadow to sell the animation.
-
-## [v1.6.3] — 2026-10-19 — [`e4fbb89`](https://github.com/harlequinzxc/MichiBinder/commit/e4fbb890974465300c9c81dfb9db6b3ca4812ae2)
-
-### Fixed
-
-- Kept animated page flips vertically aligned by giving the spread an explicit frame height and controlled overflow clip.
-
-## [v1.6.2] — 2026-10-19 — [`ee89bc5`](https://github.com/harlequinzxc/MichiBinder/commit/ee89bc5498ad2e95371173a5e73fb974a2633387)
-
-### Fixed
-
-- Refined forward and backward turning-sheet transforms, face visibility, transform origins, and spine pinning.
-- Added guard handling when a planned page face no longer exists.
-
-## [v1.6.1] — 2026-10-19 — [`e95acaf`](https://github.com/harlequinzxc/MichiBinder/commit/e95acafc4913d423853a6716cb0a43ba0decc9e1)
-
-### Fixed
-
-- Corrected page-flip alignment at the center spine and at front/back cover boundaries.
-- Distinguished front-cover, back-cover, and normal-spread animation plans.
-
-## [v1.6.0] — 2026-10-19 — [`bf5a93e`](https://github.com/harlequinzxc/MichiBinder/commit/bf5a93e6b59b806556a32f26b9ffee6fbcaf3f10)
-
-### Added
-
-- Added double-sided physical page-turn animation with front/back faces, stable base leaves, cover layers, and directional plans.
-- Integrated insertion and duplication transitions with the physical-sheet model.
-
-## [v1.5.1] — 2026-10-18 — [`632d076`](https://github.com/harlequinzxc/MichiBinder/commit/632d076707590426b4b66e6e716a8f1a9e3b34b9)
-
-### Fixed
-
-- Aligned page grouping with physical facing-page behavior: first and last boundary pages render alone and interior pages render as spreads.
-- Updated labels, navigation, thumbnails, and side assignment to use the same binder grouping functions.
-
-## [v1.5.0] — 2026-10-18 — [`f32ce17`](https://github.com/harlequinzxc/MichiBinder/commit/f32ce170ad73d233e3251f9a4b6c112918a296ba)
-
-### Added
-
-- Modeled every physical sheet as paired `front` and `back` pages sharing a `sheetId`.
-- Added migration/repair for older odd or unpaired page arrays.
-- Made add, duplicate, delete, ordering, and minimum-page behavior operate on whole physical sheets.
-
-### Why
-
-- Independent logical pages could not correctly represent ownership, duplex printing, or realistic binder turns.
-
-## [v1.4.0] — 2026-10-18 — [`7f786bc`](https://github.com/harlequinzxc/MichiBinder/commit/7f786bc96285a2f8deb9724f9a89a01eaffc9c21)
-
-### Added
-
-- Added facing-page groups, boundary covers, a center spine, 3D page transitions, direct spread navigation, and resize-aware stage scaling.
-- Made page selection and history restoration spread-aware.
-
-## [v1.3.0] — 2026-10-18 — [`c4750f2`](https://github.com/harlequinzxc/MichiBinder/commit/c4750f244beac499df1f84740aafd25e7f26144a)
-
-### Added
-
-- Added 30-entry canvas Undo/Redo history and keyboard shortcuts.
-- Routed placement, movement, merge, unmerge, clear, reset, and layout changes through snapshot-aware canvas mutations.
-- Added selection counts, fill/delete actions, and interaction polish for cards and slots.
-
-### Technical decision
-
-- History snapshots contain pages, current page, and layout. Pool/image-library mutations and general settings are intentionally outside canvas history.
-
-## [v1.2.3] — 2026-10-18 — [`1716c71`](https://github.com/harlequinzxc/MichiBinder/commit/1716c71a500464b80423858d8990b0df90ca7c5b)
-
-### Changed
-
-- Polished page previews, page controls, active states, and workspace presentation.
-- Updated the committed desktop screenshot to match the refined interface.
-
-## [v1.2.2] — 2026-10-18 — [`b1542cd`](https://github.com/harlequinzxc/MichiBinder/commit/b1542cdcd860eb86bf8fd24cd98bb4935bd4856a)
-
-### Changed
-
-- Redesigned the application around the black/crimson visual system.
-- Reworked icons, manifest/theme colors, document metadata, service-worker cache identity, CSS accents, and the desktop screenshot.
-
-## [v1.2.1] — 2026-10-18 — [`0a226a2`](https://github.com/harlequinzxc/MichiBinder/commit/0a226a2a88ebe1c581ab0134de839613296c5a8c)
-
-### Changed
-
-- Replaced the original PWA icon family and refined the SVG artwork.
-
-## [v1.2.0] — 2026-10-18 — [`335b58d`](https://github.com/harlequinzxc/MichiBinder/commit/335b58dd5f22ade4d150204bddd3837ba9be8c0f)
-
-### Added
-
-- Added one-click Unmerge directly on a merged frame with a toast-level undo action.
-- Added guarded hover/focus slot actions for Unmerge and Remove Card.
-- Hardened marquee, click, double-click, and pointer interactions to prevent action bleed-through.
-
-## [v1.1.0] — 2026-10-18 — [`193e375`](https://github.com/harlequinzxc/MichiBinder/commit/193e3759e1b27156965a04e7be122d3f05c9f932)
-
-### Added
-
-- Built the initial production application: Vite/React/Tailwind workspace, local image pool, binder and paper previews, 2×2/3×3/4×3 layouts, merge/unmerge, drag/drop, crop repositioning, true-size print output, multi-page navigation, local persistence, PWA assets, Vercel configuration, and documentation.
-- Added IndexedDB image storage with local-storage fallback, install/offline support, keyboard interactions, accessibility labels, and responsive desktop/portrait handling.
-
-### Why
-
-- Established a private, backend-free card-layout tool where user uploads remain on the device and browser printing produces physically sized pages.
 
 ## [v1.0.0] — 2026-10-18 — [`9d9b7c5`](https://github.com/harlequinzxc/MichiBinder/commit/9d9b7c5421e5bf9a1ae6c336657382d5c1def10f)
 
 ### Added
 
-- Seeded the repository with the MichiBinder project identity in `README.md`.
+- Seeded the repository with `README.md` and the MichiBinder identity. This was the project boundary only; no executable application existed yet.
 
-### State at this version
+## [v1.1.0] — 2026-10-18 — [`193e375`](https://github.com/harlequinzxc/MichiBinder/commit/193e3759e1b27156965a04e7be122d3f05c9f932)
 
-- No application source existed yet; the working app arrived in v1.1.0.
+### Added
+
+- Built the first production-capable Digital Card Binder as a Vite/React/Tailwind PWA.
+- Added local image upload, reusable card pool, drag/drop placement, 2×2/3×3/4×3 grids, Merge/Unmerge, crop repositioning, multiple pages, Binder/Paper previews, true-size browser printing, accessibility labels, keyboard interaction, installation assets, service worker, Vercel config, and full README.
+- Added local-first persistence: layout metadata in `localStorage`, blobs in IndexedDB, and data-URL fallback when IndexedDB fails. The architecture avoided a backend so private images stay on-device.
+
+### Improved
+
+- Established physical-unit layout calculations and print-fit feedback so the browser print engine, rather than a server-side PDF renderer, could produce correctly sized output.
+
+## [v1.2.0] — 2026-10-18 — [`335b58d`](https://github.com/harlequinzxc/MichiBinder/commit/335b58dd5f22ade4d150204bddd3837ba9be8c0f)
+
+### Added
+
+- Added one-click Unmerge directly on a merged frame and a toast-level undo path.
+- Added guarded hover/focus actions for Unmerge and Remove Card.
+
+### Fixed
+
+- Added marquee/action timing guards so nested buttons could not leak pointer, click, or double-click events into selection, drag, or crop repositioning.
+
+## [v1.2.1] — 2026-10-18 — [`0a226a2`](https://github.com/harlequinzxc/MichiBinder/commit/0a226a2a88ebe1c581ab0134de839613296c5a8c)
+
+### Improved
+
+- Replaced the initial PWA icon family and refined the SVG artwork for cleaner install surfaces. No application behavior changed.
+
+## [v1.2.2] — 2026-10-18 — [`b1542cd`](https://github.com/harlequinzxc/MichiBinder/commit/b1542cdcd860eb86bf8fd24cd98bb4935bd4856a)
+
+### Improved
+
+- Reworked the application into the black/crimson product theme and updated accents, icons, manifest colors, document metadata, service-worker cache identity, and screenshot.
+- The visual system established red as action/selection hierarchy while leaving data and interaction contracts intact, so this remained a patch release.
+
+## [v1.2.3] — 2026-10-18 — [`1716c71`](https://github.com/harlequinzxc/MichiBinder/commit/1716c71a500464b80423858d8990b0df90ca7c5b)
+
+### Improved
+
+- Polished page previews, navigation controls, active states, and workspace proportions.
+- Updated the committed desktop screenshot to match the revised interface.
+
+## [v1.3.0] — 2026-10-18 — [`c4750f2`](https://github.com/harlequinzxc/MichiBinder/commit/c4750f244beac499df1f84740aafd25e7f26144a)
+
+### Added
+
+- Added a 30-entry Undo/Redo canvas history with keyboard shortcuts.
+- Added ordered selection counts, fill/delete actions, and history-aware placement, movement, merge, unmerge, clear, reset, and layout changes.
+
+### Improved
+
+- Centralized canvas mutations through snapshot-aware helpers. History intentionally captured pages, current page, and layout—not the card library, remote catalogue, or every setting—because canvas recovery and asset-library recovery have different lifecycles.
+
+## [v2.0.0] — 2026-10-18 — [`7f786bc`](https://github.com/harlequinzxc/MichiBinder/commit/7f786bc96285a2f8deb9724f9a89a01eaffc9c21)
+
+### Added
+
+- Replaced the flat page viewport with facing-page groups, boundary covers, center spine, preserved 3D transforms, directional transitions, and spread navigation.
+- Added resize-aware stage scaling and spread-aware selection/history restoration.
+
+### Removed
+
+- Removed the assumption that one active logical page always mapped to one flat canvas. Pages now participate in a spread and have a left/right physical side.
+
+### Improved
+
+- This was the first major architectural break: rendering, navigation, animation timing, and workspace geometry moved to a 3D spread engine rather than layering an effect over the old flat layout.
+
+## [v2.1.0] — 2026-10-18 — [`f32ce17`](https://github.com/harlequinzxc/MichiBinder/commit/f32ce170ad73d233e3251f9a4b6c112918a296ba)
+
+### Added
+
+- Added the physical-sheet ownership model: exactly two pages (`front` and `back`) share one `sheetId`.
+- Added migration/repair for odd, legacy, or unpaired page arrays.
+- Made add, duplicate, delete, ordering, and minimum-page behavior operate on whole sheets. This was necessary for duplex identity and credible page turns.
+
+### Removed
+
+- Removed independent page insertion/deletion semantics that could orphan a reverse face.
+
+## [v2.1.1] — 2026-10-18 — [`632d076`](https://github.com/harlequinzxc/MichiBinder/commit/632d076707590426b4b66e6e716a8f1a9e3b34b9)
+
+### Fixed
+
+- Unified binder grouping so the first and final boundary pages render alone while interior pages render as facing pairs.
+- Aligned labels, navigation, thumbnails, and side assignment to the same `binderViewGroups`/`binderViewForPage` model, removing divergent page math.
+
+## [v2.2.0] — 2026-10-19 — [`bf5a93e`](https://github.com/harlequinzxc/MichiBinder/commit/bf5a93e6b59b806556a32f26b9ffee6fbcaf3f10)
+
+### Added
+
+- Added double-sided physical turns with distinct front/back faces, stable base leaves, cover layers, directional plans, and insertion/duplication transitions.
+- The engine renders nonmoving base pages separately from the turning sheet so React updates cannot visually erase the page beneath the animation.
+
+## [v2.2.1] — 2026-10-19 — [`e95acaf`](https://github.com/harlequinzxc/MichiBinder/commit/e95acafc4913d423853a6716cb0a43ba0decc9e1)
+
+### Fixed
+
+- Corrected rotation-axis alignment at the center spine and at front/back cover boundaries.
+- Added distinct front-cover, back-cover, and interior-spread plans because the base leaf and transform origin differ at each boundary.
+
+## [v2.2.2] — 2026-10-19 — [`ee89bc5`](https://github.com/harlequinzxc/MichiBinder/commit/ee89bc5498ad2e95371173a5e73fb974a2633387)
+
+### Fixed
+
+- Refined forward/backward rotation signs, face visibility, transform origins, and `translateZ` separation.
+- Added a missing-face guard so stale turn plans cannot render invalid page IDs after structural edits.
+
+## [v2.2.3] — 2026-10-19 — [`e4fbb89`](https://github.com/harlequinzxc/MichiBinder/commit/e4fbb890974465300c9c81dfb9db6b3ca4812ae2)
+
+### Fixed
+
+- Pinned animated spreads to an explicit frame height and controlled overflow clipping, eliminating vertical jumps during turns.
+
+## [v2.2.4] — 2026-10-19 — [`3e510ee`](https://github.com/harlequinzxc/MichiBinder/commit/3e510ee0b66896f05f55c7574f045bcf86389bb1)
+
+### Improved
+
+- Added a thin page edge, directional face shading, cast shadows, and eased depth cues.
+- Kept geometry rigid and expressed physical depth through light/shadow, preventing decorative effects from shifting the hinge axis.
+
+## [v2.2.5] — 2026-10-19 — [`551ec39`](https://github.com/harlequinzxc/MichiBinder/commit/551ec394f30417531c7de05b422b7db685e3ad25)
+
+### Improved
+
+- Elevated hierarchy across header navigation, sizing toolbar, source pool, workspace status, responsive labels, binder spine, and page materials.
+- Condensed secondary labels at narrower widths to protect the canvas from toolbar overflow.
+
+## [v2.2.6] — 2026-10-19 — [`7ff4dc6`](https://github.com/harlequinzxc/MichiBinder/commit/7ff4dc6e09abdbd5bad39091747744c4b486bfac)
+
+### Improved
+
+- Clarified visual hierarchy between global controls, page tools, help/status surfaces, and the binder itself.
+- Refined depth and contrast so controls remain legible without competing with card art.
+
+## [v2.2.7] — 2026-10-19 — [`2b4e52c`](https://github.com/harlequinzxc/MichiBinder/commit/2b4e52c3fd7c1d0a19a3a47088501cd222cda1e1)
+
+### Improved
+
+- Rebalanced header density and responsive visibility.
+- Deepened binder beds, sleeves, covers, and workspace shadows without changing print geometry.
+
+## [v2.2.8] — 2026-10-19 — [`909614d`](https://github.com/harlequinzxc/MichiBinder/commit/909614d0a849fb8b3e1e07fa49065204bdbbb79c)
+
+### Added
+
+- Added a self-hosted Inter variable-font asset and license.
+
+### Improved
+
+- Applied Inter locally and refined typography/material details. Self-hosting preserved the no-font-network and static deployment boundary.
+
+## [v2.2.9] — 2026-10-19 — [`87a15e0`](https://github.com/harlequinzxc/MichiBinder/commit/87a15e08125f95e59187cf214b12bbdcb341948a)
+
+### Improved
+
+- Tightened toolbar, upload tray, slot-label, cover, and active-thumbnail spacing, sizing, and micro-interactions.
+
+## [v2.2.10] — 2026-10-19 — [`0f862a3`](https://github.com/harlequinzxc/MichiBinder/commit/0f862a3e7f0811b1cedeb5776cd6ef5f4854f064)
+
+### Improved
+
+- Unified page structural controls in one workspace toolbar and centralized icon rendering through the `Icon` abstraction.
+- Deepened Binder/Paper surfaces and fixed the 3D perspective at 1200px to make axis behavior predictable across viewport scaling.
+
+### Removed
+
+- Removed duplicated structural controls that had become scattered across page surfaces.
+
+## [v2.3.0] — 2026-10-19 — [`9228d40`](https://github.com/harlequinzxc/MichiBinder/commit/9228d40602bd1e074a877673e54b117662b1d476)
+
+### Added
+
+- Connected TCGdex card search with 350ms debounce, abortable requests, loading/error/empty states, low-resolution previews, and high-resolution imports.
+- Added drag, double-click, Enter-key, slot, stage, sidebar, and timeline import paths for remote cards.
+- Added a local placeholder and advanced the service-worker cache to `card-binder-v3`.
+
+### Improved
+
+- Normalized extensionless TCGdex image bases and restricted trusted absolute image URLs to `assets.tcgdex.net`.
+- Downloaded high-resolution images into local storage when possible; retained a CDN URL only when browser/CORS policy blocks blob ingestion.
+
+## [v2.4.0] — 2026-10-19 — [`849a14b`](https://github.com/harlequinzxc/MichiBinder/commit/849a14bbe6a4b1a1a6e5d99158e0d4553f677d2f)
+
+### Added
+
+- Added TCGdex set retrieval, newest-first set sorting, set filters, paged results, and per-set card caching.
+
+### Improved
+
+- Accepted both direct arrays and `{ data }` API envelopes and retried set listing without server sort parameters when the endpoint returned 400/422.
+
+## [v2.5.0] — 2026-10-19 — [`71a8295`](https://github.com/harlequinzxc/MichiBinder/commit/71a82950b7e1ddaec308100e50944ca84654f990)
+
+### Added
+
+- Added print scope for all placed cards versus private uploads only.
+- Persisted source metadata (`tcgdex` or `upload`) so storage reconciliation and printing can distinguish remote catalogue imports from private art.
+
+### Improved
+
+- Clarified scope-specific empty-print messaging and refined active timeline framing and page materials.
+
+## [v2.5.1] — 2026-10-19 — [`41a802b`](https://github.com/harlequinzxc/MichiBinder/commit/41a802b6345e0c5de9ac6a4e8216363640604756)
+
+### Fixed
+
+- Raised Print Setup's stacking level so it no longer rendered beneath workspace surfaces.
+
+## [v2.6.0] — 2026-10-19 — [`78d500d`](https://github.com/harlequinzxc/MichiBinder/commit/78d500d55830fddd7b2002d325b5e01dacde0aa3)
+
+### Added
+
+- Added separate public-catalogue and private-upload source workspaces, the foundation of the Cards/Michi sidebar.
+- Added local upload cards with source badges, selection, custom drag payloads, and private-asset actions.
+
+### Improved
+
+- Carried source identity through IndexedDB, fallback persistence, selection, and drag ingestion so remote and private cards remain interoperable without becoming indistinguishable.
+
+## [v2.7.0] — 2026-10-19 — [`536ee2d`](https://github.com/harlequinzxc/MichiBinder/commit/536ee2dd4a9de9f51f22acb3326043fab019a3e3)
+
+### Added
+
+- Added icon-bearing Cards and Michi source tabs and a collapse/expand framework for the page navigator.
+- Established current tab IDs `cards` and `michi`.
+
+### Removed
+
+- Removed redundant sidebar filters/actions and the old `tcgdex` tab ID to simplify source switching.
+
+## [v2.8.0] — 2026-10-19 — [`57ada8c`](https://github.com/harlequinzxc/MichiBinder/commit/57ada8c0faead71786a97c65b4d6a54438e4a4b0)
+
+### Added
+
+- Added the custom-upload print compiler. It gathers private upload instances in page/slot order, strips live merges, compacts them into sequential grid slots, auto-paginates by `rows × columns`, and computes paired physical sheet capacity for the temporary print tree.
+- Added Database, Custom, and Density metrics.
+
+### Improved
+
+- Rebranded Digital Card Binder as MichiBinder across metadata, manifest, README, notifications, and portrait guard.
+- Refined page-tray geometry and active thumbnail framing.
+
+## [v2.9.0] — 2026-10-19 — [`75c3f59`](https://github.com/harlequinzxc/MichiBinder/commit/75c3f59c0e7afb716a5b2e8dc3955632038b496a)
+
+### Added
+
+- Replaced manual TCGdex pagination with near-bottom infinite scrolling, append-mode fetches, a scroll lock, loading-more state, end-of-catalog state, and filter reset.
+
+### Removed
+
+- Removed previous/next API page buttons because continuous browsing better matched large sets.
+
+## [v2.10.0] — 2026-10-20 — [`9e159bf`](https://github.com/harlequinzxc/MichiBinder/commit/9e159bfb667dff6cb00deedd2672bea097adaadd)
+
+### Added
+
+- Added a floating controller pod for Undo/Redo, spread navigation, Add Spread, and Delete Sheet.
+- Added native slot-target highlighting through data attributes.
+
+### Removed
+
+- Removed page navigation and destructive sheet actions from the crowded header.
+
+### Fixed
+
+- Reset drag state before asynchronous file/import work so high-frequency native drop/end events could not leave stale highlights or locked drag state.
+
+## [v3.0.0] — 2026-10-20 — [`9c0c2ec`](https://github.com/harlequinzxc/MichiBinder/commit/9c0c2ecaf259691983684cf608271cf21b2e835d)
+
+### Added
+
+- Rebuilt the application as a four-area workspace: top utility bar, collapsible source sidebar, dynamic live preview, and contextual bottom controller.
+- Added sidebar control to the header and moved Merge/Unmerge, reset, clear, history, and spread actions into one bottom surface.
+
+### Removed
+
+- Dismantled the separate sizing toolbar, canvas toolbar, page tray, and fixed status footer from the previous paradigm.
+
+### Improved
+
+- This was the second major break: control ownership and viewport layout were replaced rather than rearranged, establishing the structure later extended by the timeline and utility rail.
+
+## [v3.1.0] — 2026-10-20 — [`11c6eb8`](https://github.com/harlequinzxc/MichiBinder/commit/11c6eb82f4bcab6001fc6760e20e6f156e4eb65d)
+
+### Added
+
+- Made the workspace fluidly resize with the sidebar instead of reserving its width permanently.
+- Grounded the floating pod into a full-width bottom control track with horizontal overflow protection.
+
+### Improved
+
+- Temporarily integrated Database/Custom/Density into the control track; these metrics returned to the preview surface in v3.2.0 to keep status distinct from actions.
+
+## [v3.2.0] — 2026-10-20 — [`d0b6350`](https://github.com/harlequinzxc/MichiBinder/commit/d0b6350944357efcfc2c0bf3c15c9613c57a8b04)
+
+### Added
+
+- Restored a collapsible timeline with spread-group thumbnails, direct switching, cross-page drops, insertion, and a right-aligned toggle in the bottom controller.
+
+### Improved
+
+- Returned Database/Custom/Density to an absolute row at the bottom of the preview viewport so timeline collapse can expand the canvas independently.
+
+## [v3.3.0] — 2026-10-20 — [`7c18131`](https://github.com/harlequinzxc/MichiBinder/commit/7c181310e21ac2f303b7fb9784de251087df0095)
+
+### Added
+
+- Unified Cards and Michi selection in `selectedCardIds`.
+- Added Shift-range and Ctrl/Command-toggle selection for TCGdex results, ordered badges, remote batch drag/import, and consecutive placement across pages.
+
+### Fixed
+
+- Docked the timeline to the dynamic right workspace with stable min-content width and horizontal overscroll containment so it no longer clipped beneath the sidebar.
+
+## [v4.0.0] — 2026-10-20 — [`268aac6`](https://github.com/harlequinzxc/MichiBinder/commit/268aac6a756c45a5e4fc1fd822d82f8e7fca829f)
+
+### Added
+
+- Added persisted per-page section names with editable Binder and Paper labels.
+- Added the standalone right control rail for layout, preview, scale, card material, printing, duplication, shortcuts, and installation.
+
+### Removed
+
+- Removed the top-heavy configuration controls and reduced the header to product identity, sidebar control, and persistence status.
+
+### Improved
+
+- This was the third major break: configuration moved from horizontal toolbar rows to a vertical rail while structural page editing stayed in the bottom controller.
+- Polished rings, sheets, covers, paper shadows, metrics, and collapsed timeline semantics.
+
+## [v4.1.0] — 2026-10-20 — [`0727608`](https://github.com/harlequinzxc/MichiBinder/commit/0727608cfd5a48493d15744c2b03f73cf9a3e397)
+
+### Added
+
+- Added reusable left-projecting dark-glass rail popovers with dialog semantics, `aria-expanded`, and `aria-haspopup`.
+- Added compact menu modules for grid, print scope, scale, card material, print setup, and shortcuts.
+
+### Removed
+
+- Removed the full-height dock/divider appearance and oversized inline rail controls, turning the rail into a detached rounded capsule.
+
+## [v4.1.1] — 2026-10-20 — [`576a4ac`](https://github.com/harlequinzxc/MichiBinder/commit/576a4ac5eb6694b32752e4e34c38dc1bff610006)
+
+### Improved
+
+- Forced every Lucide icon to exactly 16×16 through `Icon`; caller size utilities are filtered out.
+- Standardized control sizing and tightened rail gaps for shorter landscape viewports.
+- Made persistence state explicit: `Saved locally`, pulsing `Saving...`, and `Save failed`.
+
+### Fixed
+
+- Added viewport-oriented placement for large Print Setup/Shortcuts menus and eliminated mixed icon geometry that caused alignment drift.
+
+## [v4.1.2] — 2026-10-20 — [`7dd740e`](https://github.com/harlequinzxc/MichiBinder/commit/7dd740e4764c7d7a685d062f9aa478b947c3f4f3)
+
+### Improved
+
+- Moved the detached right capsule inside the same flex parent as the live preview stage. The stage now gives up the complete padded rail zone, and the rail centers against the current preview height rather than the entire main column.
+- Expanded the timeline from the sidebar boundary through the right viewport edge while retaining ownership in the right-side main tree.
+- Standardized rail and bottom-controller icon frames at 32×32 and preserved the active thumbnail's red ring plus four-pixel neutral offset.
+
+### Fixed
+
+- Replaced Tailwind important-prefixed collapse utilities with mutually exclusive open/closed class sets. This removed residual height, padding, border, clipping, and collapse jitter.
+- Ensured rail centering updates when timeline collapse changes preview height.
+
+## [v4.2.0] — 2026-10-20 — [`51b25de`](https://github.com/harlequinzxc/MichiBinder/commit/51b25de31cb5ac8e9737b2f7ce5039ac144c52e9)
+
+### Added
+
+- Added the real `/icons/icon-192.png` identity mark.
+- Added one Eye/Preview popover for Binder and Paper modes.
+- Added one Print / PDF popover containing print scope and the actual print action.
+- Added boundary-aware smooth centering for active timeline groups.
+
+### Removed
+
+- Removed the placeholder Lucide brand mark, separate Print Scope trigger, separate Binder/Paper rail buttons, and rail-level Duplicate action.
+
+### Improved
+
+- Moved Duplicate immediately left of Delete in the cohesive bottom structural controller.
+- Added `timelineContainerRef` and active `data-active="true"` group identity.
+- Compacted shortcut rows to keep the now-shorter vertically centered rail's large menus within the tested viewport.
+
+## [v4.2.1] — 2026-10-20 — [`58da341`](https://github.com/harlequinzxc/MichiBinder/commit/58da341f4c28e7013ca73144e83c87e6bcd0e46a)
+
+### Fixed
+
+- Added `timelineRevealPageIdRef` and `data-timeline-page-id` so Add Page and Duplicate target the exact new group rather than relying only on generic active-page detection.
+- Preserved the request while the timeline is collapsed and fulfilled it when reopened.
+- Made rapid consecutive additions converge on the newest request while retaining ordinary active-page boundary centering.
+
+## [v4.2.2] — 2026-10-20 — [`69ad992`](https://github.com/harlequinzxc/MichiBinder/commit/69ad99221055b7fd18c9cd12128552ef5ddcd93e)
+
+### Added
+
+- Added the first repository-owned `CHANGELOG.md` with a complete commit ledger, architecture memory, pitfalls, open gaps, and handoff context.
+
+### Improved
+
+- Synchronized package and lockfile version metadata with the then-current retrospective ledger.
+
+## [v4.2.3] — 2026-10-20
+
+### Improved
+
+- Re-audited every commit and rebuilt the ledger in chronological order with strict SemVer classification.
+- Reclassified the 3D engine, four-area workspace, and standalone rail transitions as major releases because each replaced a prior architectural paradigm.
+- Standardized each iteration around Added, Improved, Removed, and Fixed records, embedding the engineering rationale alongside the change.
+- Expanded current-state, visual-axis, drag-ingestion, print-compiler, known-gap, and incoming-engineer handoff detail.
+- Advanced package and lockfile metadata to v4.2.3; runtime application behavior did not change.
 
 ---
 
-## Current architecture and technical decisions
+## Current architecture and engineering rationale
 
-### Application shape
+### Repository shape
 
-- `src/main.jsx` mounts `CardBinder` in React `StrictMode` and registers `/sw.js` only in production.
-- `src/CardBinder.jsx` contains the data model, persistence, API integration, drag/drop engine, history, print tree, and most components. This is deliberate historical scope, but the file is now approximately 3,450 lines and is the largest maintenance risk.
-- `src/index.css` owns Tailwind import/setup plus page-turn depth, sleeve sheen, print media behavior, portrait guard, animation, and PWA-window styling.
-- Tailwind CSS v4 is integrated through Vite; there is no separate Tailwind configuration file.
-- Lucide is the only icon set. The `Icon` abstraction forces rendered icons to 16×16.
+- `src/main.jsx` mounts `CardBinder` under React `StrictMode` and registers `/sw.js` only for production builds.
+- `src/CardBinder.jsx` deliberately contains almost all product logic and UI. This minimized dependency and abstraction overhead during rapid product formation, but its size is now the primary maintenance risk.
+- `src/index.css` owns global/print styles and physical animation cues that are awkward to express as local utility strings.
+- Tailwind v4 runs through the Vite plugin; there is no separate Tailwind config.
+- The app is JavaScript/JSX only. No state, drag, component, print, or persistence library is present.
 
-### Page and sheet model
+### Physical page model
 
-- A page stores `id`, `sectionName`, `merges`, `slots`, `crops`, `sheetId`, and `face`.
-- A physical sheet always owns exactly two pages: `front` and `back`, sharing one `sheetId`.
-- `normalizePhysicalPages` repairs older/unpaired arrays, enforces an even count, and writes stable order values.
-- `binderViewGroups` treats the first and final pages as single boundary covers and groups interior pages into facing spreads.
-- Add Page inserts one two-page sheet before the final boundary page. Duplicate copies the active physical sheet, including slots, crops, and merges but with fresh page/sheet/merge IDs. Delete removes the entire active physical sheet.
-- The reset state contains four pages/two physical sheets. Structural code assumes a minimum of one physical sheet.
+- Every page has `id`, `sectionName`, `merges`, `slots`, `crops`, `sheetId`, `face`, and normalized order.
+- Every sheet has exactly two faces. `normalizePhysicalPages` repairs old/odd data instead of rejecting it, which is why persistence remained backward compatible across the physical-sheet migration.
+- `binderViewGroups` renders the first and last pages as boundary covers and pairs interior pages. `pageSide`, navigation, thumbnails, and page-turn planning all depend on that same grouping.
+- Add Page inserts a two-page sheet before the final boundary. Duplicate clones the active sheet with new page/sheet/merge IDs. Delete removes an entire sheet. Reset creates four pages/two sheets.
+- The cover model, even-page invariant, and insertion index are coupled. A change that treats a face as an independent page can corrupt duplex ownership without throwing an immediate error.
 
-### Layout, merge, and rendering model
+### Grid, merge, and hidden assignment model
 
-- Supported logical grids are 2×2, 3×3, and 4×3. The persisted slot key is `row-col`; merged frames consume their top-left anchor key.
-- Merge geometry is sanitized against a maximum 3 rows × 4 columns. Overlapping persisted merges are discarded during sanitation.
-- Layout changes can make assignments temporarily hidden. `visibleAssignments`, `hiddenAssignments`, and reflow logic preserve data rather than silently deleting hidden cards.
-- Binder and Paper modes share the same page data. Measurements are calculated in inches after conversion from millimetres so CSS print dimensions remain physical.
-- The 3D workspace uses a 1200px perspective. The current spread keeps a stable `gap-4` center-spine gap.
-- The first/last cover behavior, page-side calculations, page-turn plans, and physical sheet ownership are coupled. Most page bugs historically came from changing one without the others.
+- Supported grids are 2×2, 3×3, and 4×3. Slot identity is `row-col`; a merged frame stores content at its top-left anchor.
+- Persisted merges are sanitized to a maximum 3×4 domain. Invalid, overlapping, out-of-range, or one-cell merges are discarded.
+- Changing density can make old slot keys non-renderable. `hiddenAssignments` preserves those cards; layout-choice/reflow paths decide whether and how to move them. They are not silently deleted.
+- The live preview and print tree share sanitized data but use different presentation and pagination paths.
 
-### State, refs, and history
+### 3D rotation axis and page-turn engine
 
-- React state drives rendering, while refs such as `pagesRef`, `currentPageRef`, drag refs, edit refs, and timer refs provide synchronous values inside native pointer/drag/timer callbacks.
-- `applyCanvasChange` is the central canvas mutation path and maintains a 30-snapshot past/future history.
-- Undo/Redo covers page/layout canvas state, not the image pool, external catalogue state, print scope, or every UI setting.
-- `selectedCardIds` is shared by Cards and Michi. Selection order determines batch placement order.
-- Native HTML drag/drop and pointer capture are used; there is no drag library or state library.
+- The workspace perspective is fixed at 1200px and the current spine gap is `gap-4`.
+- The turning sheet is pinned to the center line with direction-specific left/right origins. Forward and backward rotations have opposite signs, while the reverse face starts at ±180 degrees.
+- A turn plan stores front face ID, back face ID, stable left/right base page IDs, direction, and boundary type. IDs—not array positions—keep the animation coherent while insertion or duplication changes page arrays.
+- `translateZ` separation, backface visibility, a two-pixel edge, face shading, and cast shadow sell depth. These effects must not alter width, origin, or grid-column geometry.
+- Tokenized timers cancel superseded turns. Without token checks, rapid navigation can let an old 40ms/560ms callback overwrite a newer animation.
+- The spread clip deliberately opens beyond its nominal width during animation; ordinary state uses normal clipping to prevent horizontal workspace overflow.
 
-### Timeline and control surfaces
+### React state versus synchronous interaction refs
 
-- The header contains sidebar control, the local logo, product identity, and reactive save status.
-- The Cards/Michi sidebar is collapsible; the main workspace consumes the remaining width.
-- The preview surface owns the binder stage and detached right utility rail in one flex row, preventing binder content from entering the rail zone.
-- Database/Custom/Density is an absolute status row at the bottom of the preview surface.
-- The bottom controller owns history, structural editing, spread navigation, Add, Duplicate, Delete, and the timeline toggle.
-- The timeline belongs to the right-side main tree, spans through the right viewport edge, and is fully removed from layout when collapsed.
-- Active navigation uses `data-active="true"`. Add/Duplicate also set `timelineRevealPageIdRef`; `data-timeline-page-id` resolves the exact new group before `scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })`.
+- React state drives rendering, while refs (`pagesRef`, `currentPageRef`, drag/edit/marquee refs, timer refs, and timeline reveal ref) are authoritative inside native events and timers.
+- This split exists because multiple drag/drop, pointer, or page-add events can occur before React commits a render. Reading a closed-over state array in those paths can place cards twice, insert against an old page count, or clear the wrong drag payload.
+- `applyCanvasChange` writes refs synchronously, then React state, then history. The order is intentional.
+- `selectedCardIds` is the shared source of truth for Cards and Michi; array order is placement order. Shift selection constructs contiguous source order, and Ctrl/Command preserves prior IDs.
 
-### TCGdex integration
+### High-frequency drag/drop ingestion
 
-- API base: `https://api.tcgdex.net/v2/en`.
-- Card list records are treated as CardBrief-like objects with `id`, `localId`, `name`, and an extensionless image base.
-- Preview and import URLs append `/low.jpg` and `/high.jpg` respectively.
-- Sets are sorted newest-first where release dates exist; full set fetches provide cards for local pagination/infinite scrolling.
-- Search uses debouncing and `AbortController`; catalogue pagination appends 40 normalized items at a time.
-- The asset normalizer only trusts `https://assets.tcgdex.net` for absolute remote image bases.
-- Imported high-resolution assets are stored locally when possible. If cross-origin blob download is blocked, the CDN URL is persisted as fallback.
+- Native drag payload kinds are `pool`, `remote`, `remote-batch`, and `slot`; file drops are identified from `DataTransfer.types`.
+- `dragRef.current` remains authoritative because some browsers do not preserve custom MIME data reliably for in-app drags.
+- Async remote batch import uses ordered card arrays; `Promise.all` preserves input order before consecutive placement.
+- Drop handlers snapshot `FileList`/payload data and reset visual drag state before awaiting IndexedDB, file reads, or remote downloads. This prevents a later native `dragend` from clearing state belonging to a newer drag.
+- Slot-action timing guards prevent Remove/Unmerge controls from also starting a marquee, card drag, or double-click reposition.
+- Native drag targets are DOM-highlighted rather than kept as a high-frequency React array; this avoids render-cycle lag during pointer movement.
 
-### Persistence and PWA
+### Timeline, rail, and viewport boundaries
 
-- Layout key: `digital-card-binder:v1`.
-- Persisted schema version: `4`; data newer than the current schema falls back to a clean binder.
-- IndexedDB database/store: `digital-card-binder` / `images`, version `1`.
-- Object URLs are tracked and revoked during replacement/reset/unmount paths.
-- Save status is asynchronous and intentionally brief; browser checks use short polling to observe `Saving...`.
-- The service worker uses cache name `card-binder-v3`, navigation network-first behavior, and same-origin cache-first-with-refresh behavior for assets.
-- Vercel rewrites all routes to `index.html`, disables long caching for the service worker/manifest, and gives hashed `/assets` immutable caching.
+- The header is 48px tall and owns only identity, sidebar toggle, and save state.
+- The source sidebar consumes width when open; the right-side main tree receives the remainder.
+- The preview surface is one flex row containing the scrollable stage and detached rail. The stage stops at the rail's left edge, including the rail padding zone.
+- The rail has no full-height edge divider and no `self-start`; its outer box is vertically centered against the **live preview surface**, not the complete main column. Collapsing the timeline changes preview height, so the rail's vertical center moves.
+- Database/Custom/Density is absolutely anchored to the preview bottom edge. It is not part of the timeline or bottom controller flow.
+- The bottom controller owns Undo/Redo, Merge/Unmerge/reset/clear, spread navigation, Add, Duplicate, Delete, and timeline toggle.
+- The timeline is a sibling below the preview/controller inside the right-side main tree. Expanded, it reaches the right viewport edge; collapsed, it has zero height, padding, and border so the preview grows immediately.
+- Active groups use `data-active="true"`. Add/Duplicate use a requested page ID and then call `scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })` on its containing group.
 
-### Printing
+### Persistence and history
 
-- Card presets/settings are stored in millimetres and converted to physical inches for layout math.
+- `localStorage` key: `digital-card-binder:v1`.
+- Persisted schema: version `4`. Data claiming a newer schema falls back to a clean binder rather than being partially interpreted.
+- IndexedDB: database `digital-card-binder`, store `images`, version `1`.
+- IndexedDB is preferred for blobs. Fallback records store data URLs in the local metadata payload.
+- Object URLs are tracked and revoked during reconciliation, deletion, reset, and unmount paths.
+- Undo/Redo is a 30-entry **canvas** history containing pages, active page, and layout. It intentionally excludes pool deletion/import, catalogue state, print scope, and most settings.
+- Save status is brief and asynchronous: `Saving...` appears only during persistence work, then returns to `Saved locally`; failure remains visible as `Save failed`.
+
+### TCGdex contract
+
+- API base: `https://api.tcgdex.net/v2/en`; asset host: `https://assets.tcgdex.net`.
+- Card list records provide `id`, `localId`, `name`, and an extensionless image base. The UI appends `/low.jpg`; import appends `/high.jpg`.
+- Set lists are normalized and sorted newest-first where release dates exist. Full set fetches provide the card list used by local infinite pagination.
+- Search is debounced and abortable. Pages append 40 normalized records at a time.
+- Only the TCGdex asset origin is accepted when normalizing absolute card-image bases.
+- If high-resolution fetch succeeds, the blob becomes a local asset. If browser privacy/CORS policy blocks it, the validated CDN URL remains the persisted fallback.
+
+### Print compiler state
+
+- Measurements enter the UI in millimetres and are converted to inches (`1 / 25.4`) for CSS print math.
 - Print-fit uses a 0.125-inch safe margin and supports A4, Letter, A3, and Tabloid.
-- `all` scope preserves page placement; `custom` scope compacts private uploads into consecutive unmerged print slots.
-- Print output depends on the browser dialog using matching paper, no margins, 100% scale, and background graphics. Browser “Fit to page” produces the wrong physical size.
+- `all` scope preserves binder page placement, valid cards, crops, and optional empty-page skipping.
+- `custom` scope is **implemented**, not unfinished. `compactCustomPrintPages` gathers private upload instances, orders them by source page/slot, strips merges, repacks sequentially at current grid capacity, auto-paginates overflow, carries non-centered crops, and builds temporary front/back sheet identities for printing.
+- The custom compiler does not mutate the live binder and intentionally does not preserve section names or merge geometry; it is a compact print-only projection.
+- Browser print settings remain outside application control. Correct output requires matching paper, margins None, scale 100%, and Background graphics enabled; browser “Fit to page” breaks physical size.
 
-## Known issues and limitations
+### PWA and deployment
 
-No reproducible application-breaking issue was open when v1.20.2 was written. The known limitations are:
+- Production-only service-worker registration keeps development HMR out of cache behavior.
+- `card-binder-v3` precaches shell assets and handles navigation network-first; same-origin assets use cached response with background refresh.
+- Vercel routes the SPA to `index.html`, prevents long caching for the service worker/manifest, and marks hashed `/assets` immutable.
+- The application has no server process in production and no required deployment settings beyond the repository config.
 
-1. **No committed automated test suite or CI workflow.** Validation to date has been production builds plus external Chromium scripts. Those scripts were stored outside the repository and are not a durable test harness.
-2. **No project export/import or cloud backup.** Clearing browser site data, using another browser profile, or losing the device loses locally stored work.
-3. **Desktop/landscape focus.** The app has a portrait guard and has been geometry-tested down to 1200×700 landscape, not as a small-screen mobile editor.
-4. **TCGdex requires a network connection.** The binder itself remains local, but catalogue search and CDN-only fallback images are unavailable offline until imported assets have been stored locally.
-5. **Browser print settings remain user-controlled.** The app cannot force margins, background graphics, selected printer paper, or browser scaling.
-6. **Cross-browser coverage is incomplete.** The recent interaction and geometry passes used headless Chromium. Safari and Firefox behavior for vertical range inputs, PWA installation, drag/drop, and print output has not been equivalently automated.
-7. **The service-worker runtime cache has no per-entry eviction.** Old hashed assets can remain in `card-binder-v3` until the cache name changes or site data is cleared.
-8. **README workspace wording has minor drift.** Its “Top utility bar” row still attributes card sizing, preview, and print controls to the top bar even though those controls now live in the right utility rail and Print / PDF menu.
-9. **The main component is large.** `CardBinder.jsx` is highly coupled; even visual layout edits can affect print, page ownership, pointer state, or persistence if broad rewrites are used.
+## Known issues, limitations, and visual quirks
 
-## Historical pitfalls and validation notes
+1. **No committed automated test suite or CI.** Validation has been `npm run build` plus external Chromium harnesses, so regressions are not automatically blocked.
+2. **No export/import or cloud backup.** Clearing site data, losing a profile, or changing devices loses local work.
+3. **Desktop landscape is the product boundary.** A portrait guard exists; geometry was validated down to 1200×700, not as a small-screen editor.
+4. **Cross-browser confidence is incomplete.** Recent testing used Chromium. Safari/Firefox print scaling, PWA install behavior, vertical range input, and native drag/drop have not received equivalent automated coverage.
+5. **TCGdex is an online dependency.** Search and CDN-only fallback art are unavailable offline until an import is stored locally.
+6. **Browser printing is partly manual.** The app cannot force paper, margin, scale, duplex, or background settings.
+7. **Service-worker cache growth is unbounded.** `card-binder-v3` has no per-entry eviction, so old hashed assets remain until the cache name changes or site data is cleared.
+8. **`CardBinder.jsx` is highly coupled.** Broad rewrites can cross persistence, printing, drag state, physical ownership, and layout geometry even when the request appears visual.
+9. **README has small UI drift.** Its workspace table still assigns sizing/preview/print controls to the top utility bar; those controls now live in the right rail and Print / PDF menu.
+10. **Large smooth-scroll jumps are not instantaneous.** Headless Chromium sometimes needed several seconds to settle after many rapid additions; the final target remained correct.
+11. **Fixed popovers under backdrop-filtered ancestors have a containment quirk.** Current compact content passes at tested heights, but lower landscape heights can alter effective fixed positioning and should be checked for clipping.
+12. **Custom compact print is intentionally lossy.** It preserves private images/crops, not live page labels or merged frames. That is current behavior, not an unfinished pagination loop.
 
-- Tailwind v4 did not reliably apply important-prefixed collapse utilities such as `!h-0` in this project. Timeline collapse was fixed by composing mutually exclusive open and closed class sets.
-- A backdrop-filtered ancestor can change the containing block behavior of fixed descendants. The largest rail popovers currently pass at the tested viewport floor because their content is compact; shorter landscape heights need renewed clipping checks.
-- Popover scale-in animation can make geometry tests observe approximately 60% of final size. Browser checks finished element animations before asserting bounds.
-- Smooth scrolling over very long timelines can take multiple seconds in headless Chromium. Visibility tests allowed the motion to settle instead of asserting immediately.
-- The agent sandbox used mocked TCGdex responses because direct TCGdex access was blocked by its outbound host policy. Production schema behavior was based on TCGdex documentation and normalized defensively.
-- Playwright Core with Sparticuz Chromium was the working browser setup in the prior environment; the environment required `/tmp/al2023/lib` in `LD_LIBRARY_PATH`. This setup was external and may not exist in a fresh workspace.
-- Browser harnesses were most reliable when run sequentially. Sparticuz single-process Chromium could terminate if its sole page was closed unexpectedly.
-- Several labels occur both on triggers and controls inside dialogs. Role-based selectors and explicit dialog scoping avoided ambiguous browser queries.
-- `Saving...` is asynchronous and short-lived. Slow polling can miss it.
-- Page-turn animation uses timers and stable page IDs. Rapid structural changes cancel prior turn timers by token; removing that token discipline previously risked stale animation completion.
-- TCGdex image paths are extensionless bases. Appending `/low.jpg` or `/high.jpg` is required; treating the base as a complete image URL breaks previews.
-- Persistence sanitation is part of compatibility. Replacing `sanitizePage`, `sanitizeSettings`, or `normalizePhysicalPages` with direct JSON hydration would regress old saved binders.
-- The print tree and live preview intentionally share data but not all presentation. Screen-only controls use `no-print`; print changes need both browser preview and print-media verification.
+## Historical dead ends and pitfalls
 
-## Unfinished work and handoff state
+- Tailwind v4 did not reliably emit/apply important-prefixed collapse utilities such as `!h-0`; mutually exclusive class composition fixed the timeline.
+- Measuring popovers while `animate-scaleIn` is active returns intermediate geometry (historically around 60% width). Geometry tests finished animations first.
+- Trigger and dialog controls can share accessible names; browser automation scoped by dialog and role to avoid ambiguous selectors.
+- `Saving...` can be missed by slow polling because the persistence transition is intentionally brief.
+- The agent environment blocked live TCGdex hosts, so browser tests mocked official schema responses. Production behavior was validated against documented endpoint shapes and defensive normalizers.
+- The working external browser setup used Playwright Core plus Sparticuz Chromium and required `/tmp/al2023/lib` in `LD_LIBRARY_PATH`; those files were not committed and may not exist in a fresh environment.
+- Sparticuz single-process browser runs were more stable sequentially than in parallel.
+- TCGdex image fields are extensionless bases, not complete files. Failing to append `/low.jpg` or `/high.jpg` produces broken images.
+- Hydrating raw persisted JSON without `sanitizeSettings`, `sanitizePage`, and `normalizePhysicalPages` would discard compatibility and can create overlapping merges or orphan sheet faces.
+- The print tree and live preview share data, not markup. Screen-only fixes do not prove print output, and print-only styles do not prove live geometry.
+- Python Pillow and the shell `file` utility were unavailable in the prior agent environment; ImageMagick `identify` was used for image inspection when necessary.
 
-- A repository-owned test suite is still absent. The most valuable future test coverage would formalize physical-sheet arithmetic, binder grouping, merge sanitation, placement flow, persistence migration, print compaction, and timeline reveal behavior.
+## Unfinished work and intentional boundaries
+
+- A repository-owned unit/integration/browser test system remains unbuilt. Highest-value coverage is physical-sheet normalization, binder grouping, merge sanitation, placement overflow, persistence migration, custom print compaction, page-turn plans, and timeline reveal.
 - Export/import backup remains unimplemented.
-- Cross-browser print calibration and PWA validation remain manual.
-- README workspace and Print / PDF instructions could be updated to match the latest utility-rail menus.
-- Historical versions in this file are not Git tags or GitHub releases. The commit links are the durable historical references.
-- There is no backend, account system, collaborative editing, telemetry, or required environment configuration; these were deliberate scope boundaries rather than partially built systems.
-- The most recently completed functional request was deterministic timeline reveal after Add Page and Duplicate Physical Sheet. Both actions were tested on a horizontally overflowing timeline and produced one active, visible two-page group.
+- Cross-browser print calibration and installed-PWA lifecycle testing remain manual.
+- README's workspace/control description has not yet been brought in line with the latest rail menus.
+- Historical SemVer labels are not Git tags or GitHub Releases. Commit links remain the release evidence.
+- There is no account, cloud sync, collaboration, telemetry, backend, or environment-secret layer. Those are deliberate scope boundaries, not half-built modules.
+- No active functional workspace task was open when v4.2.3 was recorded.
+
+## Incoming engineer hand-off brief
+
+The current application is stable because several boundaries agree with one another. The most important context before changing code is:
+
+- **Treat sheets as the structural unit.** A page face is not independently owned. Add, duplicate, delete, navigation, covers, and print identity all depend on front/back pairing.
+- **Treat the spine as a geometry contract.** The spread is two equal frame widths plus `gap-4`, under 1200px perspective. The page-turn origin sits on that center axis; decorative depth must not move it.
+- **Treat refs as part of the state engine.** Native drag/pointer/timer callbacks depend on synchronous refs because React state can be one render behind during burst input.
+- **Treat the preview, controller, and timeline as separate vertical bands.** The rail belongs inside the preview flex row; the status row is absolutely inside preview; the controller and timeline are siblings below it. Moving the rail outside that row reintroduces width mismatch and timeline gaps.
+- **Treat collapsed timeline dimensions literally.** Closed means zero height, padding, and border. Any residual box prevents the preview from consuming released height and shifts rail centering.
+- **Treat `selectedCardIds` order as user intent.** Batch import and placement use that order across Cards and Michi.
+- **Treat persistence sanitizers as migrations.** They are not optional validation helpers; they are the compatibility boundary for saved binders.
+- **Treat print as a second renderer.** Verify all-scope and custom-scope output independently from live Binder/Paper preview.
+- **Treat TCGdex card images as trusted-host extensionless bases.** Preserve low/high suffix behavior and fallback storage semantics.
+- **Treat all Lucide output as 16×16 and all rail/bottom icon frames as 32×32.** Mixed geometry was a prior source of drift.
+- **Treat existing `data-*` hooks as both product and validation interfaces.** Timeline auto-reveal uses them at runtime; external browser checks use many others for deterministic geometry.
+
+The practical baseline before a new visual or interaction round is a clean production build plus browser checks for page ownership, Add/Duplicate/Delete, Merge/Unmerge and history, drag batches, timeline open/closed geometry, rail centering, popover clipping, persistence status, and both print scopes. This describes the current risk surface; it does not impose a separate workflow policy.
