@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.6.2
+## Current state — v4.6.3
 
 - **Ledger date:** 2026-10-20
-- **Application state entering this feature pass:** commit `cc5e364` / v4.6.1
+- **Application state entering this feature pass:** commit `ed5adfe` / v4.6.2
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,8 +14,8 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets plus the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, required secret, or environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** unavailable market valuations are omitted instead of being presented as zero-value totals or card prices
-- **Last verified behavior:** production build plus positive-price and unavailable-price valuation checks across three desktop viewports
+- **Last functional change:** catalogue scrollbars are visually suppressed across browsers and workspace readouts use uniform uppercase presentation
+- **Last verified behavior:** production build plus three-viewport computed-style checks for hidden TCGdex/custom scrollbars and uppercase gradient-backed metrics
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## SemVer reconstruction
@@ -620,6 +620,17 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Preserved the established USD/SGD display conversion and full Total Value, Spread Value, and card-value presentation whenever complete positive pricing is available.
 - Verified both successful Cardmarket/TCGplayer valuation and provider-null unavailable-pricing behavior at 1600×1000, 1366×768, and 1200×700 with zero browser errors.
 - Advanced package and lockfile metadata to v4.6.2.
+
+## [v4.6.3] — 2026-10-20
+
+### Fixed
+
+- Standardized the TCGdex results viewport on the requested `scroll-area`, two-column grid, contained vertical-overflow, and scrollbar-suppression utility sequence.
+- Added an explicit unlayered `scrollbar-none` implementation for Firefox, Chromium, and WebKit so the global compact-scrollbar rule cannot override hidden-scrollbar catalogue viewports; native wheel, trackpad, touch, and overscroll behavior remains intact.
+- Standardized the custom-upload viewport on the same two-column, `gap-3`, padded, rounded, subtly bordered scroll capsule and updated its empty state to span the two-column grid.
+- Normalized visible workspace metrics to uppercase `DATABASE`, `ITEMS`, `CUSTOM`, `UPLOADED`, `DENSITY`, `FILLED`, and `SPREAD VALUE` strings without changing their high-contrast gradient styling.
+- Verified both catalogue viewports compute `scrollbar-width: none`, a hidden zero-width WebKit scrollbar, and native `overflow-y: auto`, and confirmed uppercase metrics plus valuation behavior at 1600×1000, 1366×768, and 1200×700 with zero browser errors.
+- Advanced package and lockfile metadata to v4.6.3.
 
 ---
 

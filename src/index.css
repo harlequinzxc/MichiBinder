@@ -101,6 +101,18 @@ img {
   background-color: #52525b;
 }
 
+/* Scrollable catalogue viewports keep native physics without exposing browser chrome. */
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
 /* 4. Physical-unit grid geometry. */
 .slot-area {
   grid-column: var(--col-start) / span var(--col-span);

@@ -1331,7 +1331,7 @@ function CardPool({
             <span className="text-[10px] font-sans font-medium text-neutral-400">{customUploadedCards.length} assets</span>
           </div>
 
-          <div role="listbox" aria-label="Custom uploaded cards" aria-multiselectable="true" className="scroll-area grid grid-cols-3 gap-2 overflow-y-auto max-h-[calc(100vh-320px)] scrollbar-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden p-0.5" onClick={(event) => { if (event.target === event.currentTarget) onClearSelection(); }}>
+          <div role="listbox" aria-label="Custom uploaded cards" aria-multiselectable="true" className="scroll-area grid grid-cols-2 gap-3 p-2 overflow-y-auto max-h-[calc(100vh-220px)] scrollbar-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden group rounded-md border border-white/[0.04]" onClick={(event) => { if (event.target === event.currentTarget) onClearSelection(); }}>
             {customCards.map((localCard) => {
               const selectionIndex = selectedCardIds.indexOf(localCard.id);
               const placed = placedIds.has(localCard.id);
@@ -1361,7 +1361,7 @@ function CardPool({
               );
             })}
             {!customUploadedCards.length && (
-              <div className="col-span-3 py-14 px-4 text-center select-none">
+              <div className="col-span-2 py-14 px-4 text-center select-none">
                 <span className="text-xs font-semibold text-neutral-300 block mb-1">No custom assets found</span>
                 <p className="text-[11px] leading-relaxed text-neutral-500 max-w-[210px] mx-auto font-sans font-medium">Drop files here or click above to upload your custom trading card artwork, alternates, or token sheets.</p>
               </div>
@@ -1425,7 +1425,7 @@ function CardPool({
                   aria-busy={isLoading}
                   onScroll={handleCatalogScroll}
                   onClick={(event) => { if (event.target === event.currentTarget) onClearSelection(); }}
-                  className="scroll-area grid grid-cols-2 gap-3 p-2 overflow-y-auto max-h-[calc(100vh-220px)] scrollbar-none will-change-transform [scrollbar-width:none] [&::-webkit-scrollbar]:hidden group rounded-md border border-white/[0.04]"
+                  className="scroll-area grid grid-cols-2 gap-3 p-2 overflow-y-auto max-h-[calc(100vh-220px)] scrollbar-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden group rounded-md border border-white/[0.04]"
                 >
                   {isLoading && !fetchedCards.length && Array.from({ length: 6 }, (_, index) => <span key={index} aria-hidden="true" className="aspect-[245/337] animate-pulse rounded-lg border border-white/[0.04] bg-neutral-900" />)}
                   {fetchedCards.map((item, index) => {
@@ -3685,15 +3685,15 @@ export default function CardBinder() {
               onDrop={handleStageDrop}
             >
               <div data-workspace-metrics aria-label={`Database ${fetchedCards.length} items, Custom ${customUploadedCards.length} uploaded, Density ${currentFilledCount} of ${layout.pockets} filled${spreadValueLabel ? `, Spread Value ${spreadValueLabel}` : ''}`} className="pointer-events-none absolute bottom-3 left-6 z-40 flex items-center gap-3 rounded-md border border-white/[0.06] bg-neutral-950/85 px-2.5 py-1.5 font-sans shadow-lg backdrop-blur-sm select-none">
-                <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="text-neutral-500 font-semibold tracking-wider text-[9px] uppercase">Database</span><strong className="font-sans text-[10px] font-medium tracking-tight bg-gradient-to-r from-neutral-400 via-neutral-300 to-neutral-200 bg-clip-text text-transparent">{fetchedCards.length} items</strong></span>
+                <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="text-neutral-500 font-semibold tracking-wider text-[9px] uppercase">DATABASE</span><strong className="font-sans text-[10px] font-medium tracking-tight bg-gradient-to-r from-neutral-400 via-neutral-300 to-neutral-200 bg-clip-text text-transparent">{fetchedCards.length} ITEMS</strong></span>
                 <span aria-hidden="true" className="h-3 w-px bg-white/[0.08]" />
-                <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="text-neutral-500 font-semibold tracking-wider text-[9px] uppercase">Custom</span><strong className="font-sans text-[10px] font-medium tracking-tight bg-gradient-to-r from-neutral-400 via-neutral-300 to-neutral-200 bg-clip-text text-transparent">{customUploadedCards.length} uploaded</strong></span>
+                <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="text-neutral-500 font-semibold tracking-wider text-[9px] uppercase">CUSTOM</span><strong className="font-sans text-[10px] font-medium tracking-tight bg-gradient-to-r from-neutral-400 via-neutral-300 to-neutral-200 bg-clip-text text-transparent">{customUploadedCards.length} UPLOADED</strong></span>
                 <span aria-hidden="true" className="h-3 w-px bg-white/[0.08]" />
-                <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="text-neutral-500 font-semibold tracking-wider text-[9px] uppercase">Density</span><strong className="font-sans text-[10px] font-medium tracking-tight bg-gradient-to-r from-neutral-400 via-neutral-300 to-neutral-200 bg-clip-text text-transparent">{currentFilledCount}/{layout.pockets} filled</strong></span>
+                <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="text-neutral-500 font-semibold tracking-wider text-[9px] uppercase">DENSITY</span><strong className="font-sans text-[10px] font-medium tracking-tight bg-gradient-to-r from-neutral-400 via-neutral-300 to-neutral-200 bg-clip-text text-transparent">{currentFilledCount}/{layout.pockets} FILLED</strong></span>
                 {spreadValueLabel && (
                   <>
                     <span aria-hidden="true" className="h-3 w-px bg-white/[0.08]" />
-                    <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="text-[9px] font-semibold text-neutral-500 uppercase tracking-widest">Spread Value</span><strong key={`${currencyDisplay}-${spreadValueLabel}`} data-spread-value className="text-xs font-semibold text-neutral-100 bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent animate-fadeIn">{spreadValueLabel}</strong></span>
+                    <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="text-[9px] font-semibold text-neutral-500 uppercase tracking-widest">SPREAD VALUE</span><strong key={`${currencyDisplay}-${spreadValueLabel}`} data-spread-value className="text-xs font-semibold text-neutral-100 bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent animate-fadeIn">{spreadValueLabel}</strong></span>
                   </>
                 )}
               </div>
