@@ -877,6 +877,10 @@ function AppBar({
 }
 
 function FloatingNavigation({
+  databaseCount,
+  customCount,
+  filledCount,
+  capacity,
   canUndo,
   canRedo,
   onUndo,
@@ -903,30 +907,41 @@ function FloatingNavigation({
 }) {
   const historyButton = 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 p-1.5 rounded-md transition-all cursor-pointer disabled:pointer-events-none disabled:text-neutral-700 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500';
   return (
-    <div data-floating-navigation className="no-print absolute bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-4 px-4 py-2 bg-neutral-900/90 backdrop-blur-md border border-white/[0.06] rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.5)] select-none">
-      <div role="group" aria-label="History" className="flex items-center gap-1">
-        <button type="button" onClick={onUndo} disabled={!canUndo} aria-label="Undo" title="Undo" className={historyButton}><Icon name="undo" size="sm" className="w-3.5 h-3.5" /></button>
-        <button type="button" onClick={onRedo} disabled={!canRedo} aria-label="Redo" title="Redo" className={historyButton}><Icon name="redo" size="sm" className="w-3.5 h-3.5" /></button>
-      </div>
-      <div role="group" aria-label="Slot structure" className="flex items-center gap-1 border-l border-white/[0.06] pl-4">
-        <button type="button" onClick={onToggleCombine} aria-pressed={combineMode} aria-label="Combine slots" title="Combine slots (M)" className={`p-1.5 rounded-md transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${combineMode ? 'bg-red-950/70 text-red-300' : 'text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200'}`}><Icon name="combine" size="sm" /></button>
-        <button type="button" onClick={onMerge} disabled={!canMerge} aria-label="Merge selected slots" title="Merge selected slots (Enter)" className="p-1.5 rounded-md text-neutral-400 transition-all hover:bg-neutral-800 hover:text-neutral-200 disabled:pointer-events-none disabled:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="merge" size="sm" /></button>
-        <button type="button" onClick={onUnmerge} disabled={!selectedMergeCount} aria-label="Unmerge selected frame" title="Unmerge selected frame (U)" className="p-1.5 rounded-md text-neutral-400 transition-all hover:bg-neutral-800 hover:text-neutral-200 disabled:pointer-events-none disabled:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="split" size="sm" /></button>
-        <button type="button" onClick={onResetLayout} disabled={!canResetLayout} aria-label="Reset merged layout" title="Reset merged layout" className="p-1.5 rounded-md text-neutral-400 transition-all hover:bg-neutral-800 hover:text-neutral-200 disabled:pointer-events-none disabled:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="reset" size="sm" /></button>
-        <button type="button" onClick={onClearPage} disabled={!canClearPage} aria-label="Clear active page" title="Clear active page" className="p-1.5 rounded-md text-neutral-500 transition-all hover:bg-red-500/10 hover:text-red-400 disabled:pointer-events-none disabled:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="eraser" size="sm" /></button>
-      </div>
-      <div className="flex items-center gap-2 border-l border-white/[0.06] pl-4">
-        <button type="button" onClick={onPrevious} disabled={!canPrevious} aria-label="Previous spread" title="Previous spread" className="p-1 text-neutral-400 hover:text-neutral-200 transition-colors disabled:pointer-events-none disabled:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="chevronLeft" size="md" className="w-4 h-4" /></button>
-        <div className="flex items-center gap-1 text-[11px] font-mono text-neutral-400 font-medium" aria-live="polite">
-          <span>Spread</span>
-          <span className="bg-neutral-950 px-2 py-0.5 rounded border border-white/[0.04] text-neutral-200 font-semibold">{currentSpread}</span>
-          <span>/</span>
-          <span>{totalSpreads}</span>
+    <div data-bottom-control-bar className="no-print w-full shrink-0 border-t border-white/[0.06] bg-neutral-900/60 px-6 py-3 backdrop-blur-md select-none">
+      <div className="flex w-full items-center justify-center">
+        <div data-floating-navigation className="flex w-fit max-w-full items-center gap-2 overflow-x-auto rounded-xl border border-white/[0.06] bg-neutral-950 px-4 py-2 shadow-2xl scrollbar-none [scrollbar-width:none] min-[1281px]:gap-4 [&::-webkit-scrollbar]:hidden">
+          <div data-workspace-metrics aria-label={`Database ${databaseCount} items, Custom ${customCount} uploaded, Density ${filledCount} of ${capacity} filled`} className="flex shrink-0 items-center gap-3 border-r border-white/[0.06] pr-2 text-[10px] font-mono min-[1281px]:pr-4">
+            <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="font-bold tracking-widest text-neutral-500 uppercase max-[1439px]:sr-only">Database</span><strong className="font-medium text-neutral-200">{databaseCount} items</strong></span>
+            <span aria-hidden="true" className="h-3 w-px bg-white/[0.06]" />
+            <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="font-bold tracking-widest text-neutral-500 uppercase max-[1439px]:sr-only">Custom</span><strong className="font-medium text-red-400">{customCount} uploaded</strong></span>
+            <span aria-hidden="true" className="h-3 w-px bg-white/[0.06]" />
+            <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="font-bold tracking-widest text-neutral-500 uppercase max-[1439px]:sr-only">Density</span><strong className="font-medium text-neutral-200">{filledCount}/{capacity} filled</strong></span>
+          </div>
+          <div role="group" aria-label="History" className="flex shrink-0 items-center gap-1">
+            <button type="button" onClick={onUndo} disabled={!canUndo} aria-label="Undo" title="Undo" className={historyButton}><Icon name="undo" size="sm" className="w-3.5 h-3.5" /></button>
+            <button type="button" onClick={onRedo} disabled={!canRedo} aria-label="Redo" title="Redo" className={historyButton}><Icon name="redo" size="sm" className="w-3.5 h-3.5" /></button>
+          </div>
+          <div role="group" aria-label="Slot structure" className="flex shrink-0 items-center gap-1 border-l border-white/[0.06] pl-2 min-[1281px]:pl-4">
+            <button type="button" onClick={onToggleCombine} aria-pressed={combineMode} aria-label="Combine slots" title="Combine slots (M)" className={`p-1.5 rounded-md transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${combineMode ? 'bg-red-950/70 text-red-300' : 'text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200'}`}><Icon name="combine" size="sm" /></button>
+            <button type="button" onClick={onMerge} disabled={!canMerge} aria-label="Merge selected slots" title="Merge selected slots (Enter)" className="p-1.5 rounded-md text-neutral-400 transition-all hover:bg-neutral-800 hover:text-neutral-200 disabled:pointer-events-none disabled:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="merge" size="sm" /></button>
+            <button type="button" onClick={onUnmerge} disabled={!selectedMergeCount} aria-label="Unmerge selected frame" title="Unmerge selected frame (U)" className="p-1.5 rounded-md text-neutral-400 transition-all hover:bg-neutral-800 hover:text-neutral-200 disabled:pointer-events-none disabled:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="split" size="sm" /></button>
+            <button type="button" onClick={onResetLayout} disabled={!canResetLayout} aria-label="Reset merged layout" title="Reset merged layout" className="p-1.5 rounded-md text-neutral-400 transition-all hover:bg-neutral-800 hover:text-neutral-200 disabled:pointer-events-none disabled:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="reset" size="sm" /></button>
+            <button type="button" onClick={onClearPage} disabled={!canClearPage} aria-label="Clear active page" title="Clear active page" className="p-1.5 rounded-md text-neutral-500 transition-all hover:bg-red-500/10 hover:text-red-400 disabled:pointer-events-none disabled:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="eraser" size="sm" /></button>
+          </div>
+          <div role="group" aria-label="Spread navigation" className="flex shrink-0 items-center gap-2 border-l border-white/[0.06] pl-2 min-[1281px]:pl-4">
+            <button type="button" onClick={onPrevious} disabled={!canPrevious} aria-label="Previous spread" title="Previous spread" className="p-1 text-neutral-400 hover:text-neutral-200 transition-colors disabled:pointer-events-none disabled:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="chevronLeft" size="md" className="w-4 h-4" /></button>
+            <div className="flex items-center gap-1 text-[11px] font-mono text-neutral-400 font-medium" aria-live="polite">
+              <span className="max-[1280px]:sr-only">Spread</span>
+              <span className="rounded border border-white/[0.04] bg-neutral-900 px-2 py-0.5 font-semibold text-neutral-200">{currentSpread}</span>
+              <span>/</span>
+              <span>{totalSpreads}</span>
+            </div>
+            <button type="button" onClick={onNext} disabled={!canNext} aria-label="Next spread" title="Next spread" className="p-1 text-neutral-400 hover:text-neutral-200 transition-colors disabled:pointer-events-none disabled:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="chevronRight" size="md" className="w-4 h-4" /></button>
+          </div>
+          <button type="button" onClick={onAdd} aria-label="Add spread" className="flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-white/[0.04] bg-neutral-800 px-2 text-xs font-semibold text-neutral-200 shadow-sm transition-all hover:bg-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 min-[1281px]:ml-2 min-[1281px]:px-3" title="Insert a new two-page physical sheet"><Icon name="plus" size="sm" className="w-3.5 h-3.5" /><span className="max-[1280px]:sr-only">Add Spread</span></button>
+          <button type="button" onClick={onDelete} disabled={!canDelete} aria-label="Delete active sheet" title={canDelete ? 'Delete active sheet' : 'Keep at least one physical sheet'} className="shrink-0 cursor-pointer rounded-md p-1.5 text-neutral-500 transition-all hover:bg-red-500/10 hover:text-red-400 disabled:pointer-events-none disabled:cursor-default disabled:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 min-[1281px]:ml-2"><Icon name="trash" size="sm" className="w-3.5 h-3.5" /></button>
         </div>
-        <button type="button" onClick={onNext} disabled={!canNext} aria-label="Next spread" title="Next spread" className="p-1 text-neutral-400 hover:text-neutral-200 transition-colors disabled:pointer-events-none disabled:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="chevronRight" size="md" className="w-4 h-4" /></button>
       </div>
-      <button type="button" onClick={onAdd} className="h-7 px-3 bg-neutral-800 hover:bg-neutral-700 border border-white/[0.04] shadow-sm text-neutral-200 text-xs font-semibold rounded-md flex items-center gap-1.5 transition-all ml-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500" title="Insert a new two-page physical sheet"><Icon name="plus" size="sm" className="w-3.5 h-3.5" /><span>Add Spread</span></button>
-      <button type="button" onClick={onDelete} disabled={!canDelete} aria-label="Delete active sheet" title={canDelete ? 'Delete active sheet' : 'Keep at least one physical sheet'} className="p-1.5 text-neutral-500 hover:text-red-400 hover:bg-red-500/10 rounded-md transition-all ml-2 cursor-pointer disabled:pointer-events-none disabled:text-neutral-700 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="trash" size="sm" className="w-3.5 h-3.5" /></button>
     </div>
   );
 }
@@ -1096,7 +1111,7 @@ function CardPool({
     <aside
       data-left-sidebar
       aria-hidden={!isOpen}
-      className={`no-print absolute inset-y-0 left-0 z-50 flex h-full shrink-0 flex-col bg-neutral-900 transition-all duration-300 ease-in-out shadow-[8px_0_28px_rgba(0,0,0,0.28)] ${isOpen ? 'w-80 opacity-100 visible border-r border-white/[0.06]' : 'w-0 opacity-0 invisible overflow-hidden pointer-events-none border-r-0'} ${sidebarDropActive ? 'ring-2 ring-inset ring-red-600' : ''}`}
+      className={`no-print relative z-50 flex h-full shrink-0 flex-col overflow-hidden bg-neutral-900 transition-[width,opacity] duration-300 ease-in-out will-change-[width,opacity] ${isOpen ? 'w-80 border-r border-white/[0.06] opacity-100 shadow-[8px_0_28px_rgba(0,0,0,0.28)]' : 'w-0 border-r-0 opacity-0 pointer-events-none'} ${sidebarDropActive ? 'ring-2 ring-inset ring-red-600' : ''}`}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
@@ -2716,9 +2731,9 @@ export default function CardBinder() {
 
   const frameWIn = settings.view === 'paper' ? paper.wIn : gridW + SHEET_PAD.left + SHEET_PAD.right;
   const frameHIn = settings.view === 'paper' ? paper.hIn : gridH + SHEET_PAD.top + SHEET_PAD.bottom;
-  const spineGap = 24;
-  const pageAreaWidth = Math.max(160, (stageSize.w - 80 - spineGap) / 2);
-  const ppi = Math.max(12, Math.min(pageAreaWidth / frameWIn, (stageSize.h - 96) / frameHIn));
+  const spineGap = 16;
+  const pageAreaWidth = Math.max(160, (stageSize.w - spineGap) / 2);
+  const ppi = Math.max(12, Math.min(pageAreaWidth / frameWIn, stageSize.h / frameHIn));
   const gridPpi = settings.view === 'paper' ? ppi * printFit : ppi;
   const frameWidth = frameWIn * ppi;
   const frameHeight = frameHIn * ppi;
@@ -3110,7 +3125,7 @@ export default function CardBinder() {
             shortcuts={<ShortcutsPopover />}
           />
         </div>
-        <div className="relative flex min-h-0 flex-1 overflow-hidden">
+        <div data-main-layout className="flex h-[calc(100vh-48px)] w-full overflow-hidden bg-neutral-950">
           <CardPool
             isOpen={isLeftSidebarOpen}
             customUploadedCards={customUploadedCards}
@@ -3146,30 +3161,16 @@ export default function CardBinder() {
             onFetchedCardDragStart={startFetchedCardDrag}
             onFetchedCardAdd={addFetchedCardToPage}
           />
-          <main className="flex-1 h-[calc(100vh-48px)] bg-neutral-950 overflow-hidden relative flex min-w-0 flex-col">
+          <main data-dynamic-workspace className="relative flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-neutral-950">
             <div
               ref={stageRef}
-              className="relative flex size-full min-h-0 flex-1 items-center justify-center overflow-hidden bg-neutral-950 bg-[radial-gradient(ellipse_at_center,rgba(82,82,91,0.18),transparent_65%)] pb-16"
+              className="relative flex min-h-0 w-full flex-1 items-center justify-center overflow-auto bg-neutral-950 bg-[radial-gradient(ellipse_at_center,rgba(82,82,91,0.18),transparent_65%)] p-8"
               onPointerMove={moveMarquee}
               onPointerDown={(event) => { if (event.target === event.currentTarget && combineMode) { setSelBox(null); setSelectionPageId(null); } }}
               onDragEnter={(event) => { if (!combineMode && (['pool', 'remote'].includes(dragRef.current?.kind) || hasFiles(event.dataTransfer))) event.preventDefault(); }}
               onDragOver={(event) => { if (!combineMode && (['pool', 'remote'].includes(dragRef.current?.kind) || hasFiles(event.dataTransfer))) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; } }}
               onDrop={handleStageDrop}
             >
-              <div data-workspace-metrics className={`absolute bottom-20 z-25 flex items-center gap-2 select-none pointer-events-none transition-[left] duration-300 ${isLeftSidebarOpen ? 'left-[21rem]' : 'left-4'}`}>
-                <div className="flex items-center gap-1.5 px-2 py-1 bg-neutral-900/80 backdrop-blur-sm border border-white/[0.06] rounded-md shadow-sm">
-                  <span className="text-[9px] font-bold tracking-widest text-neutral-500 uppercase">Database</span>
-                  <span className="text-[10px] font-mono font-medium text-neutral-200">{fetchedCards.length} items</span>
-                </div>
-                <div className="flex items-center gap-1.5 px-2 py-1 bg-neutral-950/80 backdrop-blur-sm border border-white/[0.06] rounded-md shadow-sm">
-                  <span className="text-[9px] font-bold tracking-widest text-neutral-500 uppercase">Custom</span>
-                  <span className="text-[10px] font-mono font-medium text-red-400">{customUploadedCards.length} uploaded</span>
-                </div>
-                <div className="flex items-center gap-1.5 px-2 py-1 bg-neutral-900/80 backdrop-blur-sm border border-white/[0.06] rounded-md shadow-sm">
-                  <span className="text-[9px] font-bold tracking-widest text-neutral-500 uppercase">Density</span>
-                  <span className="text-[10px] font-mono font-medium text-neutral-200">{currentFilledCount}/{layout.pockets} filled</span>
-                </div>
-              </div>
               {settings.view === 'binder' && (
                 <span
                   data-binder-bed
@@ -3182,7 +3183,7 @@ export default function CardBinder() {
                 <div
                   data-spread
                   data-flip-active={pageFlip.animating ? '' : undefined}
-                  className={`relative grid size-full grid-cols-2 gap-6 [transform-style:preserve-3d] ${pageFlip.animating ? 'pointer-events-none' : ''}`}
+                  className={`relative grid size-full grid-cols-2 gap-4 [transform-style:preserve-3d] ${pageFlip.animating ? 'pointer-events-none' : ''}`}
                   style={{ clipPath: pageFlip.animating ? 'inset(0 -100% 0 -100%)' : undefined }}
                 >
                   {(settings.view === 'binder' || activeSpread.length === 2 || pageFlip.animating) && <BinderSpine view={settings.view} />}
@@ -3208,32 +3209,36 @@ export default function CardBinder() {
                   )}
                 </div>
               </div>
-              <FloatingNavigation
-                canUndo={pastRef.current.length > 0}
-                canRedo={futureRef.current.length > 0}
-                onUndo={undoAction}
-                onRedo={redoAction}
-                combineMode={combineMode}
-                onToggleCombine={() => setCombineMode((value) => !value)}
-                canMerge={canMerge}
-                onMerge={() => performMerge(selBox, selectionPageIndex)}
-                selectedMergeCount={selectedMerges.length}
-                onUnmerge={() => unmergeBox()}
-                canResetLayout={activeMerges(current, dims).length > 0}
-                onResetLayout={() => resetLayout(currentPage)}
-                canClearPage={currentFilledCount > 0}
-                onClearPage={() => clearPage(currentPage)}
-                currentSpread={activeSpreadIndex + 1}
-                totalSpreads={spreadGroups.length}
-                canPrevious={activeSpreadIndex > 0 && !pageFlip.animating}
-                canNext={activeSpreadIndex < spreadGroups.length - 1 && !pageFlip.animating}
-                onPrevious={() => goToAdjacentSpread(-1)}
-                onNext={() => goToAdjacentSpread(1)}
-                onAdd={addPage}
-                onDelete={deletePage}
-                canDelete={pages.length > 2}
-              />
             </div>
+            <FloatingNavigation
+              databaseCount={fetchedCards.length}
+              customCount={customUploadedCards.length}
+              filledCount={currentFilledCount}
+              capacity={layout.pockets}
+              canUndo={pastRef.current.length > 0}
+              canRedo={futureRef.current.length > 0}
+              onUndo={undoAction}
+              onRedo={redoAction}
+              combineMode={combineMode}
+              onToggleCombine={() => setCombineMode((value) => !value)}
+              canMerge={canMerge}
+              onMerge={() => performMerge(selBox, selectionPageIndex)}
+              selectedMergeCount={selectedMerges.length}
+              onUnmerge={() => unmergeBox()}
+              canResetLayout={activeMerges(current, dims).length > 0}
+              onResetLayout={() => resetLayout(currentPage)}
+              canClearPage={currentFilledCount > 0}
+              onClearPage={() => clearPage(currentPage)}
+              currentSpread={activeSpreadIndex + 1}
+              totalSpreads={spreadGroups.length}
+              canPrevious={activeSpreadIndex > 0 && !pageFlip.animating}
+              canNext={activeSpreadIndex < spreadGroups.length - 1 && !pageFlip.animating}
+              onPrevious={() => goToAdjacentSpread(-1)}
+              onNext={() => goToAdjacentSpread(1)}
+              onAdd={addPage}
+              onDelete={deletePage}
+              canDelete={pages.length > 2}
+            />
           </main>
         </div>
         <div className="no-print pointer-events-none fixed bottom-10 right-5 z-[100] flex w-[360px] flex-col items-end gap-2">
