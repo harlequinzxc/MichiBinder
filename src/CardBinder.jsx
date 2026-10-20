@@ -1443,6 +1443,7 @@ export default function CardBinder() {
 
   const stageRef = useRef(null);
   const timelineContainerRef = useRef(null);
+  const timelineRevealPageIdRef = useRef(null);
   const inputRef = useRef(null);
   const dragRef = useRef(null);
   const searchAbortRef = useRef(null);
@@ -1516,16 +1517,22 @@ export default function CardBinder() {
     const timeline = timelineContainerRef.current;
     if (!timeline || !showBottomTimeline) return undefined;
     const frame = window.requestAnimationFrame(() => {
-      const activeGroup = timeline.querySelector('[data-active="true"]');
-      if (!activeGroup) return;
+      const requestedPageId = timelineRevealPageIdRef.current;
+      const requestedLeaf = requestedPageId
+        ? [...timeline.querySelectorAll('[data-timeline-page-id]')].find((leaf) => leaf.dataset.timelinePageId === requestedPageId)
+        : null;
+      const requestedGroup = requestedLeaf?.closest('[data-page-group]');
+      const targetGroup = requestedGroup || timeline.querySelector('[data-active="true"]');
+      if (requestedPageId) timelineRevealPageIdRef.current = null;
+      if (!targetGroup) return;
       const trackBounds = timeline.getBoundingClientRect();
-      const activeBounds = activeGroup.getBoundingClientRect();
-      if (activeBounds.left < trackBounds.left || activeBounds.right > trackBounds.right) {
-        activeGroup.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      const targetBounds = targetGroup.getBoundingClientRect();
+      if (requestedGroup || targetBounds.left < trackBounds.left || targetBounds.right > trackBounds.right) {
+        targetGroup.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
       }
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [currentPage, activeSpreadIndex, showBottomTimeline]);
+  }, [currentPage, activeSpreadIndex, pages.length, showBottomTimeline]);
 
   const notify = useCallback((message, tone = 'info', action = null) => {
     const id = uid('toast');
@@ -2682,6 +2689,7 @@ export default function CardBinder() {
       sheet.back,
       ...pagesRef.current.slice(insertionIndex),
     ];
+    timelineRevealPageIdRef.current = nextPages[nextPage].id;
     beginPageFlip(currentPageRef.current, nextPage, { fromPages: pagesRef.current, toPages: nextPages });
     applyCanvasChange(nextPages, { currentPage: nextPage });
     setSelBox(null);
@@ -2713,6 +2721,7 @@ export default function CardBinder() {
     if (!sourceFront || !sourceBack) return;
     const copies = [copyFace(sourceFront, 'front'), copyFace(sourceBack, 'back')];
     const nextPages = [...pagesRef.current.slice(0, insertionIndex), ...copies, ...pagesRef.current.slice(insertionIndex)];
+    timelineRevealPageIdRef.current = copies[0].id;
     beginPageFlip(sourceIndex, insertionIndex, { fromPages: pagesRef.current, toPages: nextPages });
     applyCanvasChange(nextPages, { currentPage: insertionIndex });
     notify('Physical sheet duplicated.', 'success');
@@ -3030,6 +3039,7 @@ export default function CardBinder() {
       <button
         key={page.id}
         type="button"
+        data-timeline-page-id={page.id}
         aria-label={`Page ${pageIndex + 1}`}
         aria-current={currentLeaf ? 'page' : undefined}
         onClick={() => switchPage(pageIndex)}
