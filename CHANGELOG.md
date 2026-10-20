@@ -2,7 +2,7 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.5.0
+## Current state — v4.5.1
 
 - **Ledger date:** 2026-10-20
 - **Application state entering this feature pass:** commit `4f1413b` / v4.4.1
@@ -575,6 +575,18 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Verified exact tilt coordinates, baseline reset, sheen response, page-face transforms, timeline states, button feedback classes, catalogue stagger/final visibility, valuation behavior, sidebar and selection regressions, viewport containment, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.5.0.
 
+## [v4.5.1] — 2026-10-20
+
+### Fixed
+
+- Split placed cards into a flat outer pointer-tracking wrapper and an inner GPU-rendered hull so cursor normalization always reads invariant slot bounds instead of a box already distorted by its own perspective transform.
+- Tuned the moving hull to a 0.98 3D scale, creating a clean micro-inset that protects tilted edges from clipping while keeping slot geometry and action overlays stationary.
+- Forced crop-edit mode to zero both rotational channels while retaining the inset hull, preserving reposition controls and pointer ownership.
+- Replaced catalogue entrance animation fill-state dependence with a two-frame transition and a deterministic settled-state fallback, preventing search cards from remaining permanently transparent when a browser defers an offscreen animation timeline.
+- Extended TCGdex extraction to inspect `variants_detailed`/`variantsDetailed` pricing when the card-level `pricing.tcgplayer` provider is null, without treating genuinely unavailable provider data as a fabricated value.
+- Verified stable outer geometry, exact pointer vectors, inner-only transforms, 0.98 edit transforms, sheen/reset behavior, catalogue final visibility without forced animation completion, detailed-variant price fallback, valuation badges, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
+- Advanced package and lockfile metadata to v4.5.1.
+
 ---
 
 ## Current architecture and engineering rationale
@@ -609,7 +621,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - The turning sheet is pinned to the center line with direction-specific left/right origins. Forward and backward rotations have opposite signs, while the reverse face starts at ±180 degrees.
 - A turn plan stores front face ID, back face ID, stable left/right base page IDs, direction, and boundary type. IDs—not array positions—keep the animation coherent while insertion or duplication changes page arrays.
 - The 500ms turn uses a weighted `cubic-bezier(0.25, 1, 0.5, 1)` track. Both front and reverse canvases use 0.8px `translateZ` separation, backface visibility, a two-pixel edge, face shading, and cast shadow without altering width, origin, or grid-column geometry.
-- Placed cards update local tilt/specular CSS variables directly from pointer coordinates. The DOM write path avoids React state, resets on leave/cancel, and is disabled while crop editing, marquee selection, or dragging owns the pointer.
+- Placed cards use a flat outer tracking wrapper and a 0.98-scale inner 3D hull. The outer layer updates local tilt/specular CSS variables from invariant pointer coordinates without React state; the inner layer alone consumes perspective transforms, resets on leave/cancel, and locks rotation to zero during crop editing.
 - Tokenized timers cancel superseded turns. Without token checks, rapid navigation can let an old 40ms/560ms callback overwrite a newer animation.
 - The spread clip deliberately opens beyond its nominal width during animation; ordinary state uses normal clipping to prevent horizontal workspace overflow.
 
@@ -664,7 +676,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 
 - API base: `https://api.tcgdex.net/v2/en`; asset host: `https://assets.tcgdex.net`.
 - Card list records provide `id`, `localId`, `name`, and an extensionless image base. The UI appends `/low.jpg`; import appends `/high.jpg`.
-- Queried and persisted TCGdex cards hydrate `/cards/{id}` detail records. Raw USD selection accepts only positive values, prioritizing market → low → mid across both direct `pricing.tcgplayer` fields and variant records such as `normal.marketPrice`, `holofoil.lowPrice`, or `reverse.midPrice`.
+- Queried and persisted TCGdex cards hydrate `/cards/{id}` detail records. Raw USD selection accepts only positive values, prioritizing market → low → mid across direct `pricing.tcgplayer`, print-variant records such as `normal.marketPrice`, and `variants_detailed` pricing when the root provider is null.
 - Set lists are normalized and sorted newest-first where release dates exist. Full set fetches provide the card list used by local infinite pagination.
 - Search is debounced and abortable. Pages append 40 normalized records at a time; new result wrappers use a 300ms fade/rise animation staggered by 25ms per result, and detail-price requests are deduplicated by canonical card ID.
 - Only the TCGdex asset origin is accepted when normalizing absolute card-image bases.

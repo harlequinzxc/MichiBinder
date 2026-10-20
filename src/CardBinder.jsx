@@ -134,9 +134,13 @@ const positiveMoney = (value) => {
 };
 const tcgplayerMarketPrice = (payload) => {
   const card = payload?.data && !Array.isArray(payload.data) ? payload.data : payload;
-  const pricing = card?.pricing?.tcgplayer || card?.pricing?.tcgPlayer || card?.tcgplayer?.prices || card?.tcgplayer;
-  if (!pricing || typeof pricing !== 'object') return 0;
-  const variantPricing = pricing.prices && typeof pricing.prices === 'object' ? pricing.prices : pricing;
+  const detailedVariants = Array.isArray(card?.variants_detailed)
+    ? card.variants_detailed
+    : Array.isArray(card?.variantsDetailed) ? card.variantsDetailed : [];
+  const pricingSources = [card, ...detailedVariants]
+    .map((item) => item?.pricing?.tcgplayer || item?.pricing?.tcgPlayer || item?.tcgplayer?.prices || item?.tcgplayer)
+    .filter((pricing) => pricing && typeof pricing === 'object');
+  if (!pricingSources.length) return 0;
   const variantGroups = [
     { enabled: card?.variants?.normal, keys: ['normal'] },
     { enabled: card?.variants?.holo, keys: ['holofoil', 'holo'] },
@@ -146,10 +150,14 @@ const tcgplayerMarketPrice = (payload) => {
   ];
   const preferredKeys = variantGroups.filter((group) => group.enabled).flatMap((group) => group.keys);
   const allKeys = [...new Set([...preferredKeys, ...variantGroups.flatMap((group) => group.keys)])];
-  const variants = allKeys.map((key) => variantPricing[key]).filter((value) => value && typeof value === 'object');
+  const variantPricingSources = pricingSources.map((pricing) => (
+    pricing.prices && typeof pricing.prices === 'object' ? pricing.prices : pricing
+  ));
+  const variants = variantPricingSources.flatMap((pricing) => allKeys.map((key) => pricing[key]))
+    .filter((value) => value && typeof value === 'object');
   const selectPrice = (directField, variantField) => (
-    positiveMoney(pricing[directField])
-    || positiveMoney(variantPricing[directField])
+    pricingSources.reduce((price, pricing) => price || positiveMoney(pricing[directField]), 0)
+    || variantPricingSources.reduce((price, pricing) => price || positiveMoney(pricing[directField]), 0)
     || variants.reduce((price, variant) => price || positiveMoney(variant[variantField]) || positiveMoney(variant[directField]), 0)
   );
   return selectPrice('market', 'marketPrice') || selectPrice('low', 'lowPrice') || selectPrice('mid', 'midPrice');
@@ -1408,6 +1416,16 @@ function CardPool({
                         key={item.id}
                         data-tcgdex-card={item.id}
                         role="option"
+                        ref={(node) => {
+                          if (!node || node.dataset.catalogEntrance) return;
+                          node.dataset.catalogEntrance = 'pending';
+                          window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+                            if (node.isConnected) node.dataset.catalogEntrance = 'complete';
+                          }));
+                          window.setTimeout(() => {
+                            if (node.isConnected) node.dataset.catalogEntrance = 'settled';
+                          }, index * 25 + 350);
+                        }}
                         aria-selected={selectionIndex >= 0}
                         aria-label={`${item.name}, drag to binder`}
                         tabIndex={0}
@@ -1418,7 +1436,7 @@ function CardPool({
                         onDragEnd={onDragEnd}
                         onDoubleClick={() => onFetchedCardAdd(item, highResImageUrl)}
                         onKeyDown={(event) => { if (event.key === 'Enter') onFetchedCardAdd(item, highResImageUrl); }}
-                        style={{ animationDelay: `${index * 25}ms` }}
+                        style={{ animationDelay: `${index * 25}ms`, transitionDelay: `${index * 25}ms` }}
                         className={`relative group/card aspect-[245/337] cursor-grab active:cursor-grabbing rounded-md overflow-hidden bg-neutral-900 outline-none animate-fadeIn transition-all opacity-0 translate-y-2 duration-300 ease-out will-change-[transform,opacity] transform-gpu focus-visible:ring-2 focus-visible:ring-red-500 ${selectionIndex >= 0 ? 'ring-2 ring-red-500 scale-[0.98] brightness-110 shadow-lg' : 'border border-white/[0.03] hover:opacity-100 shadow-sm hover:shadow-xl hover:border-white/[0.1]'}`}
                       >
                         <img data-img-id={item.id} src={fullImageUrl} alt={item.name} draggable={false} loading="lazy" className="w-full h-auto object-contain bg-neutral-950 transition-opacity duration-200" onError={(event) => { if (!event.currentTarget.src.endsWith('/placeholder.png')) event.currentTarget.src = '/placeholder.png'; }} />
@@ -3115,7 +3133,8 @@ export default function CardBinder() {
     const cardMarketValueLabel = currencyDisplay === 'SGD' ? `S$${(cardMarketValueUSD * sgdRate).toFixed(2)}` : `$${cardMarketValueUSD.toFixed(2)}`;
     const labelVisible = (frameW * gridPpi) >= 72;
     const slotActionsAvailable = !combineMode && !dragInfo && !marqueeActive && !editing;
-    const updateCardTilt = (event) => {
+    const handleCardPointerMove = (event) => {
+      if (isEditing) { movePan(event); return; }
       if (editing || combineMode || dragInfo || marqueeActive || event.buttons) return;
       const rect = event.currentTarget.getBoundingClientRect();
       if (!rect.width || !rect.height) return;
@@ -3130,7 +3149,7 @@ export default function CardBinder() {
       event.currentTarget.style.setProperty('--mx', `${sheenX}%`);
       event.currentTarget.style.setProperty('--my', `${sheenY}%`);
     };
-    const resetCardTilt = (event) => {
+    const handleCardPointerLeave = (event) => {
       event.currentTarget.style.setProperty('--rx', '0deg');
       event.currentTarget.style.setProperty('--ry', '0deg');
       event.currentTarget.style.setProperty('--mx', '50%');
@@ -3203,13 +3222,13 @@ export default function CardBinder() {
         data-card-tilt
         data-editing-slot={isEditing ? '' : undefined}
         draggable={!combineMode && !editing}
-        onDragStart={(event) => { resetCardTilt(event); startSlotDrag(event, page.id, slot.key, imgId); }}
+        onDragStart={(event) => { handleCardPointerLeave(event); startSlotDrag(event, page.id, slot.key, imgId); }}
         onDragEnd={resetDrag}
         onPointerDown={(event) => isEditing ? beginPan(event) : beginMarquee(event, slot, false, page, pageIndex)}
-        onPointerMove={(event) => { if (isEditing) movePan(event); else updateCardTilt(event); }}
-        onPointerLeave={resetCardTilt}
+        onPointerMove={handleCardPointerMove}
+        onPointerLeave={handleCardPointerLeave}
         onPointerUp={isEditing ? endPan : undefined}
-        onPointerCancel={(event) => { resetCardTilt(event); if (isEditing) endPan(event); }}
+        onPointerCancel={(event) => { handleCardPointerLeave(event); if (isEditing) endPan(event); }}
         onDoubleClick={(event) => {
           if (performance.now() < slotActionGuardRef.current) { event.stopPropagation(); return; }
           activateCanvasPage(pageIndex);
@@ -3220,17 +3239,17 @@ export default function CardBinder() {
           activateCanvasPage(pageIndex);
           if (combineMode) { setSelectionPageId(page.id); setSelBox(expandBox(mergeBox(slot), pageMerges)); }
         }}
-        className={`group group/slot relative size-full transform-gpu transition-all duration-200 [transition-timing-function:cubic-bezier(0.1,1,0.1,1)] ease-out hover:z-40 [transform-style:preserve-3d] will-change-transform ${!combineMode && !editing ? 'cursor-grab active:cursor-grabbing' : ''}`}
-        style={{
-          '--rx': '0deg',
-          '--ry': '0deg',
-          '--mx': '50%',
-          '--my': '50%',
-          transform: 'perspective(600px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) scale3d(1.02, 1.02, 1.02)',
-          transitionTimingFunction: 'cubic-bezier(0.1, 1, 0.1, 1)',
-        }}
+        className={`group group/slot relative size-full hover:z-40 ${!combineMode && !editing ? 'cursor-grab active:cursor-grabbing' : ''}`}
+        style={{ '--rx': '0deg', '--ry': '0deg', '--mx': '50%', '--my': '50%' }}
       >
-        {isEditing && editing.geometry && (
+        <div
+          data-card-tilt-hull
+          className="relative size-full transform-gpu [transform-style:preserve-3d] will-change-transform transition-transform duration-200 ease-out"
+          style={{
+            transform: `perspective(600px) rotateX(${editing ? '0deg' : 'var(--rx, 0deg)'}) rotateY(${editing ? '0deg' : 'var(--ry, 0deg)'}) scale3d(0.98, 0.98, 0.98)`,
+          }}
+        >
+          {isEditing && editing.geometry && (
           <img
             src={source}
             alt=""
@@ -3255,6 +3274,7 @@ export default function CardBinder() {
             className="size-full"
             style={{ objectFit: settings.fit, objectPosition: `${isEditing ? editing.x : crop.x}% ${isEditing ? editing.y : crop.y}%` }}
           /> : <span className="absolute inset-0 grid place-items-center bg-zinc-800 text-zinc-500"><Icon name="image" /></span>}
+          </div>
         </div>
         {slotActions}
         {!dragInfo && !combineMode && !editing && dpi && <span key={`${currencyDisplay}-${cardMarketValueLabel}`} data-slot-market-value title={`${dpi} effective DPI at print size · ${cardMarketValueLabel} market value`} className="absolute bottom-2 right-2 z-30 rounded-md bg-black/80 px-2 py-1 text-[9px] font-mono tracking-wide text-neutral-200 backdrop-blur-sm border border-white/10 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none animate-scaleIn">{dpi} DPI · {cardMarketValueLabel}</span>}
