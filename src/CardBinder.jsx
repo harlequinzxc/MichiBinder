@@ -895,10 +895,12 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
 
       <div className="flex shrink-0 items-center justify-end gap-2">
         <button type="button" data-currency-toggle onClick={onToggleCurrency} className="h-8 rounded-full border border-white/[0.04] bg-neutral-950/40 px-2.5 font-mono text-[9px] font-bold tracking-widest text-neutral-500 uppercase hover:text-neutral-200 transition-colors shadow-sm focus:outline-none" aria-label={`Display values in ${currencyDisplay === 'SGD' ? 'USD' : 'SGD'}`} title={`Switch to ${currencyDisplay === 'SGD' ? 'USD' : 'SGD'}`}>{currencyDisplay}</button>
-        <div data-portfolio-value className="h-8 flex items-center gap-1.5 rounded-full border border-white/[0.04] bg-neutral-950/40 px-3 py-1.5 shadow-sm text-xs select-none backdrop-blur-md" aria-live="polite" aria-label={`Total portfolio value ${portfolioValueLabel}`}>
-          <span className="text-[9px] font-bold tracking-widest text-neutral-500 uppercase font-sans">Total Value</span>
-          <span key={`${currencyDisplay}-${portfolioValueLabel}`} className="font-sans font-semibold tracking-tight text-emerald-400 font-medium animate-fadeIn">{portfolioValueLabel}</span>
-        </div>
+        {portfolioValueLabel && (
+          <div data-portfolio-value className="h-8 flex items-center gap-1.5 rounded-full border border-white/[0.04] bg-neutral-950/40 px-3 py-1.5 shadow-sm text-xs select-none backdrop-blur-md" aria-live="polite" aria-label={`Total portfolio value ${portfolioValueLabel}`}>
+            <span className="text-[9px] font-bold tracking-widest text-neutral-500 uppercase font-sans">Total Value</span>
+            <span key={`${currencyDisplay}-${portfolioValueLabel}`} className="font-sans font-semibold tracking-tight text-emerald-400 font-medium animate-fadeIn">{portfolioValueLabel}</span>
+          </div>
+        )}
         <button
           type="button"
           className="w-8 h-8 flex items-center justify-center rounded-lg bg-neutral-800/40 hover:bg-neutral-700/60 border border-white/[0.03] text-neutral-400 hover:text-neutral-200 transition-all cursor-pointer shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
@@ -1644,8 +1646,19 @@ export default function CardBinder() {
   const customUploadedCards = useMemo(() => pool.filter((item) => item.source !== 'tcgdex'), [pool]);
   const customUploadedIds = useMemo(() => new Set(customUploadedCards.map((item) => item.id)), [customUploadedCards]);
   const allPoolIds = useMemo(() => new Set(pool.map((item) => item.id)), [pool]);
+  const tcgdexAssetIds = useMemo(() => new Set(pool.filter((item) => item.source === 'tcgdex').map((item) => item.id)), [pool]);
   const priceKeyByAssetId = useMemo(() => new Map(pool.map((item) => [item.id, item.tcgdexId || item.id])), [pool]);
   const getCardPriceUSD = useCallback((assetId) => positiveMoney(cardPrices[priceKeyByAssetId.get(assetId) || assetId]), [cardPrices, priceKeyByAssetId]);
+  const portfolioValuationAssetIds = useMemo(() => pages
+    .flatMap((page) => Object.values(page.slots || {}))
+    .filter((assetId) => tcgdexAssetIds.has(assetId)), [pages, tcgdexAssetIds]);
+  const activeSpreadValuationAssetIds = useMemo(() => activeSpread.flatMap((pageIndex) => {
+    const spreadPage = pages[pageIndex];
+    if (!spreadPage) return [];
+    return getSlots(spreadPage, dims).map((slot) => spreadPage.slots[slot.key]).filter((assetId) => tcgdexAssetIds.has(assetId));
+  }), [activeSpread, pages, dims, tcgdexAssetIds]);
+  const portfolioValueAvailable = portfolioValuationAssetIds.length > 0 && portfolioValuationAssetIds.every((assetId) => getCardPriceUSD(assetId) > 0);
+  const spreadValueAvailable = activeSpreadValuationAssetIds.length > 0 && activeSpreadValuationAssetIds.every((assetId) => getCardPriceUSD(assetId) > 0);
   const portfolioValueUSD = useMemo(() => pages.reduce((total, page) => (
     total + Object.values(page.slots || {}).reduce((subtotal, assetId) => subtotal + getCardPriceUSD(assetId), 0)
   ), 0), [pages, getCardPriceUSD]);
@@ -1655,8 +1668,12 @@ export default function CardBinder() {
     return total + getSlots(spreadPage, dims).reduce((subtotal, slot) => subtotal + getCardPriceUSD(spreadPage.slots[slot.key]), 0);
   }, 0), [activeSpread, pages, dims, getCardPriceUSD]);
   const displayRate = currencyDisplay === 'SGD' ? sgdRate : 1;
-  const portfolioValueLabel = currencyDisplay === 'SGD' ? `SGD $${(portfolioValueUSD * displayRate).toFixed(2)}` : `$${portfolioValueUSD.toFixed(2)}`;
-  const spreadValueLabel = currencyDisplay === 'SGD' ? `S$${(activeSpreadValueUSD * displayRate).toFixed(2)}` : `$${activeSpreadValueUSD.toFixed(2)}`;
+  const portfolioValueLabel = portfolioValueAvailable
+    ? (currencyDisplay === 'SGD' ? `SGD $${(portfolioValueUSD * displayRate).toFixed(2)}` : `$${portfolioValueUSD.toFixed(2)}`)
+    : null;
+  const spreadValueLabel = spreadValueAvailable
+    ? (currencyDisplay === 'SGD' ? `S$${(activeSpreadValueUSD * displayRate).toFixed(2)}` : `$${activeSpreadValueUSD.toFixed(2)}`)
+    : null;
   const printPages = useMemo(() => {
     if (printScope === 'custom') return compactCustomPrintPages(pages, dims, customUploadedIds);
     return pages
@@ -3174,7 +3191,10 @@ export default function CardBinder() {
       ? Math.min(natural.w / (frameW * printFit), natural.h / (frameH * printFit))
       : Math.max(natural.w / (frameW * printFit), natural.h / (frameH * printFit))) : null;
     const cardMarketValueUSD = getCardPriceUSD(imgId);
-    const cardMarketValueLabel = currencyDisplay === 'SGD' ? `S$${(cardMarketValueUSD * sgdRate).toFixed(2)}` : `$${cardMarketValueUSD.toFixed(2)}`;
+    const hasCardMarketValue = cardMarketValueUSD > 0;
+    const cardMarketValueLabel = hasCardMarketValue
+      ? currencyDisplay === 'SGD' ? `S$${(cardMarketValueUSD * sgdRate).toFixed(2)}` : `$${cardMarketValueUSD.toFixed(2)}`
+      : null;
     const labelVisible = (frameW * gridPpi) >= 72;
     const slotActionsAvailable = !combineMode && !dragInfo && !marqueeActive && !editing;
     const handleCardPointerMove = (event) => {
@@ -3321,7 +3341,17 @@ export default function CardBinder() {
           </div>
         </div>
         {slotActions}
-        {!dragInfo && !combineMode && !editing && dpi && <span key={`${currencyDisplay}-${cardMarketValueLabel}`} data-slot-market-value title={`${dpi} effective DPI at print size · ${cardMarketValueLabel} market value`} className="absolute bottom-2 right-2 z-30 rounded-md bg-black/80 px-2 py-1 text-[9px] font-mono tracking-wide text-neutral-200 backdrop-blur-sm border border-white/10 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none animate-scaleIn">{dpi} DPI · {cardMarketValueLabel}</span>}
+        {!dragInfo && !combineMode && !editing && dpi && (
+          <span
+            key={`${currencyDisplay}-${cardMarketValueLabel || 'unavailable'}`}
+            data-slot-dpi
+            data-slot-market-value={hasCardMarketValue ? '' : undefined}
+            title={`${dpi} effective DPI at print size${hasCardMarketValue ? ` · ${cardMarketValueLabel} market value` : ''}`}
+            className="absolute bottom-2 right-2 z-30 rounded-md bg-black/80 px-2 py-1 text-[9px] font-mono tracking-wide text-neutral-200 backdrop-blur-sm border border-white/10 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none animate-scaleIn"
+          >
+            {dpi} DPI{hasCardMarketValue ? ` · ${cardMarketValueLabel}` : ''}
+          </span>
+        )}
         {slot.mergeId && <span className="absolute bottom-1.5 left-1.5 z-40 rounded-full bg-red-700/90 px-1.5 py-0.5 text-[9px] font-bold text-white shadow">{boxDims(slot)}</span>}
         {isEditing && <span className="absolute left-1/2 top-2 z-50 -translate-x-1/2 rounded-full bg-amber-500 px-2 py-0.5 text-[9px] font-bold text-amber-950 shadow">Drag to reposition</span>}
       </div>
@@ -3654,14 +3684,18 @@ export default function CardBinder() {
               onDragOver={(event) => { if (!combineMode && (['pool', 'remote', 'remote-batch'].includes(dragRef.current?.kind) || hasFiles(event.dataTransfer))) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; } }}
               onDrop={handleStageDrop}
             >
-              <div data-workspace-metrics aria-label={`Database ${fetchedCards.length} items, Custom ${customUploadedCards.length} uploaded, Density ${currentFilledCount} of ${layout.pockets} filled, Spread Value ${spreadValueLabel}`} className="pointer-events-none absolute bottom-3 left-6 z-40 flex items-center gap-3 rounded-md border border-white/[0.06] bg-neutral-950/85 px-2.5 py-1.5 font-sans shadow-lg backdrop-blur-sm select-none">
+              <div data-workspace-metrics aria-label={`Database ${fetchedCards.length} items, Custom ${customUploadedCards.length} uploaded, Density ${currentFilledCount} of ${layout.pockets} filled${spreadValueLabel ? `, Spread Value ${spreadValueLabel}` : ''}`} className="pointer-events-none absolute bottom-3 left-6 z-40 flex items-center gap-3 rounded-md border border-white/[0.06] bg-neutral-950/85 px-2.5 py-1.5 font-sans shadow-lg backdrop-blur-sm select-none">
                 <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="text-neutral-500 font-semibold tracking-wider text-[9px] uppercase">Database</span><strong className="font-sans text-[10px] font-medium tracking-tight bg-gradient-to-r from-neutral-400 via-neutral-300 to-neutral-200 bg-clip-text text-transparent">{fetchedCards.length} items</strong></span>
                 <span aria-hidden="true" className="h-3 w-px bg-white/[0.08]" />
                 <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="text-neutral-500 font-semibold tracking-wider text-[9px] uppercase">Custom</span><strong className="font-sans text-[10px] font-medium tracking-tight bg-gradient-to-r from-neutral-400 via-neutral-300 to-neutral-200 bg-clip-text text-transparent">{customUploadedCards.length} uploaded</strong></span>
                 <span aria-hidden="true" className="h-3 w-px bg-white/[0.08]" />
                 <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="text-neutral-500 font-semibold tracking-wider text-[9px] uppercase">Density</span><strong className="font-sans text-[10px] font-medium tracking-tight bg-gradient-to-r from-neutral-400 via-neutral-300 to-neutral-200 bg-clip-text text-transparent">{currentFilledCount}/{layout.pockets} filled</strong></span>
-                <span aria-hidden="true" className="h-3 w-px bg-white/[0.08]" />
-                <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="text-[9px] font-semibold text-neutral-500 uppercase tracking-widest">Spread Value</span><strong key={`${currencyDisplay}-${spreadValueLabel}`} data-spread-value className="text-xs font-semibold text-neutral-100 bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent animate-fadeIn">{spreadValueLabel}</strong></span>
+                {spreadValueLabel && (
+                  <>
+                    <span aria-hidden="true" className="h-3 w-px bg-white/[0.08]" />
+                    <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="text-[9px] font-semibold text-neutral-500 uppercase tracking-widest">Spread Value</span><strong key={`${currencyDisplay}-${spreadValueLabel}`} data-spread-value className="text-xs font-semibold text-neutral-100 bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent animate-fadeIn">{spreadValueLabel}</strong></span>
+                  </>
+                )}
               </div>
               {settings.view === 'binder' && (
                 <span

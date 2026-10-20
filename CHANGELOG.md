@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.6.1
+## Current state — v4.6.2
 
 - **Ledger date:** 2026-10-20
-- **Application state entering this feature pass:** commit `03f24e2` / v4.6.0
+- **Application state entering this feature pass:** commit `cc5e364` / v4.6.1
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,8 +14,8 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets plus the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, required secret, or environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** catalogue filter spacing and label-contrast polish in the left sidebar
-- **Last verified behavior:** production build plus focused catalogue-sidebar inspection for metadata-row spacing and Card Set label legibility
+- **Last functional change:** unavailable market valuations are omitted instead of being presented as zero-value totals or card prices
+- **Last verified behavior:** production build plus positive-price and unavailable-price valuation checks across three desktop viewports
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## SemVer reconstruction
@@ -609,6 +609,17 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Added explicit top spacing to the catalogue metadata and Clear Filters row so it no longer crowds the Card Set selector frame.
 - Raised the uppercase Card Set label from muted neutral-500 semibold text to neutral-400 bold text with the established compact sans-serif tracking, improving contrast against the dark sidebar.
 - Advanced package and lockfile metadata to v4.6.1.
+
+## [v4.6.2] — 2026-10-20
+
+### Fixed
+
+- Hid the app-bar Total Value until every placed TCGdex-backed card contributing to the portfolio has a positive retrieved or persisted price, preventing incomplete totals and `$0.00` placeholders.
+- Hid the active Spread Value and its separator when the visible spread has no complete positive valuation, including removal from the workspace metrics accessibility label.
+- Omitted unavailable per-card market values from placed-card hover details while preserving the useful effective-DPI readout.
+- Preserved the established USD/SGD display conversion and full Total Value, Spread Value, and card-value presentation whenever complete positive pricing is available.
+- Verified both successful Cardmarket/TCGplayer valuation and provider-null unavailable-pricing behavior at 1600×1000, 1366×768, and 1200×700 with zero browser errors.
+- Advanced package and lockfile metadata to v4.6.2.
 
 ---
 
