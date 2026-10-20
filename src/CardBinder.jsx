@@ -894,7 +894,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
       </div>
 
       <div className="flex shrink-0 items-center justify-end gap-2">
-        <button type="button" data-currency-toggle onClick={onToggleCurrency} className="h-8 rounded-full border border-white/[0.04] bg-neutral-950/40 px-2.5 font-mono text-[9px] font-bold tracking-widest text-neutral-500 uppercase hover:text-neutral-200 transition-colors shadow-sm focus:outline-none" aria-label={`Display values in ${currencyDisplay === 'SGD' ? 'USD' : 'SGD'}`} title={`Switch to ${currencyDisplay === 'SGD' ? 'USD' : 'SGD'}`}>{currencyDisplay}</button>
+        {portfolioValueLabel && <button type="button" data-currency-toggle onClick={onToggleCurrency} className="h-8 rounded-full border border-white/[0.04] bg-neutral-950/40 px-2.5 font-mono text-[9px] font-bold tracking-widest text-neutral-500 uppercase hover:text-neutral-200 transition-colors shadow-sm focus:outline-none" aria-label={`Display values in ${currencyDisplay === 'SGD' ? 'USD' : 'SGD'}`} title={`Switch to ${currencyDisplay === 'SGD' ? 'USD' : 'SGD'}`}>{currencyDisplay}</button>}
         {portfolioValueLabel && (
           <div data-portfolio-value className="h-8 flex items-center gap-1.5 rounded-full border border-white/[0.04] bg-neutral-950/40 px-3 py-1.5 shadow-sm text-xs select-none backdrop-blur-md" aria-live="polite" aria-label={`Total portfolio value ${portfolioValueLabel}`}>
             <span className="text-[9px] font-bold tracking-widest text-neutral-500 uppercase font-sans">Total Value</span>

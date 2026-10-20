@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.6.3
+## Current state — v4.6.4
 
 - **Ledger date:** 2026-10-20
-- **Application state entering this feature pass:** commit `ed5adfe` / v4.6.2
+- **Application state entering this feature pass:** commit `3f8da41` / v4.6.3
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,8 +14,8 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets plus the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, required secret, or environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** catalogue scrollbars are visually suppressed across browsers and workspace readouts use uniform uppercase presentation
-- **Last verified behavior:** production build plus three-viewport computed-style checks for hidden TCGdex/custom scrollbars and uppercase gradient-backed metrics
+- **Last functional change:** the currency converter now follows the same complete-pricing visibility gate as Total Value
+- **Last verified behavior:** production build plus positive-price and unavailable-price valuation visibility checks across three desktop viewports
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## SemVer reconstruction
@@ -631,6 +631,15 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Normalized visible workspace metrics to uppercase `DATABASE`, `ITEMS`, `CUSTOM`, `UPLOADED`, `DENSITY`, `FILLED`, and `SPREAD VALUE` strings without changing their high-contrast gradient styling.
 - Verified both catalogue viewports compute `scrollbar-width: none`, a hidden zero-width WebKit scrollbar, and native `overflow-y: auto`, and confirmed uppercase metrics plus valuation behavior at 1600×1000, 1366×768, and 1200×700 with zero browser errors.
 - Advanced package and lockfile metadata to v4.6.3.
+
+## [v4.6.4] — 2026-10-20
+
+### Fixed
+
+- Hid the USD/SGD currency converter unless every placed TCGdex-backed card contributing to the portfolio has a positive retrieved or persisted price, matching the existing Total Value completeness gate.
+- Preserved converter access and currency switching whenever the portfolio has a complete positive valuation.
+- Verified complete-price and provider-null visibility behavior at 1600×1000, 1366×768, and 1200×700 with zero browser errors.
+- Advanced package and lockfile metadata to v4.6.4.
 
 ---
 
