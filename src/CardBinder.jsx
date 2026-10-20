@@ -3057,10 +3057,11 @@ export default function CardBinder() {
 
   const renderSelectionOverlay = (page) => selectionPageId === page.id && selBox && (
     <div
-      className="slot-area pointer-events-none z-50 grid place-items-center rounded-lg border-2 border-red-600 bg-red-950/50 shadow-[inset_0_0_0_1px_rgba(255,255,255,.12)]"
+      data-selection-overlay
+      className="slot-area pointer-events-none z-50 grid place-items-center border border-red-500/80 bg-red-500/[0.04] backdrop-blur-[1px] shadow-[inset_0_0_0_1px_rgba(239,68,68,0.15),0_4px_12px_rgba(0,0,0,0.3)] rounded-md transition-all duration-75"
       style={{ '--col-start': selBox.c + 1, '--col-span': selBox.cs, '--row-start': selBox.r + 1, '--row-span': selBox.rs }}
     >
-      <span className="rounded-full bg-red-600 px-2 py-1 text-[10px] font-bold text-white shadow-lg">
+      <span data-selection-badge className="rounded-full border border-white/10 bg-neutral-950/90 px-2 py-0.5 font-mono text-[9px] font-semibold tracking-wider text-neutral-200 uppercase shadow-md backdrop-blur-md">
         {selBox.cs} × {selBox.rs}{marqueeRef.current?.quick ? ' · release to merge' : selectedMerges.length ? ' · U to unmerge' : ' · Enter to merge'}
       </span>
     </div>

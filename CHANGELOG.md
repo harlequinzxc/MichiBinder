@@ -518,6 +518,20 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Verified exact input geometry, 14px form spacing, count reset styles, tab states, 20px upload geometry, empty-state content, responsive sidebar layout, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.3.3.
 
+## [v4.3.4] — 2026-10-20
+
+### Improved
+
+- Replaced the opaque two-pixel selection marquee with a Figma-style one-pixel red hairline, four-percent translucent surface, one-pixel backdrop blur, restrained inset highlight, and compact transition timing.
+- Reworked the centered selection-size readout as a low-profile neutral glass capsule with 9px uppercase monospaced context instead of a solid red badge.
+- Added deterministic selection-overlay and badge data hooks for geometry and visual-state verification without changing merge, quick-merge, or Unmerge behavior.
+
+### Fixed
+
+- Prevented the Combine selection frame from visually obscuring underlying cards and pocket slots during multi-cell drags.
+- Verified 2×2 marquee interaction, one-pixel frame geometry, four-percent surface opacity, blur/shadow treatment, badge typography and padding, viewport containment, document overflow, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
+- Advanced package and lockfile metadata to v4.3.4.
+
 ---
 
 ## Current architecture and engineering rationale
@@ -543,6 +557,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Supported grids are 2×2, 3×3, and 4×3. Slot identity is `row-col`; a merged frame stores content at its top-left anchor.
 - Persisted merges are sanitized to a maximum 3×4 domain. Invalid, overlapping, out-of-range, or one-cell merges are discarded.
 - Changing density can make old slot keys non-renderable. `hiddenAssignments` preserves those cards; layout-choice/reflow paths decide whether and how to move them. They are not silently deleted.
+- Combine-mode selection uses a dimension-neutral one-pixel wireframe with four-percent red translucency and a neutral glass size badge, preserving the visibility of cards and slots beneath the marquee.
 - The live preview and print tree share sanitized data but use different presentation and pagination paths.
 
 ### 3D rotation axis and page-turn engine
