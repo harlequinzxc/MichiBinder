@@ -17,6 +17,8 @@ import {
   Keyboard,
   Layers,
   LayoutGrid,
+  Maximize2,
+  Minimize2,
   MonitorDown,
   Move,
   Menu,
@@ -565,8 +567,10 @@ const ICONS = {
   install: MonitorDown,
   keyboard: Keyboard,
   layers: Layers,
+  maximize: Maximize2,
   merge: TableCellsMerge,
   menu: Menu,
+  minimize: Minimize2,
   move: Move,
   plus: Plus,
   printer: Printer,
@@ -779,7 +783,10 @@ function SaveStatus({ status }) {
   );
 }
 
-function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, saveStatus }) {
+function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, onToggleZenMode, saveStatus }) {
+  const isZenMode = !isLeftSidebarOpen && !showBottomTimeline;
+  const zenModeTitle = isZenMode ? 'Exit Focus Mode' : 'Enter Focus Mode';
+
   return (
     <header className="titlebar no-print relative z-[70] h-12 bg-neutral-900 border-b border-white/[0.06] flex items-center justify-between px-4 shrink-0">
       <div className="flex min-w-0 items-center gap-3">
@@ -798,6 +805,20 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, saveStatus }) {
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
         </div>
         <SaveStatus status={saveStatus} />
+      </div>
+
+      <div className="flex shrink-0 items-center justify-end">
+        <button
+          type="button"
+          className="w-8 h-8 flex items-center justify-center rounded-lg bg-neutral-800/40 hover:bg-neutral-700/60 border border-white/[0.03] text-neutral-400 hover:text-neutral-200 transition-all cursor-pointer shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+          onClick={onToggleZenMode}
+          title={zenModeTitle}
+          aria-label={zenModeTitle}
+          aria-pressed={isZenMode}
+          data-zen-mode-toggle
+        >
+          <Icon name={isZenMode ? 'minimize' : 'maximize'} />
+        </button>
       </div>
     </header>
   );
@@ -1411,6 +1432,16 @@ export default function CardBinder() {
   const [activeTab, setActiveTab] = useState('cards');
   const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(true);
   const [showBottomTimeline, setShowBottomTimeline] = useState(true);
+  const handleToggleZenMode = useCallback(() => {
+    if (isLeftSidebarOpen || showBottomTimeline) {
+      setIsLeftSidebarOpen(false);
+      setShowBottomTimeline(false);
+      return;
+    }
+    setIsLeftSidebarOpen(true);
+    setShowBottomTimeline(true);
+  }, [isLeftSidebarOpen, showBottomTimeline]);
+  const isZenMode = !isLeftSidebarOpen && !showBottomTimeline;
   const [searchQuery, setSearchQuery] = useState('');
   const [fetchedCards, setFetchedCards] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -3276,6 +3307,8 @@ export default function CardBinder() {
         <AppBar
           isLeftSidebarOpen={isLeftSidebarOpen}
           setIsLeftSidebarOpen={setIsLeftSidebarOpen}
+          showBottomTimeline={showBottomTimeline}
+          onToggleZenMode={handleToggleZenMode}
           saveStatus={saveStatus}
         />
         <div data-main-layout className="flex h-[calc(100vh-48px)] w-full overflow-hidden bg-neutral-950">
@@ -3314,7 +3347,7 @@ export default function CardBinder() {
             onFetchedCardDragStart={startFetchedCardDrag}
             onFetchedCardAdd={addFetchedCardToPage}
           />
-          <main data-dynamic-workspace className="relative flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-neutral-950">
+          <main data-dynamic-workspace data-zen-mode={isZenMode} className="relative flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-neutral-950">
             <div data-preview-surface className="relative flex min-h-0 w-full flex-1 items-center overflow-hidden">
               <div
                 ref={stageRef}

@@ -459,6 +459,20 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Expanded current-state, visual-axis, drag-ingestion, print-compiler, known-gap, and incoming-engineer handoff detail.
 - Advanced package and lockfile metadata to v4.2.3; runtime application behavior did not change.
 
+## [v4.3.0] — 2026-10-20
+
+### Added
+
+- Added a centralized Zen Mode toggle to the far-right global header with 32×32 premium utility styling, accessible pressed state, and Lucide `Maximize2`/`Minimize2` icons through the shared 16×16 `Icon` abstraction.
+- Added one root `handleToggleZenMode` coordinator: if either the source sidebar or page timeline is visible it closes both, and when both are closed it restores both.
+
+### Improved
+
+- Kept the independent sidebar and timeline controls intact while making their combined focus state immediately visible through exact “Enter Focus Mode” and “Exit Focus Mode” titles.
+- Reused the preview stage's existing `ResizeObserver`, elastic sheet-frame transitions, and flex boundaries so reclaimed width and height enlarge the binder without moving the detached rail outside the live preview surface.
+- Verified simultaneous collapse/restore, independent sidebar behavior, 16×16 icon geometry, zero-dimension closed timeline state, centered rail geometry, binder scaling, and absence of document overflow at 1600×1000, 1366×768, and 1200×700.
+- Advanced package and lockfile metadata to v4.3.0.
+
 ---
 
 ## Current architecture and engineering rationale
@@ -513,7 +527,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 
 ### Timeline, rail, and viewport boundaries
 
-- The header is 48px tall and owns only identity, sidebar toggle, and save state.
+- The header is 48px tall and owns identity, sidebar toggle, save state, and the centralized Zen Mode toggle.
 - The source sidebar consumes width when open; the right-side main tree receives the remainder.
 - The preview surface is one flex row containing the scrollable stage and detached rail. The stage stops at the rail's left edge, including the rail padding zone.
 - The rail has no full-height edge divider and no `self-start`; its outer box is vertically centered against the **live preview surface**, not the complete main column. Collapsing the timeline changes preview height, so the rail's vertical center moves.
