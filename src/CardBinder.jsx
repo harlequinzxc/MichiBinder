@@ -1,6 +1,7 @@
 import {
   AlertTriangle,
   BookOpen,
+  BookOpenCheck,
   Check,
   ChevronDown,
   ChevronLeft,
@@ -547,6 +548,7 @@ const idbClear = () => idbRun('readwrite', (store) => store.clear());
 const ICONS = {
   alert: AlertTriangle,
   book: BookOpen,
+  brand: BookOpenCheck,
   check: Check,
   chevronDown: ChevronDown,
   chevronLeft: ChevronLeft,
@@ -793,7 +795,10 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, saveStatus }) {
         >
           <Icon name="menu" />
         </button>
-        <h1 className="select-none bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
+        <div className="flex items-center gap-2 select-none">
+          <Icon name="brand" className="text-red-500" />
+          <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
+        </div>
         <SaveStatus status={saveStatus} />
       </div>
     </header>
@@ -810,7 +815,7 @@ function RailButton({ icon, label, active = false, expanded, onClick, className 
       aria-expanded={expanded}
       aria-haspopup={expanded === undefined ? undefined : 'dialog'}
       title={label}
-      className={`relative flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-lg border shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${active ? 'border-red-500/30 bg-red-950/70 text-red-300' : 'border-white/[0.08] bg-neutral-950 text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200'} ${className}`}
+      className={`relative w-8 h-8 flex shrink-0 items-center justify-center rounded-lg bg-neutral-800/40 hover:bg-neutral-700/60 border border-white/[0.03] transition-all cursor-pointer shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${active ? '!border-red-500/30 !bg-red-950/70 text-red-300' : 'text-neutral-400 hover:text-neutral-200'} ${className}`}
     >
       {icon && <Icon name={icon} />}
       {children}
@@ -866,10 +871,10 @@ function RightControlRail({
   const chooseGrid = (layoutId) => { onChooseLayout(layoutId); setOpenPanel(null); };
 
   return (
-    <aside data-control-rail aria-label="Layout and print controls" className="no-print py-3 pr-3 flex items-center justify-center z-40 select-none max-h-[calc(100vh-176px)] self-start shrink-0">
+    <aside data-control-rail aria-label="Layout and print controls" className="no-print py-3 pr-3 flex items-center justify-center z-40 select-none max-h-[calc(100vh-176px)] shrink-0">
       <div data-control-pod className="w-14 h-full bg-neutral-900/85 backdrop-blur-md border border-white/[0.06] rounded-2xl flex flex-col items-center py-4 gap-6 shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)] [@media(max-height:720px)]:gap-3">
         <div data-rail-zone="primary" className="flex flex-col items-center gap-2 [@media(max-height:720px)]:gap-1">
-          <button type="button" onClick={onPrint} aria-label="Print / PDF" title="Print / PDF" className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg border border-white/[0.08] bg-neutral-800 text-neutral-200 shadow-sm transition-all hover:bg-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="printer" /></button>
+          <button type="button" onClick={onPrint} aria-label="Print / PDF" title="Print / PDF" className="w-8 h-8 flex items-center justify-center rounded-lg bg-neutral-800/40 hover:bg-neutral-700/60 border border-white/[0.03] transition-all cursor-pointer text-neutral-200 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="printer" /></button>
           <div className="relative flex">
             <RailButton icon="filter" label={`Print scope: ${printScope === 'all' ? 'Include all' : 'Uploads only'}`} active={openPanel === 'print-scope'} expanded={openPanel === 'print-scope'} onClick={() => togglePanel('print-scope')}>
               <span className="absolute bottom-1 right-1 text-[7px] font-mono font-bold leading-none text-current">{printScope === 'all' ? 'A' : 'U'}</span>
@@ -913,8 +918,8 @@ function RightControlRail({
           </div>
           <span aria-hidden="true" className="my-1 h-px w-7 bg-white/[0.06]" />
           <div role="radiogroup" aria-label="Preview mode" className="flex flex-col gap-1.5">
-            <RailButton icon="book" label="Binder preview" active={settings.view === 'binder'} onClick={() => onViewChange('binder')} className="h-9" />
-            <RailButton icon="file" label="Paper preview" active={settings.view === 'paper'} onClick={() => onViewChange('paper')} className="h-9" />
+            <RailButton icon="book" label="Binder preview" active={settings.view === 'binder'} onClick={() => onViewChange('binder')} />
+            <RailButton icon="file" label="Paper preview" active={settings.view === 'paper'} onClick={() => onViewChange('paper')} />
           </div>
           <div className="relative flex">
             <button type="button" aria-label={`Card scale: ${Math.round(cleanSize.scale * 100)}%`} aria-expanded={openPanel === 'scale'} aria-haspopup="dialog" onClick={() => togglePanel('scale')} title="Card scale" className={`flex h-7 w-11 items-center justify-center rounded-full border text-[10px] font-mono font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${openPanel === 'scale' ? 'border-red-500/30 bg-red-950/70 text-red-300' : 'border-white/[0.08] bg-neutral-950 text-neutral-300 hover:bg-neutral-800'}`}>{Math.round(cleanSize.scale * 100)}%</button>
@@ -985,8 +990,8 @@ function FloatingNavigation({
   onDelete,
   canDelete,
 }) {
-  const bottomIconButton = 'w-8 h-8 flex items-center justify-center rounded-lg transition-all shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500';
-  const neutralIconButton = `${bottomIconButton} cursor-pointer text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200 disabled:pointer-events-none disabled:cursor-default disabled:text-neutral-700`;
+  const bottomIconButton = 'w-8 h-8 flex items-center justify-center rounded-lg bg-neutral-800/40 hover:bg-neutral-700/60 border border-white/[0.03] transition-all cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500';
+  const neutralIconButton = `${bottomIconButton} text-neutral-400 hover:text-neutral-200 disabled:pointer-events-none disabled:cursor-default disabled:text-neutral-700`;
   return (
     <div data-bottom-control-bar className="no-print relative flex w-full shrink-0 items-center justify-center border-t border-white/[0.06] bg-neutral-900/60 px-6 py-3 backdrop-blur-md select-none">
       <div className="flex w-full items-center justify-center">
@@ -996,11 +1001,11 @@ function FloatingNavigation({
             <button type="button" onClick={onRedo} disabled={!canRedo} aria-label="Redo" title="Redo" className={neutralIconButton}><Icon name="redo" /></button>
           </div>
           <div role="group" aria-label="Slot structure" className="flex shrink-0 items-center gap-1 border-l border-white/[0.06] pl-2 min-[1281px]:pl-4">
-            <button type="button" onClick={onToggleCombine} aria-pressed={combineMode} aria-label="Combine slots" title="Combine slots (M)" className={`${bottomIconButton} ${combineMode ? 'bg-red-950/70 text-red-300' : 'text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200'}`}><Icon name="combine" /></button>
+            <button type="button" onClick={onToggleCombine} aria-pressed={combineMode} aria-label="Combine slots" title="Combine slots (M)" className={`${bottomIconButton} ${combineMode ? '!border-red-500/30 !bg-red-950/70 text-red-300' : 'text-neutral-400 hover:text-neutral-200'}`}><Icon name="combine" /></button>
             <button type="button" onClick={onMerge} disabled={!canMerge} aria-label="Merge selected slots" title="Merge selected slots (Enter)" className={neutralIconButton}><Icon name="merge" /></button>
             <button type="button" onClick={onUnmerge} disabled={!selectedMergeCount} aria-label="Unmerge selected frame" title="Unmerge selected frame (U)" className={neutralIconButton}><Icon name="split" /></button>
             <button type="button" onClick={onResetLayout} disabled={!canResetLayout} aria-label="Reset merged layout" title="Reset merged layout" className={neutralIconButton}><Icon name="reset" /></button>
-            <button type="button" onClick={onClearPage} disabled={!canClearPage} aria-label="Clear active page" title="Clear active page" className={`${bottomIconButton} cursor-pointer text-neutral-500 hover:bg-red-500/10 hover:text-red-400 disabled:pointer-events-none disabled:cursor-default disabled:text-neutral-700`}><Icon name="eraser" /></button>
+            <button type="button" onClick={onClearPage} disabled={!canClearPage} aria-label="Clear active page" title="Clear active page" className={`${bottomIconButton} text-neutral-500 hover:!bg-red-500/10 hover:text-red-400 disabled:pointer-events-none disabled:cursor-default disabled:text-neutral-700`}><Icon name="eraser" /></button>
           </div>
           <div role="group" aria-label="Spread navigation" className="flex shrink-0 items-center gap-2 border-l border-white/[0.06] pl-2 min-[1281px]:pl-4">
             <button type="button" onClick={onPrevious} disabled={!canPrevious} aria-label="Previous spread" title="Previous spread" className={neutralIconButton}><Icon name="chevronLeft" /></button>
@@ -1012,8 +1017,8 @@ function FloatingNavigation({
             </div>
             <button type="button" onClick={onNext} disabled={!canNext} aria-label="Next spread" title="Next spread" className={neutralIconButton}><Icon name="chevronRight" /></button>
           </div>
-          <button type="button" onClick={onAdd} aria-label="Add spread" className={`${bottomIconButton} border border-white/[0.04] bg-neutral-800 text-neutral-200 shadow-sm hover:bg-neutral-700 min-[1281px]:ml-2`} title="Insert a new two-page physical sheet"><Icon name="plus" /></button>
-          <button type="button" onClick={onDelete} disabled={!canDelete} aria-label="Delete active sheet" title={canDelete ? 'Delete active sheet' : 'Keep at least one physical sheet'} className={`${bottomIconButton} cursor-pointer text-neutral-500 hover:bg-red-500/10 hover:text-red-400 disabled:pointer-events-none disabled:cursor-default disabled:text-neutral-700 min-[1281px]:ml-2`}><Icon name="trash" /></button>
+          <button type="button" onClick={onAdd} aria-label="Add spread" className={`${bottomIconButton} text-neutral-200 shadow-sm min-[1281px]:ml-2`} title="Insert a new two-page physical sheet"><Icon name="plus" /></button>
+          <button type="button" onClick={onDelete} disabled={!canDelete} aria-label="Delete active sheet" title={canDelete ? 'Delete active sheet' : 'Keep at least one physical sheet'} className={`${bottomIconButton} text-neutral-500 hover:!bg-red-500/10 hover:text-red-400 disabled:pointer-events-none disabled:cursor-default disabled:text-neutral-700 min-[1281px]:ml-2`}><Icon name="trash" /></button>
         </div>
       </div>
       <button
@@ -1021,10 +1026,9 @@ function FloatingNavigation({
         aria-expanded={showBottomTimeline}
         aria-controls="bottom-page-timeline"
         onClick={onToggleTimeline}
-        className="absolute right-6 flex cursor-pointer items-center gap-1 rounded-md border border-white/[0.06] bg-neutral-950 p-1.5 text-[11px] font-medium text-neutral-400 shadow transition-all hover:bg-neutral-800 hover:text-neutral-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+        className={`${bottomIconButton} absolute right-6 text-neutral-400 shadow hover:text-neutral-200`}
         title={showBottomTimeline ? 'Collapse Timeline' : 'Expand Timeline'}
       >
-        <span className="text-[10px] font-sans font-bold tracking-wider text-neutral-500 uppercase max-[1180px]:sr-only">Timeline</span>
         <Icon name={showBottomTimeline ? 'chevronDown' : 'chevronUp'} />
       </button>
     </div>
@@ -3267,9 +3271,10 @@ export default function CardBinder() {
             onFetchedCardAdd={addFetchedCardToPage}
           />
           <main data-dynamic-workspace className="relative flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-neutral-950">
-            <div
-              ref={stageRef}
-              className="relative flex min-h-0 w-full flex-1 items-center justify-center overflow-auto bg-neutral-950 bg-[radial-gradient(ellipse_at_center,rgba(82,82,91,0.18),transparent_65%)] p-6"
+            <div data-preview-surface className="relative flex min-h-0 w-full flex-1 items-center overflow-hidden">
+              <div
+                ref={stageRef}
+                className="relative flex h-full min-w-0 flex-1 items-center justify-center overflow-auto bg-neutral-950 bg-[radial-gradient(ellipse_at_center,rgba(82,82,91,0.18),transparent_65%)] p-6"
               onPointerMove={moveMarquee}
               onPointerDown={(event) => { if (event.target === event.currentTarget && combineMode) { setSelBox(null); setSelectionPageId(null); } }}
               onDragEnter={(event) => { if (!combineMode && (['pool', 'remote', 'remote-batch'].includes(dragRef.current?.kind) || hasFiles(event.dataTransfer))) event.preventDefault(); }}
@@ -3321,6 +3326,25 @@ export default function CardBinder() {
                   )}
                 </div>
               </div>
+              </div>
+              <RightControlRail
+                settings={settings}
+                setSettings={setSettings}
+                onChooseLayout={chooseLayout}
+                onViewChange={(view) => { commitEditing(); setSettings((value) => ({ ...value, view })); }}
+                printScope={printScope}
+                setPrintScope={setPrintScope}
+                onPrint={handlePrint}
+                openPanel={openPanel}
+                setOpenPanel={setOpenPanel}
+                fitInfo={fitInfo}
+                suggestedPaper={suggestedPaper}
+                printCount={printPages.length}
+                onReset={resetBinder}
+                onDuplicate={duplicatePage}
+                installPrompt={installPrompt}
+                onInstall={async () => { await installPrompt.prompt(); setInstallPrompt(null); }}
+              />
             </div>
             <FloatingNavigation
               showBottomTimeline={showBottomTimeline}
@@ -3355,9 +3379,9 @@ export default function CardBinder() {
               aria-label="Page timeline"
               aria-hidden={!showBottomTimeline}
               inert={showBottomTimeline ? undefined : true}
-              className={`no-print relative flex min-w-0 w-full shrink-0 items-center justify-start gap-4 bg-neutral-900/40 backdrop-blur-sm transition-all duration-300 ease-in-out select-none ${showBottomTimeline ? 'h-28 py-4 px-6 border-t border-white/[0.04] border-opacity-100 opacity-100 overflow-x-auto overscroll-x-contain' : 'h-0 py-0 px-6 border-0 border-opacity-0 opacity-0 overflow-hidden pointer-events-none'}`}
+              className={`no-print w-full bg-neutral-900/40 backdrop-blur-sm transition-all duration-300 ease-in-out shrink-0 relative flex justify-start items-center select-none scrollbar-none min-w-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${showBottomTimeline ? 'h-28 border-t border-white/[0.04] overflow-x-auto overscroll-x-contain gap-4 p-4 opacity-100' : 'h-0 border-0 overflow-hidden gap-0 p-0 opacity-0 pointer-events-none'}`}
             >
-              <div data-page-timeline-inner className="mx-auto flex h-full min-w-max w-max items-center justify-center gap-4">
+              <div data-page-timeline-inner className="flex h-full min-w-max w-max items-center justify-start gap-4">
                 {spreadGroups.map(renderThumbnailGroup)}
                 <div className="flex shrink-0 flex-col items-center gap-1 text-[10px] font-medium whitespace-nowrap text-neutral-500">
                   <button type="button" onClick={addPage} aria-label="Add page" className="group shrink-0 rounded-md bg-transparent p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500">
@@ -3368,24 +3392,6 @@ export default function CardBinder() {
               </div>
             </footer>
           </main>
-          <RightControlRail
-            settings={settings}
-            setSettings={setSettings}
-            onChooseLayout={chooseLayout}
-            onViewChange={(view) => { commitEditing(); setSettings((value) => ({ ...value, view })); }}
-            printScope={printScope}
-            setPrintScope={setPrintScope}
-            onPrint={handlePrint}
-            openPanel={openPanel}
-            setOpenPanel={setOpenPanel}
-            fitInfo={fitInfo}
-            suggestedPaper={suggestedPaper}
-            printCount={printPages.length}
-            onReset={resetBinder}
-            onDuplicate={duplicatePage}
-            installPrompt={installPrompt}
-            onInstall={async () => { await installPrompt.prompt(); setInstallPrompt(null); }}
-          />
         </div>
         <div className="no-print pointer-events-none fixed bottom-10 right-20 z-[100] flex w-[360px] flex-col items-end gap-2">
           {toasts.map((toast) => <div key={toast.id} role="status" className={`animate-toast pointer-events-auto flex max-w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-[12px] shadow-2xl shadow-black/40 ${toastTones[toast.tone] || toastTones.info}`}><span className="leading-relaxed">{toast.message}</span>{toast.action && <button type="button" onClick={() => { setToasts((value) => value.filter((item) => item.id !== toast.id)); toast.action.onClick(); }} className="shrink-0 rounded-md bg-white/10 px-2 py-1 font-semibold text-white hover:bg-white/20">{toast.action.label}</button>}<button type="button" title="Dismiss" aria-label="Dismiss notification" onClick={() => setToasts((value) => value.filter((item) => item.id !== toast.id))} className="grid size-6 shrink-0 place-items-center rounded-md text-current hover:bg-white/10"><Icon name="x" /></button></div>)}
