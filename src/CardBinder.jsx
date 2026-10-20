@@ -1,7 +1,6 @@
 import {
   AlertTriangle,
   BookOpen,
-  BookOpenCheck,
   Check,
   ChevronDown,
   ChevronLeft,
@@ -10,6 +9,7 @@ import {
   Columns4,
   Copy,
   Eraser,
+  Eye,
   File,
   Grid2X2,
   Grid3X3,
@@ -17,7 +17,6 @@ import {
   Keyboard,
   Layers,
   LayoutGrid,
-  ListFilter,
   MonitorDown,
   Move,
   Menu,
@@ -548,7 +547,6 @@ const idbClear = () => idbRun('readwrite', (store) => store.clear());
 const ICONS = {
   alert: AlertTriangle,
   book: BookOpen,
-  brand: BookOpenCheck,
   check: Check,
   chevronDown: ChevronDown,
   chevronLeft: ChevronLeft,
@@ -557,6 +555,7 @@ const ICONS = {
   combine: SquareDashedMousePointer,
   copy: Copy,
   eraser: Eraser,
+  eye: Eye,
   file: File,
   grid: LayoutGrid,
   grid2x2: Grid2X2,
@@ -566,7 +565,6 @@ const ICONS = {
   install: MonitorDown,
   keyboard: Keyboard,
   layers: Layers,
-  filter: ListFilter,
   merge: TableCellsMerge,
   menu: Menu,
   move: Move,
@@ -796,7 +794,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, saveStatus }) {
           <Icon name="menu" />
         </button>
         <div className="flex items-center gap-2 select-none">
-          <Icon name="brand" className="text-red-500" />
+          <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
         </div>
         <SaveStatus status={saveStatus} />
@@ -857,7 +855,6 @@ function RightControlRail({
   suggestedPaper,
   printCount,
   onReset,
-  onDuplicate,
   installPrompt,
   onInstall,
 }) {
@@ -867,30 +864,35 @@ function RightControlRail({
   const activeLayout = getLayout(settings.layout);
   const setCardSize = (patch) => setSettings((value) => ({ ...value, cardSize: sanitizeCardSize({ ...value.cardSize, ...patch }) }));
   const togglePanel = (panel) => setOpenPanel((value) => value === panel ? null : panel);
-  const choosePrintScope = (scope) => { setPrintScope(scope); setOpenPanel(null); };
+  const choosePrintScope = (scope) => { setPrintScope(scope); };
   const chooseGrid = (layoutId) => { onChooseLayout(layoutId); setOpenPanel(null); };
+  const chooseView = (view) => { onViewChange(view); setOpenPanel(null); };
 
   return (
     <aside data-control-rail aria-label="Layout and print controls" className="no-print py-3 pr-3 flex items-center justify-center z-40 select-none max-h-[calc(100vh-176px)] shrink-0">
       <div data-control-pod className="w-14 h-full bg-neutral-900/85 backdrop-blur-md border border-white/[0.06] rounded-2xl flex flex-col items-center py-4 gap-6 shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)] [@media(max-height:720px)]:gap-3">
         <div data-rail-zone="primary" className="flex flex-col items-center gap-2 [@media(max-height:720px)]:gap-1">
-          <button type="button" onClick={onPrint} aria-label="Print / PDF" title="Print / PDF" className="w-8 h-8 flex items-center justify-center rounded-lg bg-neutral-800/40 hover:bg-neutral-700/60 border border-white/[0.03] transition-all cursor-pointer text-neutral-200 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="printer" /></button>
           <div className="relative flex">
-            <RailButton icon="filter" label={`Print scope: ${printScope === 'all' ? 'Include all' : 'Uploads only'}`} active={openPanel === 'print-scope'} expanded={openPanel === 'print-scope'} onClick={() => togglePanel('print-scope')}>
-              <span className="absolute bottom-1 right-1 text-[7px] font-mono font-bold leading-none text-current">{printScope === 'all' ? 'A' : 'U'}</span>
-            </RailButton>
-            {openPanel === 'print-scope' && (
-              <RailPopover title="Print scope" icon="filter">
-                <div role="radiogroup" aria-label="Print scope" className="flex flex-col gap-1">
-                  {[
-                    { value: 'all', label: 'Include all', detail: 'Print every placed card' },
-                    { value: 'custom', label: 'Uploads only', detail: 'Print private uploads only' },
-                  ].map((option) => (
-                    <button key={option.value} type="button" role="radio" aria-checked={printScope === option.value} onClick={() => choosePrintScope(option.value)} className={`flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${printScope === option.value ? 'border-red-500/25 bg-red-950/55 text-red-200' : 'border-white/[0.05] bg-neutral-900/60 text-neutral-300 hover:bg-neutral-800'}`}>
-                      <span className={`grid size-4 shrink-0 place-items-center rounded-full border ${printScope === option.value ? 'border-red-400/50 bg-red-500/15' : 'border-white/10 bg-neutral-950'}`}>{printScope === option.value && <span className="size-1.5 rounded-full bg-red-400" />}</span>
-                      <span className="min-w-0"><strong className="block text-[11px] font-semibold">{option.label}</strong><span className="block truncate text-[9px] text-neutral-500">{option.detail}</span></span>
-                    </button>
-                  ))}
+            <RailButton icon="printer" label="Print / PDF" active={openPanel === 'print-menu'} expanded={openPanel === 'print-menu'} onClick={() => togglePanel('print-menu')} />
+            {openPanel === 'print-menu' && (
+              <RailPopover title="Print / PDF" icon="printer">
+                <button type="button" onClick={onPrint} className="flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-red-500/25 bg-red-950/55 px-3 text-[11px] font-semibold text-red-100 transition-colors hover:bg-red-900/65 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500">
+                  <Icon name="printer" />
+                  <span>Open print dialog</span>
+                </button>
+                <div className="border-t border-white/[0.06] pt-2">
+                  <span className="mb-1.5 block text-[9px] font-bold tracking-widest text-neutral-500 uppercase">Print scope</span>
+                  <div role="radiogroup" aria-label="Print scope" className="flex flex-col gap-1">
+                    {[
+                      { value: 'all', label: 'Include all', detail: 'Every placed card' },
+                      { value: 'custom', label: 'Uploads only', detail: 'Private uploads only' },
+                    ].map((option) => (
+                      <button key={option.value} type="button" role="radio" aria-checked={printScope === option.value} onClick={() => choosePrintScope(option.value)} className={`flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${printScope === option.value ? 'border-red-500/25 bg-red-950/55 text-red-200' : 'border-white/[0.05] bg-neutral-900/60 text-neutral-300 hover:bg-neutral-800'}`}>
+                        <span className={`grid size-4 shrink-0 place-items-center rounded-full border ${printScope === option.value ? 'border-red-400/50 bg-red-500/15' : 'border-white/10 bg-neutral-950'}`}>{printScope === option.value && <span className="size-1.5 rounded-full bg-red-400" />}</span>
+                        <span className="min-w-0"><strong className="block text-[11px] font-semibold">{option.label}</strong><span className="block truncate text-[9px] text-neutral-500">{option.detail}</span></span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </RailPopover>
             )}
@@ -917,9 +919,24 @@ function RightControlRail({
             )}
           </div>
           <span aria-hidden="true" className="my-1 h-px w-7 bg-white/[0.06]" />
-          <div role="radiogroup" aria-label="Preview mode" className="flex flex-col gap-1.5">
-            <RailButton icon="book" label="Binder preview" active={settings.view === 'binder'} onClick={() => onViewChange('binder')} />
-            <RailButton icon="file" label="Paper preview" active={settings.view === 'paper'} onClick={() => onViewChange('paper')} />
+          <div className="relative flex">
+            <RailButton icon="eye" label="Preview" active={openPanel === 'preview'} expanded={openPanel === 'preview'} onClick={() => togglePanel('preview')} />
+            {openPanel === 'preview' && (
+              <RailPopover title="Preview" icon="eye">
+                <div role="radiogroup" aria-label="Preview mode" className="flex flex-col gap-1">
+                  {[
+                    { value: 'binder', label: 'Binder preview', detail: 'Physical spread and rings', icon: 'book' },
+                    { value: 'paper', label: 'Paper preview', detail: 'Print-safe sheet surface', icon: 'file' },
+                  ].map((option) => (
+                    <button key={option.value} type="button" role="radio" aria-checked={settings.view === option.value} onClick={() => chooseView(option.value)} className={`flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${settings.view === option.value ? 'border-red-500/25 bg-red-950/55 text-red-200' : 'border-white/[0.05] bg-neutral-900/60 text-neutral-300 hover:bg-neutral-800'}`}>
+                      <span className="grid size-7 shrink-0 place-items-center rounded-md border border-white/[0.06] bg-neutral-950"><Icon name={option.icon} /></span>
+                      <span className="min-w-0 flex-1"><strong className="block text-[11px] font-semibold">{option.label}</strong><span className="block truncate text-[9px] text-neutral-500">{option.detail}</span></span>
+                      {settings.view === option.value && <Icon name="check" className="text-red-400" />}
+                    </button>
+                  ))}
+                </div>
+              </RailPopover>
+            )}
           </div>
           <div className="relative flex">
             <button type="button" aria-label={`Card scale: ${Math.round(cleanSize.scale * 100)}%`} aria-expanded={openPanel === 'scale'} aria-haspopup="dialog" onClick={() => togglePanel('scale')} title="Card scale" className={`flex h-7 w-11 items-center justify-center rounded-full border text-[10px] font-mono font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${openPanel === 'scale' ? 'border-red-500/30 bg-red-950/70 text-red-300' : 'border-white/[0.08] bg-neutral-950 text-neutral-300 hover:bg-neutral-800'}`}>{Math.round(cleanSize.scale * 100)}%</button>
@@ -951,7 +968,6 @@ function RightControlRail({
             </RailButton>
             {openPanel === 'print' && <RailPopover title="Print setup" icon="sliders" align="viewport"><PrintSetupContent settings={settings} setSettings={setSettings} fitInfo={fitInfo} suggestedPaper={suggestedPaper} printCount={printCount} onReset={onReset} /></RailPopover>}
           </div>
-          <RailButton icon="copy" label="Duplicate physical sheet" onClick={onDuplicate} />
           <div className="relative flex">
             <RailButton icon="keyboard" label="Keyboard shortcuts" active={openPanel === 'shortcuts'} expanded={openPanel === 'shortcuts'} onClick={() => togglePanel('shortcuts')} />
             {openPanel === 'shortcuts' && <RailPopover title="Keyboard shortcuts" icon="keyboard" align="viewport"><ShortcutsContent /></RailPopover>}
@@ -987,6 +1003,7 @@ function FloatingNavigation({
   onPrevious,
   onNext,
   onAdd,
+  onDuplicate,
   onDelete,
   canDelete,
 }) {
@@ -1018,7 +1035,8 @@ function FloatingNavigation({
             <button type="button" onClick={onNext} disabled={!canNext} aria-label="Next spread" title="Next spread" className={neutralIconButton}><Icon name="chevronRight" /></button>
           </div>
           <button type="button" onClick={onAdd} aria-label="Add spread" className={`${bottomIconButton} text-neutral-200 shadow-sm min-[1281px]:ml-2`} title="Insert a new two-page physical sheet"><Icon name="plus" /></button>
-          <button type="button" onClick={onDelete} disabled={!canDelete} aria-label="Delete active sheet" title={canDelete ? 'Delete active sheet' : 'Keep at least one physical sheet'} className={`${bottomIconButton} text-neutral-500 hover:!bg-red-500/10 hover:text-red-400 disabled:pointer-events-none disabled:cursor-default disabled:text-neutral-700 min-[1281px]:ml-2`}><Icon name="trash" /></button>
+          <button type="button" onClick={onDuplicate} aria-label="Duplicate physical sheet" title="Duplicate physical sheet" className={`${neutralIconButton} min-[1281px]:ml-2`}><Icon name="copy" /></button>
+          <button type="button" onClick={onDelete} disabled={!canDelete} aria-label="Delete active sheet" title={canDelete ? 'Delete active sheet' : 'Keep at least one physical sheet'} className={`${bottomIconButton} text-neutral-500 hover:!bg-red-500/10 hover:text-red-400 disabled:pointer-events-none disabled:cursor-default disabled:text-neutral-700`}><Icon name="trash" /></button>
         </div>
       </div>
       <button
@@ -1077,9 +1095,9 @@ function ShortcutsContent() {
     ['Double-click', 'Reposition an image'],
   ];
   return (
-    <dl className="flex flex-col gap-1">
+    <dl className="flex flex-col gap-0.5">
       {rows.map(([key, action]) => (
-        <div key={key} className="flex items-center gap-2 rounded-md border border-white/[0.04] bg-neutral-900/45 px-2 py-1">
+        <div key={key} className="flex items-center gap-2 rounded-md border border-white/[0.04] bg-neutral-900/45 px-2 py-0.5">
           <dt className="shrink-0"><Kbd className="text-[8px]">{key}</Kbd></dt>
           <dd className="min-w-0 text-[9px] leading-tight text-neutral-400">{action}</dd>
         </div>
@@ -1424,6 +1442,7 @@ export default function CardBinder() {
   const [stageSize, setStageSize] = useState({ w: 1000, h: 620 });
 
   const stageRef = useRef(null);
+  const timelineContainerRef = useRef(null);
   const inputRef = useRef(null);
   const dragRef = useRef(null);
   const searchAbortRef = useRef(null);
@@ -1492,6 +1511,21 @@ export default function CardBinder() {
   useEffect(() => { editingRef.current = editing; }, [editing]);
   useEffect(() => { selBoxRef.current = selBox; }, [selBox]);
   useEffect(() => { selectionPageIdRef.current = selectionPageId; }, [selectionPageId]);
+
+  useEffect(() => {
+    const timeline = timelineContainerRef.current;
+    if (!timeline || !showBottomTimeline) return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      const activeGroup = timeline.querySelector('[data-active="true"]');
+      if (!activeGroup) return;
+      const trackBounds = timeline.getBoundingClientRect();
+      const activeBounds = activeGroup.getBoundingClientRect();
+      if (activeBounds.left < trackBounds.left || activeBounds.right > trackBounds.right) {
+        activeGroup.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [currentPage, activeSpreadIndex, showBottomTimeline]);
 
   const notify = useCallback((message, tone = 'info', action = null) => {
     const id = uid('toast');
@@ -3020,7 +3054,7 @@ export default function CardBinder() {
     const pageNumbers = group.map((pageIndex) => pageIndex + 1);
     const label = group.length === 1 ? `Page ${pageNumbers[0]}` : `Pages ${pageNumbers[0]}–${pageNumbers[1]}`;
     return (
-      <div key={group.join('-')} data-page-group={pageNumbers.join('-')} className={`relative flex shrink-0 flex-col items-center gap-1 text-[10px] font-medium whitespace-nowrap ${active ? 'text-red-400' : 'text-neutral-500'}`}>
+      <div key={group.join('-')} data-page-group={pageNumbers.join('-')} data-active={active ? 'true' : undefined} className={`relative flex shrink-0 flex-col items-center gap-1 text-[10px] font-medium whitespace-nowrap ${active ? 'text-red-400' : 'text-neutral-500'}`}>
         <div className={`flex items-center gap-0.5 p-1.5 ${active ? 'ring-2 ring-red-500 ring-offset-4 ring-offset-neutral-950 rounded-md scale-105 duration-200 transition-transform' : 'rounded-md duration-200 transition-transform'}`}>
           {group.map((pageIndex) => renderThumbnailLeaf(pages[pageIndex], pageIndex))}
         </div>
@@ -3341,7 +3375,6 @@ export default function CardBinder() {
                 suggestedPaper={suggestedPaper}
                 printCount={printPages.length}
                 onReset={resetBinder}
-                onDuplicate={duplicatePage}
                 installPrompt={installPrompt}
                 onInstall={async () => { await installPrompt.prompt(); setInstallPrompt(null); }}
               />
@@ -3370,10 +3403,12 @@ export default function CardBinder() {
               onPrevious={() => goToAdjacentSpread(-1)}
               onNext={() => goToAdjacentSpread(1)}
               onAdd={addPage}
+              onDuplicate={duplicatePage}
               onDelete={deletePage}
               canDelete={pages.length > 2}
             />
             <footer
+              ref={timelineContainerRef}
               id="bottom-page-timeline"
               data-page-timeline
               aria-label="Page timeline"
