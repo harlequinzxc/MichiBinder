@@ -153,6 +153,7 @@ const normalizeTcgdexSets = (payload) => {
 const safeFileName = (value) => String(value || 'pokemon-card').replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim() || 'pokemon-card';
 const emptyPage = (sheetId = null, face = null) => ({
   id: uid('page'),
+  sectionName: '',
   merges: [],
   slots: {},
   crops: {},
@@ -466,6 +467,7 @@ function sanitizePage(value = {}) {
   });
   return {
     id: String(value.id || uid('page')),
+    sectionName: typeof value.sectionName === 'string' ? value.sectionName.slice(0, 40) : '',
     merges,
     slots,
     crops,
@@ -621,10 +623,6 @@ function Kbd({ children, className = '' }) {
   return <kbd className={`inline-flex min-w-4 items-center justify-center rounded border border-white/15 bg-zinc-700/80 px-1 py-0.5 text-[10px] font-semibold leading-none text-white ${className}`}>{children}</kbd>;
 }
 
-function ToolbarDivider({ slim = false }) {
-  return <span aria-hidden="true" className={`${slim ? 'mx-0.5 h-5' : 'mx-1 h-6'} w-px shrink-0 bg-white/10`} />;
-}
-
 function SegmentedControl({ value, onChange, options, ariaLabel, dense = false, appearance = 'default' }) {
   const currentIndex = Math.max(0, options.findIndex((option) => option.value === value));
   const previewStyle = appearance === 'preview';
@@ -707,6 +705,33 @@ function MmField({ label, value, onCommit }) {
   );
 }
 
+function PageSectionInput({ value, pageNumber, onCommit, style }) {
+  const [draft, setDraft] = useState(value || '');
+  useEffect(() => setDraft(value || ''), [value]);
+  const commit = () => {
+    const next = draft.trim().slice(0, 40);
+    setDraft(next);
+    if (next !== (value || '')) onCommit(next);
+  };
+  return (
+    <input
+      data-page-section
+      value={draft}
+      maxLength={40}
+      aria-label={`Section name for page ${pageNumber}`}
+      placeholder="Section name"
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') { event.preventDefault(); event.currentTarget.blur(); }
+        if (event.key === 'Escape') { setDraft(value || ''); event.currentTarget.blur(); }
+      }}
+      className="absolute z-20 h-5 border-0 bg-transparent px-2 text-center font-mono text-[9px] font-semibold tracking-[0.22em] text-white/40 uppercase outline-none transition-colors placeholder:text-white/20 hover:text-white/60 focus:bg-black/15 focus:text-white/80 focus:ring-0"
+      style={style}
+    />
+  );
+}
+
 function SheetGrid({ page, card, gap, unit, dims, animate = false, renderSlot, getSlotProps, children, className = '' }) {
   const slots = getSlots(page, dims);
   return (
@@ -734,150 +759,139 @@ function SheetGrid({ page, card, gap, unit, dims, animate = false, renderSlot, g
 
 function SaveStatus({ status }) {
   const config = status === 'error'
-    ? { dot: 'bg-red-400', text: 'Save failed' }
+    ? { dot: 'bg-red-400', text: 'Storage issue' }
     : status === 'saving'
-      ? { dot: 'bg-amber-400', text: 'Saving…' }
-      : { dot: 'bg-emerald-400', text: 'Saved locally' };
+      ? { dot: 'bg-amber-400', text: 'Saving' }
+      : { dot: 'bg-emerald-400', text: 'Active' };
   return (
-    <div className="flex shrink-0 items-center gap-1.5 text-[11px] text-zinc-400" aria-live="polite">
-      <span className={`size-1.5 rounded-full ${config.dot}`} />
-      <span>{config.text}</span>
+    <div data-engine-badge className="flex shrink-0 items-center gap-1.5 rounded-full border border-white/[0.06] bg-neutral-950/70 px-2 py-1 text-[9px] font-bold tracking-wider text-neutral-400 uppercase shadow-inner" aria-live="polite" aria-label={`Local engine: ${config.text}`} title={`Local persistence engine · ${config.text}`}>
+      <span className={`size-1.5 rounded-full ${config.dot} shadow-[0_0_8px_currentColor]`} />
+      <span>Local engine</span>
     </div>
   );
 }
 
-function PopoverShell({ title, icon, children }) {
+function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, saveStatus }) {
   return (
-    <section className="absolute right-0 top-11 z-[80] w-80 rounded-xl border border-zinc-800 bg-[#121214] p-4 text-left shadow-2xl shadow-black/70" onPointerDown={(event) => event.stopPropagation()}>
-      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-white"><Icon name={icon} />{title}</div>
+    <header className="titlebar no-print relative z-[70] h-12 bg-neutral-900 border-b border-white/[0.06] flex items-center justify-between px-4 shrink-0">
+      <div className="flex min-w-0 items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setIsLeftSidebarOpen((value) => !value)}
+          className="cursor-pointer rounded-md p-1.5 text-neutral-400 transition-all hover:bg-neutral-800 hover:text-neutral-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+          title={isLeftSidebarOpen ? 'Collapse Sidebar' : 'Expand Sidebar'}
+          aria-label={isLeftSidebarOpen ? 'Collapse Sidebar' : 'Expand Sidebar'}
+          aria-pressed={!isLeftSidebarOpen}
+        >
+          <Icon name="menu" size="md" className="h-4 w-4" />
+        </button>
+        <h1 className="select-none bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
+        <SaveStatus status={saveStatus} />
+      </div>
+    </header>
+  );
+}
+
+function RailButton({ icon, label, active = false, onClick, className = '', children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      aria-pressed={active}
+      title={label}
+      className={`relative flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-lg border shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${active ? 'border-red-500/30 bg-red-950/70 text-red-300' : 'border-white/[0.08] bg-neutral-950 text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200'} ${className}`}
+    >
+      {icon && <Icon name={icon} size="md" className="h-4 w-4" />}
+      {children}
+    </button>
+  );
+}
+
+function RailPanel({ title, icon, position = 'top-4', children }) {
+  return (
+    <section className={`absolute right-full ${position} z-[80] mr-3 w-72 rounded-xl border border-white/[0.08] bg-neutral-900 p-4 text-left shadow-2xl shadow-black/70`} onPointerDown={(event) => event.stopPropagation()}>
+      <div className="mb-3 flex items-center gap-2 border-b border-white/[0.06] pb-3 text-xs font-semibold text-neutral-100"><Icon name={icon} size="sm" className="text-neutral-400" />{title}</div>
       {children}
     </section>
   );
 }
 
-function HeaderCardControls({ settings, setSettings }) {
+function RightControlRail({
+  settings,
+  setSettings,
+  onChooseLayout,
+  onViewChange,
+  printScope,
+  setPrintScope,
+  onPrint,
+  openPanel,
+  setOpenPanel,
+  fitInfo,
+  suggestedPaper,
+  printCount,
+  onReset,
+  onDuplicate,
+  installPrompt,
+  onInstall,
+}) {
   const cleanSize = settings.cardSize;
   const base = baseCardSizeMm(cleanSize);
   const custom = cleanSize.preset === 'custom';
   const setCardSize = (patch) => setSettings((value) => ({ ...value, cardSize: sanitizeCardSize({ ...value.cardSize, ...patch }) }));
+  const togglePanel = (panel) => setOpenPanel((value) => value === panel ? null : panel);
   return (
-    <div role="group" aria-label="Card configuration" className="flex min-w-0 items-center gap-2">
-      <div className="flex h-8 min-w-0 items-center gap-1.5 rounded-md border border-white/[0.06] bg-neutral-950/45 px-2">
-        <Icon name="ruler" size="sm" className="text-neutral-500" />
-        <span className="hidden text-[10px] font-bold tracking-widest whitespace-nowrap text-neutral-500 uppercase min-[1500px]:inline">Card size</span>
-        <select
-          value={custom ? 'custom' : cleanSize.preset}
-          aria-label="Card size"
-          onChange={(event) => {
-            if (event.target.value === 'custom') setCardSize({ preset: 'custom', customWmm: base.w, customHmm: base.h });
-            else setCardSize({ preset: event.target.value });
-          }}
-          className="h-7 w-[170px] min-w-0 truncate bg-transparent text-xs font-medium text-neutral-200 outline-none max-[1499px]:w-[155px] focus-visible:ring-2 focus-visible:ring-red-500"
-        >
-          {CARD_PRESETS.map((preset) => <option key={preset.id} value={preset.id}>{preset.label.replace(' TCG', '')} · {preset.wMm} × {preset.hMm} mm</option>)}
-          <option value="custom">Custom…</option>
-        </select>
-      </div>
-      <div className="flex h-8 shrink-0 items-center gap-2 rounded-md border border-white/[0.06] bg-neutral-950/45 px-2">
-        <span className="hidden text-[10px] font-bold tracking-widest uppercase text-neutral-500 min-[1500px]:inline">Scale</span>
-        <input
-          type="range"
-          min={80}
-          max={125}
-          step={1}
-          value={Math.round(cleanSize.scale * 100)}
-          aria-label="Card scale"
-          list="scale-ticks"
-          onChange={(event) => setCardSize({ scale: Number(event.target.value) / 100 })}
-          onDoubleClick={() => setCardSize({ scale: 1 })}
-          className="w-20 shrink-0 rounded-full accent-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 min-[1500px]:w-24"
-        />
-        <datalist id="scale-ticks"><option value="100" /></datalist>
-        <strong className="min-w-[4ch] text-right text-xs font-medium text-neutral-200">{Math.round(cleanSize.scale * 100)}%</strong>
-      </div>
-    </div>
-  );
-}
-
-function AppBar({
-  settings,
-  setSettings,
-  isLeftSidebarOpen,
-  setIsLeftSidebarOpen,
-  workspaceControls,
-  onDuplicate,
-  saveStatus,
-  installPrompt,
-  onInstall,
-  openPanel,
-  setOpenPanel,
-  printScope,
-  setPrintScope,
-  onPrint,
-  printSetup,
-  shortcuts,
-}) {
-  return (
-    <header className="titlebar no-print relative z-[70] h-12 bg-neutral-900 border-b border-white/[0.06] flex items-center justify-between px-4 shrink-0">
-      <div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden">
-        <button
-          type="button"
-          onClick={() => setIsLeftSidebarOpen((value) => !value)}
-          className="p-1.5 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 rounded-md transition-all cursor-pointer mr-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
-          title={isLeftSidebarOpen ? 'Collapse Sidebar' : 'Expand Sidebar'}
-          aria-label={isLeftSidebarOpen ? 'Collapse Sidebar' : 'Expand Sidebar'}
-          aria-pressed={!isLeftSidebarOpen}
-        >
-          <Icon name="menu" size="md" className="w-4 h-4" />
-        </button>
-        <span className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-lg border border-white/[0.06] bg-neutral-900 shadow-lg shadow-black/40"><img src="/icons/icon.svg" alt="" className="size-8" /></span>
-        <div className="flex min-w-0 flex-col justify-center max-[1180px]:hidden">
-          <h1 className="shrink-0 text-xs font-semibold tracking-tight bg-gradient-to-r from-neutral-100 to-neutral-300 bg-clip-text text-transparent select-none whitespace-nowrap">MichiBinder</h1>
-          <SaveStatus status={saveStatus} />
+    <aside data-control-rail aria-label="Layout and print controls" className="no-print relative z-40 flex h-full w-16 shrink-0 select-none flex-col items-center justify-between border-l border-white/[0.06] bg-neutral-900 py-4">
+      <div data-rail-zone="primary" className="flex flex-col items-center gap-3">
+        <button type="button" onClick={onPrint} aria-label="Print / PDF" title="Print / PDF" className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg border border-white/[0.08] bg-neutral-800 text-neutral-200 shadow-sm transition-all hover:bg-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="printer" size="md" className="h-4 w-4" /></button>
+        <div role="group" aria-label="Print scope" className="flex w-12 flex-col gap-1 rounded-lg border border-white/[0.05] bg-neutral-950/70 p-1">
+          <button type="button" aria-pressed={printScope === 'all'} onClick={() => setPrintScope('all')} className={`rounded-md px-1 py-1 text-[9px] font-bold leading-[1.05] tracking-wider uppercase transition-all ${printScope === 'all' ? 'bg-neutral-800 text-neutral-200 shadow-sm' : 'text-neutral-500 hover:text-neutral-300'}`}><span className="block">Include</span><span className="block">All</span></button>
+          <button type="button" aria-pressed={printScope === 'custom'} onClick={() => setPrintScope('custom')} className={`rounded-md px-1 py-1 text-[9px] font-bold leading-[1.05] tracking-wider uppercase transition-all ${printScope === 'custom' ? 'bg-neutral-800 text-neutral-200 shadow-sm' : 'text-neutral-500 hover:text-neutral-300'}`}><span className="block">Uploads</span><span className="block">Only</span></button>
         </div>
-        <ToolbarDivider />
-        <HeaderCardControls settings={settings} setSettings={setSettings} />
-        {workspaceControls}
       </div>
 
-      <div className="relative flex shrink-0 items-center justify-end gap-1.5">
-        {installPrompt && <ToolButton icon="install" variant="outline" onClick={onInstall} title="Install App" />}
-        <ToolButton icon="keyboard" onClick={() => setOpenPanel(openPanel === 'shortcuts' ? null : 'shortcuts')} active={openPanel === 'shortcuts'} title="Keyboard shortcuts" className="hidden min-[1560px]:inline-flex" />
-        <div className="flex h-8 items-center justify-center gap-2 self-center">
-          <ToolButton icon="copy" onClick={onDuplicate} title="Duplicate physical sheet" className="max-[1420px]:hidden" />
-          <ToolButton icon="sliders" label="Print Setup" onClick={() => setOpenPanel(openPanel === 'print' ? null : 'print')} active={openPanel === 'print'} title="Print setup" className="[&>span]:hidden" />
+      <div data-rail-zone="layout" className="flex flex-col items-center gap-2">
+        <div role="radiogroup" aria-label="Pocket layout" className="flex flex-col gap-1.5">
+          {GRID_LAYOUTS.map((layoutOption) => (
+            <button key={layoutOption.id} type="button" role="radio" aria-checked={settings.layout === layoutOption.id} aria-label={`${layoutOption.label} (${layoutOption.hint})`} title={`${layoutOption.label} · ${layoutOption.hint}`} onClick={() => onChooseLayout(layoutOption.id)} className={`flex h-9 w-10 items-center justify-center gap-1 rounded-lg border text-[10px] font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${settings.layout === layoutOption.id ? 'border-red-500/30 bg-red-950/70 text-red-300' : 'border-white/[0.06] bg-neutral-950 text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200'}`}><Icon name={layoutOption.icon} size="xs" /><span>{layoutOption.pockets}</span></button>
+          ))}
         </div>
-        <div className="flex items-center gap-4 border-l border-white/[0.06] pl-4 ml-2">
-          <div className="flex flex-col items-end gap-1">
-            <span className="text-[9px] font-bold tracking-widest text-neutral-500 uppercase select-none">Print Scope</span>
-            <div role="group" aria-label="Print scope" className="flex p-0.5 bg-neutral-950 border border-white/[0.06] rounded-md shadow-inner">
-              <button
-                type="button"
-                aria-pressed={printScope === 'all'}
-                onClick={() => setPrintScope('all')}
-                className={`px-2.5 py-0.5 text-[10px] font-medium transition-all duration-150 ${printScope === 'all' ? 'bg-neutral-800 text-neutral-200 rounded shadow-sm border border-white/[0.04]' : 'text-neutral-500 hover:text-neutral-300'}`}
-              >
-                Include All
-              </button>
-              <button
-                type="button"
-                aria-pressed={printScope === 'custom'}
-                onClick={() => setPrintScope('custom')}
-                className={`px-2.5 py-0.5 text-[10px] font-medium transition-all duration-150 ${printScope === 'custom' ? 'bg-neutral-800 text-neutral-200 rounded shadow-sm border border-white/[0.04]' : 'text-neutral-500 hover:text-neutral-300'}`}
-              >
-                Uploads Only
-              </button>
-            </div>
+        <span aria-hidden="true" className="my-1 h-px w-7 bg-white/[0.06]" />
+        <div role="radiogroup" aria-label="Preview mode" className="flex flex-col gap-1.5">
+          <RailButton icon="book" label="Binder preview" active={settings.view === 'binder'} onClick={() => onViewChange('binder')} className="h-9" />
+          <RailButton icon="file" label="Paper preview" active={settings.view === 'paper'} onClick={() => onViewChange('paper')} className="h-9" />
+        </div>
+        <button type="button" aria-expanded={openPanel === 'scale'} onClick={() => togglePanel('scale')} title="Card scale" className={`flex h-7 w-11 items-center justify-center rounded-full border text-[10px] font-mono font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${openPanel === 'scale' ? 'border-red-500/30 bg-red-950/70 text-red-300' : 'border-white/[0.08] bg-neutral-950 text-neutral-300 hover:bg-neutral-800'}`}>{Math.round(cleanSize.scale * 100)}%</button>
+      </div>
+
+      <div data-rail-zone="material" className="flex flex-col items-center gap-2">
+        <RailButton icon="layers" label={`Card size: ${custom ? 'Custom' : 'Pokémon'} ${round1(base.w)} × ${round1(base.h)} mm`} active={openPanel === 'card-size'} onClick={() => togglePanel('card-size')} />
+        <RailButton icon="sliders" label="Print setup" active={openPanel === 'print'} onClick={() => togglePanel('print')}>
+          <span className={`absolute right-1 top-1 size-1.5 rounded-full ${fitInfo.fitsTrueSize ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+        </RailButton>
+        <RailButton icon="copy" label="Duplicate physical sheet" onClick={onDuplicate} />
+        <RailButton icon="keyboard" label="Keyboard shortcuts" active={openPanel === 'shortcuts'} onClick={() => togglePanel('shortcuts')} />
+        {installPrompt && <RailButton icon="install" label="Install app" onClick={onInstall} />}
+      </div>
+
+      {openPanel === 'scale' && (
+        <RailPanel title="Card scale" icon="ruler" position="top-1/2 -translate-y-1/2">
+          <div className="flex items-center justify-center gap-6 py-2">
+            <input type="range" min={80} max={125} step={1} value={Math.round(cleanSize.scale * 100)} aria-label="Card scale" onChange={(event) => setCardSize({ scale: Number(event.target.value) / 100 })} onDoubleClick={() => setCardSize({ scale: 1 })} className="h-44 w-5 cursor-pointer accent-red-600 [direction:rtl] [writing-mode:vertical-lr] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500" />
+            <div className="flex flex-col items-center gap-3"><output className="text-2xl font-semibold tracking-tight text-neutral-100">{Math.round(cleanSize.scale * 100)}%</output><span className="text-[10px] font-mono tracking-widest text-neutral-500 uppercase">80–125%</span><button type="button" onClick={() => setCardSize({ scale: 1 })} className="rounded-md border border-white/[0.08] bg-neutral-950 px-2 py-1 text-[10px] font-semibold text-neutral-400 hover:text-neutral-200">Reset 100%</button></div>
           </div>
-          <button type="button" onClick={onPrint} className="h-8 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-white/[0.08] shadow-sm px-3 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 mt-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500">
-            <Icon name="printer" size="sm" className="opacity-70" />
-            <span className="max-[1420px]:hidden">Print / PDF</span>
-          </button>
-        </div>
-        {openPanel === 'print' && printSetup}
-        {openPanel === 'shortcuts' && shortcuts}
-      </div>
-    </header>
+        </RailPanel>
+      )}
+      {openPanel === 'card-size' && (
+        <RailPanel title="Card material" icon="layers" position="bottom-4">
+          <label className="block"><span className="mb-1.5 block text-[10px] font-bold tracking-widest text-neutral-500 uppercase">Card archetype</span><select value={custom ? 'custom' : cleanSize.preset} aria-label="Card size" onChange={(event) => { if (event.target.value === 'custom') setCardSize({ preset: 'custom', customWmm: base.w, customHmm: base.h }); else setCardSize({ preset: event.target.value }); }} className="h-9 w-full rounded-lg border border-white/[0.08] bg-neutral-950 px-2.5 text-xs font-medium text-neutral-200 outline-none focus-visible:ring-2 focus-visible:ring-red-500">{CARD_PRESETS.map((preset) => <option key={preset.id} value={preset.id}>{preset.label} · {preset.wMm} × {preset.hMm} mm</option>)}<option value="custom">Custom dimensions…</option></select></label>
+          {custom && <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-white/[0.06] bg-neutral-950/70 p-2"><MmField label="W" value={cleanSize.customWmm} onCommit={(customWmm) => setCardSize({ customWmm })} /><span className="text-neutral-600">×</span><MmField label="H" value={cleanSize.customHmm} onCommit={(customHmm) => setCardSize({ customHmm })} /><span className="text-[10px] text-neutral-500">mm</span></div>}
+          <div className="mt-3 flex items-center justify-between border-t border-white/[0.06] pt-3 text-[10px] font-mono text-neutral-500"><span>Effective size</span><strong className="text-neutral-200">{fmtMm(resolveCardSize(cleanSize).w)} × {fmtMm(resolveCardSize(cleanSize).h)} mm</strong></div>
+        </RailPanel>
+      )}
+      {openPanel === 'print' && <RailPanel title="Print setup" icon="sliders" position="top-4"><PrintSetupContent settings={settings} setSettings={setSettings} fitInfo={fitInfo} suggestedPaper={suggestedPaper} printCount={printCount} onReset={onReset} /></RailPanel>}
+      {openPanel === 'shortcuts' && <RailPanel title="Keyboard shortcuts" icon="keyboard" position="bottom-4"><ShortcutsContent /></RailPanel>}
+    </aside>
   );
 }
 
@@ -953,47 +967,40 @@ function FloatingNavigation({
   );
 }
 
-function PrintSetupPopover({ settings, setSettings, fitInfo, suggestedPaper, printCount, onReset }) {
+function PrintSetupContent({ settings, setSettings, fitInfo, suggestedPaper, printCount, onReset }) {
   return (
-    <PopoverShell title="Print setup" icon="sliders">
-      <div className="space-y-3 text-[12px] text-zinc-300">
-        <label className="block">
-          <span className="mb-1 block text-[11px] font-medium text-zinc-400">Paper size</span>
-          <select value={settings.paper} onChange={(event) => setSettings((value) => ({ ...value, paper: event.target.value }))} className="h-8 w-full rounded-lg border border-zinc-800 bg-[#0B0B0C] px-2 text-[12px] text-zinc-200 outline-none focus-visible:ring-2 focus-visible:ring-red-500">
-            {Object.entries(PAPER_SIZES).map(([key, paper]) => <option key={key} value={key}>{paper.label}</option>)}
-          </select>
-        </label>
-        <div className={`flex items-center gap-2 rounded-lg p-2 ${fitInfo.fitsTrueSize ? 'bg-emerald-500/10 text-emerald-300' : 'bg-amber-500/10 text-amber-300'}`}>
-          <Icon name={fitInfo.fitsTrueSize ? 'check' : 'alert'} size="sm" />
-          <span>{fitInfo.fitsTrueSize ? `True size on ${PAPER_SIZES[settings.paper].short}` : `${PAPER_SIZES[settings.paper].short} prints at ${fmtPct(fitInfo.printFit)}`}</span>
-          {!fitInfo.fitsTrueSize && suggestedPaper && <button type="button" onClick={() => setSettings((value) => ({ ...value, paper: suggestedPaper }))} className="ml-auto font-semibold underline decoration-white/30 underline-offset-2">Use {PAPER_SIZES[suggestedPaper].short}</button>}
-        </div>
-        <fieldset>
-          <legend className="mb-1 text-[11px] font-medium text-zinc-400">Pocket gap</legend>
-          <SegmentedControl ariaLabel="Pocket gap" value={settings.gap} onChange={(gap) => setSettings((value) => ({ ...value, gap }))} dense options={GAP_OPTIONS.map((option) => ({ value: option.value, label: option.label }))} />
-        </fieldset>
-        <label className="block">
-          <span className="mb-1 block text-[11px] font-medium text-zinc-400">Image fit</span>
-          <select value={settings.fit} onChange={(event) => setSettings((value) => ({ ...value, fit: event.target.value }))} className="h-8 w-full rounded-lg border border-zinc-800 bg-[#0B0B0C] px-2 text-[12px] text-zinc-200 outline-none focus-visible:ring-2 focus-visible:ring-red-500">
-            <option value="cover">Fill (crop)</option>
-            <option value="contain">Fit (letterbox)</option>
-          </select>
-        </label>
-        <label className="flex items-center gap-2"><input type="checkbox" checked={settings.skipEmptyPages} onChange={(event) => setSettings((value) => ({ ...value, skipEmptyPages: event.target.checked }))} className="accent-red-600" />Skip empty pages when printing</label>
-        <label className="flex items-center gap-2"><input type="checkbox" checked={settings.cutGuides} onChange={(event) => setSettings((value) => ({ ...value, cutGuides: event.target.checked }))} className="accent-red-600" />Print hairline cut guides</label>
-        <div className="rounded-lg border border-zinc-800 bg-[#0B0B0C]/70 p-2 text-[11px] leading-relaxed text-zinc-400">
-          In the print dialog choose <strong className="text-zinc-200">Save as PDF</strong>, margins <strong className="text-zinc-200">None</strong>, scale <strong className="text-zinc-200">100%</strong>, and turn on <strong className="text-zinc-200">Background graphics</strong>.
-        </div>
-        <div className="flex items-center justify-between border-t border-zinc-800 pt-3">
-          <span>{plural(printCount, 'page')} will print</span>
-          <ToolButton icon="reset" label="Reset binder…" variant="danger" dense onClick={onReset} />
-        </div>
+    <div className="space-y-3 text-[12px] text-zinc-300">
+      <label className="block">
+        <span className="mb-1 block text-[11px] font-medium text-zinc-400">Paper size</span>
+        <select value={settings.paper} onChange={(event) => setSettings((value) => ({ ...value, paper: event.target.value }))} className="h-8 w-full rounded-lg border border-zinc-800 bg-[#0B0B0C] px-2 text-[12px] text-zinc-200 outline-none focus-visible:ring-2 focus-visible:ring-red-500">
+          {Object.entries(PAPER_SIZES).map(([key, paper]) => <option key={key} value={key}>{paper.label}</option>)}
+        </select>
+      </label>
+      <div className={`flex items-center gap-2 rounded-lg p-2 ${fitInfo.fitsTrueSize ? 'bg-emerald-500/10 text-emerald-300' : 'bg-amber-500/10 text-amber-300'}`}>
+        <Icon name={fitInfo.fitsTrueSize ? 'check' : 'alert'} size="sm" />
+        <span>{fitInfo.fitsTrueSize ? `True size on ${PAPER_SIZES[settings.paper].short}` : `${PAPER_SIZES[settings.paper].short} prints at ${fmtPct(fitInfo.printFit)}`}</span>
+        {!fitInfo.fitsTrueSize && suggestedPaper && <button type="button" onClick={() => setSettings((value) => ({ ...value, paper: suggestedPaper }))} className="ml-auto font-semibold underline decoration-white/30 underline-offset-2">Use {PAPER_SIZES[suggestedPaper].short}</button>}
       </div>
-    </PopoverShell>
+      <fieldset>
+        <legend className="mb-1 text-[11px] font-medium text-zinc-400">Pocket gap</legend>
+        <SegmentedControl ariaLabel="Pocket gap" value={settings.gap} onChange={(gap) => setSettings((value) => ({ ...value, gap }))} dense options={GAP_OPTIONS.map((option) => ({ value: option.value, label: option.label }))} />
+      </fieldset>
+      <label className="block">
+        <span className="mb-1 block text-[11px] font-medium text-zinc-400">Image fit</span>
+        <select value={settings.fit} onChange={(event) => setSettings((value) => ({ ...value, fit: event.target.value }))} className="h-8 w-full rounded-lg border border-zinc-800 bg-[#0B0B0C] px-2 text-[12px] text-zinc-200 outline-none focus-visible:ring-2 focus-visible:ring-red-500">
+          <option value="cover">Fill (crop)</option>
+          <option value="contain">Fit (letterbox)</option>
+        </select>
+      </label>
+      <label className="flex items-center gap-2"><input type="checkbox" checked={settings.skipEmptyPages} onChange={(event) => setSettings((value) => ({ ...value, skipEmptyPages: event.target.checked }))} className="accent-red-600" />Skip empty pages when printing</label>
+      <label className="flex items-center gap-2"><input type="checkbox" checked={settings.cutGuides} onChange={(event) => setSettings((value) => ({ ...value, cutGuides: event.target.checked }))} className="accent-red-600" />Print hairline cut guides</label>
+      <div className="rounded-lg border border-zinc-800 bg-[#0B0B0C]/70 p-2 text-[11px] leading-relaxed text-zinc-400">In the print dialog choose <strong className="text-zinc-200">Save as PDF</strong>, margins <strong className="text-zinc-200">None</strong>, scale <strong className="text-zinc-200">100%</strong>, and turn on <strong className="text-zinc-200">Background graphics</strong>.</div>
+      <div className="flex items-center justify-between border-t border-zinc-800 pt-3"><span>{plural(printCount, 'page')} will print</span><ToolButton icon="reset" label="Reset binder…" variant="danger" dense onClick={onReset} /></div>
+    </div>
   );
 }
 
-function ShortcutsPopover() {
+function ShortcutsContent() {
   const rows = [
     ['Ctrl/⌘ + Z', 'Undo canvas change'], ['Ctrl + Y / Ctrl/⌘ + Shift + Z', 'Redo canvas change'],
     ['Ctrl/⌘ + A', 'Select visible cards'], ['Esc', 'Cancel or clear'], ['Delete', 'Delete selected cards'],
@@ -1001,60 +1008,7 @@ function ShortcutsPopover() {
     ['← / →', 'Previous / next spread'], ['PageUp / PageDown', 'Previous / next spread'], ['F', 'Fill active page'],
     ['Double-click', 'Reposition an image'],
   ];
-  return (
-    <PopoverShell title="Keyboard shortcuts" icon="keyboard">
-      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-[12px]">
-        {rows.map(([key, action]) => <div key={key} className="contents"><dt><Kbd>{key}</Kbd></dt><dd className="text-zinc-300">{action}</dd></div>)}
-      </dl>
-    </PopoverShell>
-  );
-}
-
-function PrintFitBadge({ fitInfo, paperKey, suggestedPaper, onUsePaper }) {
-  const paper = PAPER_SIZES[paperKey];
-  return (
-    <div title={`Grid ${fmtMm(fitInfo.gridW)} × ${fmtMm(fitInfo.gridH)} mm`} className={`flex h-8 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[11px] font-semibold whitespace-nowrap ${fitInfo.fitsTrueSize ? 'bg-emerald-500/12 text-emerald-300 ring-1 ring-inset ring-emerald-400/20' : 'bg-amber-500/12 text-amber-300 ring-1 ring-inset ring-amber-400/25'}`}>
-      <Icon name={fitInfo.fitsTrueSize ? 'check' : 'alert'} size="xs" />
-      <span>{fitInfo.fitsTrueSize ? `True size on ${paper.short}` : `${paper.short} at ${fmtPct(fitInfo.printFit)}`}</span>
-      {!fitInfo.fitsTrueSize && suggestedPaper && <button type="button" onClick={() => onUsePaper(suggestedPaper)} className="rounded-full bg-amber-400/15 px-1.5 py-0.5 text-amber-200 hover:bg-amber-400/25">Use {PAPER_SIZES[suggestedPaper].short}</button>}
-    </div>
-  );
-}
-
-function SetupToolbar({ settings, setSettings, fitInfo, suggestedPaper, onChooseLayout, onViewChange }) {
-  const cleanSize = settings.cardSize;
-  const custom = cleanSize.preset === 'custom';
-  const setCardSize = (patch) => setSettings((value) => ({ ...value, cardSize: sanitizeCardSize({ ...value.cardSize, ...patch }) }));
-  return (
-    <div data-utility-controls role="toolbar" aria-label="Card sizing" className="flex min-w-0 items-center gap-3 overflow-hidden">
-      <div className="flex shrink-0 items-center gap-2 text-xs font-medium text-neutral-400">
-        {custom && (
-          <div className="flex h-8 shrink-0 items-center gap-2 rounded-lg border border-white/5 bg-neutral-900/60 px-2">
-            <span className="text-[10px] font-bold tracking-wider text-neutral-500 uppercase">Custom size</span>
-            <MmField label="W" value={cleanSize.customWmm} onCommit={(customWmm) => setCardSize({ customWmm })} />
-            <span className="text-zinc-500">×</span>
-            <MmField label="H" value={cleanSize.customHmm} onCommit={(customHmm) => setCardSize({ customHmm })} />
-            <span className="text-[11px] text-zinc-400">mm</span>
-          </div>
-        )}
-        <div className="flex h-8 shrink-0 items-center gap-2 rounded-lg border border-white/5 bg-neutral-900/60 px-2">
-          <span className="shrink-0 text-[10px] font-bold tracking-widest text-neutral-500 uppercase max-[1249px]:hidden">Grid</span>
-          <SegmentedControl
-            ariaLabel="Pocket layout"
-            value={settings.layout}
-            onChange={onChooseLayout}
-            dense={custom}
-            options={GRID_LAYOUTS.map((layout) => ({ value: layout.id, label: String(layout.pockets), icon: layout.icon, ariaLabel: `${layout.label} (${layout.hint})`, title: `${layout.label} (${layout.hint})` }))}
-          />
-        </div>
-      </div>
-      <div className="flex shrink-0 items-center gap-2">
-        <span className="hidden shrink-0 text-[10px] font-bold tracking-wider text-neutral-500 uppercase min-[1380px]:inline">Preview</span>
-        <SegmentedControl ariaLabel="Preview" value={settings.view} onChange={onViewChange} options={[{ value: 'binder', label: 'Binder', icon: 'book' }, { value: 'paper', label: 'Paper', icon: 'file' }]} dense={custom} appearance="preview" />
-        <div className="hidden min-[1700px]:block"><PrintFitBadge fitInfo={fitInfo} paperKey={settings.paper} suggestedPaper={suggestedPaper} onUsePaper={(paper) => setSettings((value) => ({ ...value, paper }))} /></div>
-      </div>
-    </div>
-  );
+  return <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-[12px]">{rows.map(([key, action]) => <div key={key} className="contents"><dt><Kbd>{key}</Kbd></dt><dd className="text-zinc-300">{action}</dd></div>)}</dl>;
 }
 
 function CardPool({
@@ -1328,15 +1282,15 @@ function BinderSpine({ view }) {
       aria-hidden="true"
       className={`pointer-events-none absolute inset-y-0 left-1/2 z-30 -translate-x-1/2 ${binderView ? 'w-8 shadow-[inset_10px_0_18px_-12px_rgba(0,0,0,0.98),inset_-10px_0_18px_-12px_rgba(0,0,0,0.98)]' : 'w-px bg-black/70'}`}
     >
-      {binderView && <span data-spine-crease className="pointer-events-none absolute inset-0 h-full w-full bg-gradient-to-r from-black/50 via-transparent to-black/50" />}
-      <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-black/80" />
+      {binderView && <span data-spine-crease className="pointer-events-none absolute inset-0 h-full w-full bg-gradient-to-r from-black/85 via-transparent to-black/85" />}
+      <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-black/90" />
       {binderView && [0.17, 0.5, 0.83].map((position) => (
         <span
           key={position}
-          className="absolute left-1/2 h-3 w-14 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/10 bg-gradient-to-b from-neutral-500/70 via-neutral-800 to-black shadow-[0_4px_8px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.28),inset_0_-1px_0_rgba(0,0,0,0.9)]"
+          className="absolute left-1/2 h-3 w-14 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/10 bg-gradient-to-b from-neutral-500/70 via-neutral-800 to-black shadow-[0_4px_8px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.28),inset_0_-1px_0_rgba(0,0,0,0.9)]"
           style={{ top: `${position * 100}%` }}
         >
-          <span className="absolute inset-x-2 top-px h-px rounded-full bg-gradient-to-r from-transparent via-white/35 to-transparent" />
+          <span className="absolute inset-x-2 top-px h-px rounded-full bg-gradient-to-r from-transparent via-white/45 to-transparent" />
         </span>
       ))}
     </div>
@@ -1394,7 +1348,6 @@ export default function CardBinder() {
 
   const stageRef = useRef(null);
   const inputRef = useRef(null);
-  const panelRootRef = useRef(null);
   const dragRef = useRef(null);
   const searchAbortRef = useRef(null);
   const searchDebounceRef = useRef(null);
@@ -1909,6 +1862,12 @@ export default function CardBinder() {
     }
     return { pages: nextPages, changed: true };
   }, []);
+
+  const updateSectionName = useCallback((pageId, sectionName) => {
+    applyCanvasChange((allPages) => allPages.map((page) => (
+      page.id === pageId ? { ...page, sectionName } : page
+    )));
+  }, [applyCanvasChange]);
 
   const commitEditing = useCallback(() => {
     const value = editingRef.current;
@@ -2773,8 +2732,7 @@ export default function CardBinder() {
   useEffect(() => {
     if (!openPanel) return undefined;
     const close = (event) => {
-      if (event.target.closest?.('[data-panel-toggle]')) return;
-      if (!panelRootRef.current?.contains(event.target)) setOpenPanel(null);
+      if (!event.target.closest?.('[data-control-rail]')) setOpenPanel(null);
     };
     window.addEventListener('pointerdown', close);
     return () => window.removeEventListener('pointerdown', close);
@@ -2861,10 +2819,10 @@ export default function CardBinder() {
               if (combineMode) { setSelectionPageId(page.id); setSelBox(expandBox(mergeBox(slot), pageMerges)); return; }
               if (selectedOrdered.length) placeCards(selectedOrdered, pageIndex, slot.key);
             }}
-            className={`group grid size-full cursor-pointer place-items-center overflow-hidden rounded-md border outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-red-500 ${settings.view === 'binder' ? 'border-white/[0.03] bg-neutral-900/50 text-neutral-300 shadow-inner hover:border-white/[0.08] hover:bg-neutral-900/80 hover:text-neutral-100' : 'border-dashed border-zinc-400 bg-white/30 text-zinc-700 hover:border-red-500 hover:text-red-800'}`}
+            className={`group grid size-full cursor-pointer place-items-center overflow-hidden rounded-md border border-dashed outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-red-500 ${settings.view === 'binder' ? 'border-white/[0.05] bg-neutral-900/40 text-neutral-400 shadow-inner hover:border-white/[0.1] hover:bg-neutral-900/70 hover:text-neutral-200' : 'border-zinc-400 bg-white/30 text-zinc-700 hover:border-red-500 hover:text-red-800'}`}
             style={{ borderRadius: radius }}
           >
-            {labelVisible && <span className="flex flex-col items-center gap-1.5"><span className="text-xs font-light text-neutral-600 transition-colors group-hover:text-neutral-400"><Icon name="plus" size="xs" strokeWidth={1.25} /></span><span className="text-[9px] font-mono font-medium tracking-widest text-neutral-500 uppercase transition-colors group-hover:text-neutral-400">{slot.cs * slot.rs > 1 ? `${boxDims(slot)} frame` : `Slot ${slotIndex + 1}`}</span></span>}
+            {labelVisible && <span className="flex flex-col items-center gap-1.5"><span className="text-neutral-700 transition-colors group-hover:text-neutral-500"><Icon name="plus" size="xs" className="h-2.5 w-2.5" strokeWidth={1.1} /></span><span className="text-[9px] font-mono font-medium tracking-widest text-neutral-600 uppercase transition-colors group-hover:text-neutral-400">{slot.cs * slot.rs > 1 ? `${boxDims(slot)} frame` : `Slot ${slotIndex + 1}`}</span></span>}
           </button>
           {slotActions}
         </div>
@@ -2891,7 +2849,7 @@ export default function CardBinder() {
           activateCanvasPage(pageIndex);
           if (combineMode) { setSelectionPageId(page.id); setSelBox(expandBox(mergeBox(slot), pageMerges)); }
         }}
-        className={`group group/slot relative size-full ${!combineMode && !editing ? 'cursor-grab active:cursor-grabbing' : ''}`}
+        className={`group group/slot relative size-full transition-transform duration-150 ease-out hover:z-30 hover:scale-[1.02] ${!combineMode && !editing ? 'cursor-grab active:cursor-grabbing' : ''}`}
       >
         {isEditing && editing.geometry && (
           <img
@@ -2906,7 +2864,7 @@ export default function CardBinder() {
             }}
           />
         )}
-        <div className={`relative size-full overflow-hidden border bg-white transition-all duration-200 ${settings.view === 'binder' ? 'sleeve-sheen rounded-md border-white/[0.03] bg-neutral-900/50 shadow-inner hover:border-white/[0.08] hover:bg-neutral-900/80' : 'border-transparent'} ${isEditing ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-zinc-900' : ''}`} style={{ borderRadius: radius }}>
+        <div className={`relative size-full overflow-hidden border bg-white transition-all duration-150 ${settings.view === 'binder' ? 'sleeve-sheen rounded-md border-white/[0.06] bg-neutral-900/50 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),inset_0_-8px_18px_rgba(0,0,0,0.22),0_8px_22px_rgba(0,0,0,0.24)] hover:border-white/[0.12] hover:bg-neutral-900/80 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.09),0_14px_30px_rgba(0,0,0,0.42)]' : 'border-transparent'} ${isEditing ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-zinc-900' : ''}`} style={{ borderRadius: radius }}>
           {source ? <img
             data-img-id={imgId}
             src={source}
@@ -3017,15 +2975,17 @@ export default function CardBinder() {
       >
         {settings.view === 'binder' ? (
           <div
-            className="sheet-frame relative flex size-full items-start justify-start overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-b from-neutral-800 to-neutral-800/90 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.85),0_1px_0px_rgba(255,255,255,0.05)_inset]"
+            className="sheet-frame relative flex size-full items-start justify-start overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-b from-neutral-800 to-neutral-800/90 shadow-[0_30px_70px_-15px_rgba(0,0,0,0.9),0_1px_0px_rgba(255,255,255,0.05)_inset]"
             style={{ paddingTop: SHEET_PAD.top * ppi, paddingRight: (side === 'left' ? SHEET_PAD.left : SHEET_PAD.right) * ppi, paddingBottom: SHEET_PAD.bottom * ppi, paddingLeft: (side === 'left' ? SHEET_PAD.right : SHEET_PAD.left) * ppi }}
           >
+            <PageSectionInput value={page.sectionName} pageNumber={pageIndex + 1} onCommit={(sectionName) => updateSectionName(page.id, sectionName)} style={{ left: (side === 'left' ? SHEET_PAD.right : SHEET_PAD.left) * ppi, top: Math.max(1, (SHEET_PAD.top * ppi - 20) / 2), width: gridW * gridPpi }} />
             {[0.17, 0.5, 0.83].map((position) => <span key={position} aria-hidden="true" className={`absolute size-3 -translate-y-1/2 rounded-full border border-black/80 bg-neutral-900 ring-1 ring-white/10 shadow-[inset_0_2px_4px_rgba(0,0,0,0.95),0_1px_0_rgba(255,255,255,0.12)] ${side === 'left' ? 'translate-x-1/2' : '-translate-x-1/2'}`} style={{ [side === 'left' ? 'right' : 'left']: (SHEET_PAD.left * ppi) / 2, top: `${position * 100}%` }} />)}
             {renderEditorGrid(page, pageIndex)}
           </div>
         ) : (
-          <div className="sheet-frame relative grid size-full place-items-center overflow-hidden bg-[#f4f4f5] shadow-[0_25px_70px_rgba(0,0,0,0.45)] ring-1 ring-black/20">
+          <div className="sheet-frame relative grid size-full place-items-center overflow-hidden bg-[#f4f4f5] shadow-[0_30px_70px_-15px_rgba(0,0,0,0.6),0_1px_0px_rgba(255,255,255,0.7)_inset] ring-1 ring-black/20">
             <span aria-hidden="true" className="pointer-events-none absolute border border-dashed border-zinc-400" style={{ inset: PRINT_SAFE_MARGIN_IN * ppi }} />
+            <PageSectionInput value={page.sectionName} pageNumber={pageIndex + 1} onCommit={(sectionName) => updateSectionName(page.id, sectionName)} style={{ left: '50%', top: Math.max(1, (frameHeight - gridH * gridPpi) / 2 - 22), width: gridW * gridPpi, transform: 'translateX(-50%)', color: 'rgba(24,24,27,0.55)' }} />
             {renderEditorGrid(page, pageIndex)}
           </div>
         )}
@@ -3039,11 +2999,12 @@ export default function CardBinder() {
       key={`cover-${side}`}
       data-cover-layer={side}
       aria-hidden="true"
-      className={`relative overflow-hidden bg-neutral-950 ${side === 'left' ? 'border-r border-white/[0.02] shadow-[inset_-12px_0_30px_rgba(0,0,0,0.8)] rounded-l-xl' : 'border-l border-white/[0.02] shadow-[inset_12px_0_30px_rgba(0,0,0,0.8)] rounded-r-xl'}`}
+      className={`relative overflow-hidden border border-white/[0.04] bg-neutral-950 ${side === 'left' ? 'shadow-[inset_-18px_0_38px_rgba(0,0,0,0.9),0_26px_65px_-18px_rgba(0,0,0,0.85)] rounded-l-2xl' : 'shadow-[inset_18px_0_38px_rgba(0,0,0,0.9),0_26px_65px_-18px_rgba(0,0,0,0.85)] rounded-r-2xl'}`}
       style={{ width: frameWidth, height: frameHeight, gridColumn: side === 'left' ? 1 : 2, gridRow: 1 }}
     >
-      <span className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.025),transparent_34%,rgba(0,0,0,0.2))]" />
-      <span className={`absolute inset-y-0 w-8 ${side === 'left' ? 'right-0 bg-gradient-to-l' : 'left-0 bg-gradient-to-r'} from-black/45 to-transparent`} />
+      <span className="absolute inset-0 opacity-70 bg-[repeating-linear-gradient(92deg,rgba(255,255,255,0.012)_0px,rgba(255,255,255,0.012)_1px,transparent_1px,transparent_4px)]" />
+      <span className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.035),transparent_34%,rgba(0,0,0,0.28))]" />
+      <span className={`absolute inset-y-0 w-10 ${side === 'left' ? 'right-0 bg-gradient-to-l' : 'left-0 bg-gradient-to-r'} from-black/70 to-transparent`} />
     </div>
   );
 
@@ -3191,33 +3152,11 @@ export default function CardBinder() {
   return (
     <>
       <div className="app-shell flex flex-col bg-[#0B0B0C] text-zinc-200">
-        <div ref={panelRootRef}>
-          <AppBar
-            settings={settings}
-            setSettings={setSettings}
-            isLeftSidebarOpen={isLeftSidebarOpen}
-            setIsLeftSidebarOpen={setIsLeftSidebarOpen}
-            workspaceControls={<SetupToolbar
-              settings={settings}
-              setSettings={setSettings}
-              fitInfo={fitInfo}
-              suggestedPaper={suggestedPaper}
-              onChooseLayout={chooseLayout}
-              onViewChange={(view) => { commitEditing(); setSettings((value) => ({ ...value, view })); }}
-            />}
-            onDuplicate={duplicatePage}
-            saveStatus={saveStatus}
-            installPrompt={installPrompt}
-            onInstall={async () => { await installPrompt.prompt(); setInstallPrompt(null); }}
-            openPanel={openPanel}
-            setOpenPanel={setOpenPanel}
-            printScope={printScope}
-            setPrintScope={setPrintScope}
-            onPrint={handlePrint}
-            printSetup={<PrintSetupPopover settings={settings} setSettings={setSettings} fitInfo={fitInfo} suggestedPaper={suggestedPaper} printCount={printPages.length} onReset={resetBinder} />}
-            shortcuts={<ShortcutsPopover />}
-          />
-        </div>
+        <AppBar
+          isLeftSidebarOpen={isLeftSidebarOpen}
+          setIsLeftSidebarOpen={setIsLeftSidebarOpen}
+          saveStatus={saveStatus}
+        />
         <div data-main-layout className="flex h-[calc(100vh-48px)] w-full overflow-hidden bg-neutral-950">
           <CardPool
             isOpen={isLeftSidebarOpen}
@@ -3265,11 +3204,11 @@ export default function CardBinder() {
               onDrop={handleStageDrop}
             >
               <div data-workspace-metrics aria-label={`Database ${fetchedCards.length} items, Custom ${customUploadedCards.length} uploaded, Density ${currentFilledCount} of ${layout.pockets} filled`} className="pointer-events-none absolute bottom-3 left-6 z-40 flex items-center gap-3 rounded-md border border-white/[0.06] bg-neutral-950/85 px-2.5 py-1.5 text-[10px] font-mono shadow-lg backdrop-blur-sm select-none">
-                <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="font-bold tracking-widest text-neutral-500 uppercase">Database</span><strong className="font-medium text-neutral-200">{fetchedCards.length} items</strong></span>
+                <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="font-bold tracking-widest text-neutral-500 uppercase">Database</span><strong className="text-xs font-semibold text-neutral-100">{fetchedCards.length} items</strong></span>
                 <span aria-hidden="true" className="h-3 w-px bg-white/[0.08]" />
-                <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="font-bold tracking-widest text-neutral-500 uppercase">Custom</span><strong className="font-medium text-red-400">{customUploadedCards.length} uploaded</strong></span>
+                <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="font-bold tracking-widest text-neutral-500 uppercase">Custom</span><strong className="text-xs font-semibold text-red-300">{customUploadedCards.length} uploaded</strong></span>
                 <span aria-hidden="true" className="h-3 w-px bg-white/[0.08]" />
-                <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="font-bold tracking-widest text-neutral-500 uppercase">Density</span><strong className="font-medium text-neutral-200">{currentFilledCount}/{layout.pockets} filled</strong></span>
+                <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="font-bold tracking-widest text-neutral-500 uppercase">Density</span><strong className="text-xs font-semibold text-neutral-100">{currentFilledCount}/{layout.pockets} filled</strong></span>
               </div>
               {settings.view === 'binder' && (
                 <span
@@ -3342,7 +3281,7 @@ export default function CardBinder() {
               data-page-timeline
               aria-label="Page timeline"
               aria-hidden={!showBottomTimeline}
-              inert={showBottomTimeline ? undefined : ''}
+              inert={showBottomTimeline ? undefined : true}
               className={`no-print relative flex min-w-0 w-full shrink-0 items-center justify-start gap-4 bg-neutral-900/40 backdrop-blur-sm transition-all duration-300 ease-in-out select-none ${showBottomTimeline ? 'h-28 py-4 px-6 border-t border-white/[0.04] border-opacity-100 opacity-100 overflow-x-auto overscroll-x-contain' : 'h-0 py-0 px-6 border-0 border-opacity-0 opacity-0 overflow-hidden pointer-events-none'}`}
             >
               <div data-page-timeline-inner className="mx-auto flex h-full min-w-max w-max items-center justify-center gap-4">
@@ -3356,8 +3295,26 @@ export default function CardBinder() {
               </div>
             </footer>
           </main>
+          <RightControlRail
+            settings={settings}
+            setSettings={setSettings}
+            onChooseLayout={chooseLayout}
+            onViewChange={(view) => { commitEditing(); setSettings((value) => ({ ...value, view })); }}
+            printScope={printScope}
+            setPrintScope={setPrintScope}
+            onPrint={handlePrint}
+            openPanel={openPanel}
+            setOpenPanel={setOpenPanel}
+            fitInfo={fitInfo}
+            suggestedPaper={suggestedPaper}
+            printCount={printPages.length}
+            onReset={resetBinder}
+            onDuplicate={duplicatePage}
+            installPrompt={installPrompt}
+            onInstall={async () => { await installPrompt.prompt(); setInstallPrompt(null); }}
+          />
         </div>
-        <div className="no-print pointer-events-none fixed bottom-10 right-5 z-[100] flex w-[360px] flex-col items-end gap-2">
+        <div className="no-print pointer-events-none fixed bottom-10 right-20 z-[100] flex w-[360px] flex-col items-end gap-2">
           {toasts.map((toast) => <div key={toast.id} role="status" className={`animate-toast pointer-events-auto flex max-w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-[12px] shadow-2xl shadow-black/40 ${toastTones[toast.tone] || toastTones.info}`}><span className="leading-relaxed">{toast.message}</span>{toast.action && <button type="button" onClick={() => { setToasts((value) => value.filter((item) => item.id !== toast.id)); toast.action.onClick(); }} className="shrink-0 rounded-md bg-white/10 px-2 py-1 font-semibold text-white hover:bg-white/20">{toast.action.label}</button>}<button type="button" title="Dismiss" aria-label="Dismiss notification" onClick={() => setToasts((value) => value.filter((item) => item.id !== toast.id))} className="grid size-6 shrink-0 place-items-center rounded-md text-current hover:bg-white/10"><Icon name="x" size="sm" /></button></div>)}
         </div>
       </div>
