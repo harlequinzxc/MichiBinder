@@ -133,9 +133,26 @@ const positiveMoney = (value) => {
   return Number.isFinite(amount) && amount > 0 ? amount : 0;
 };
 const tcgplayerMarketPrice = (payload) => {
-  const pricing = payload?.pricing?.tcgplayer || payload?.pricing?.tcgPlayer || payload?.tcgplayer?.prices || payload?.tcgplayer;
+  const card = payload?.data && !Array.isArray(payload.data) ? payload.data : payload;
+  const pricing = card?.pricing?.tcgplayer || card?.pricing?.tcgPlayer || card?.tcgplayer?.prices || card?.tcgplayer;
   if (!pricing || typeof pricing !== 'object') return 0;
-  return positiveMoney(pricing.market) || positiveMoney(pricing.low) || positiveMoney(pricing.mid);
+  const variantPricing = pricing.prices && typeof pricing.prices === 'object' ? pricing.prices : pricing;
+  const variantGroups = [
+    { enabled: card?.variants?.normal, keys: ['normal'] },
+    { enabled: card?.variants?.holo, keys: ['holofoil', 'holo'] },
+    { enabled: card?.variants?.reverse, keys: ['reverse-holofoil', 'reverseHolofoil', 'reverse'] },
+    { enabled: card?.variants?.firstEdition, keys: ['1st-edition', 'firstEdition', '1st-edition-holofoil', 'firstEditionHolofoil'] },
+    { enabled: true, keys: ['unlimited', 'unlimited-holofoil', 'unlimitedHolofoil'] },
+  ];
+  const preferredKeys = variantGroups.filter((group) => group.enabled).flatMap((group) => group.keys);
+  const allKeys = [...new Set([...preferredKeys, ...variantGroups.flatMap((group) => group.keys)])];
+  const variants = allKeys.map((key) => variantPricing[key]).filter((value) => value && typeof value === 'object');
+  const selectPrice = (directField, variantField) => (
+    positiveMoney(pricing[directField])
+    || positiveMoney(variantPricing[directField])
+    || variants.reduce((price, variant) => price || positiveMoney(variant[variantField]) || positiveMoney(variant[directField]), 0)
+  );
+  return selectPrice('market', 'marketPrice') || selectPrice('low', 'lowPrice') || selectPrice('mid', 'midPrice');
 };
 const sanitizePriceMap = (value) => Object.fromEntries(Object.entries(value || {})
   .map(([id, price]) => [String(id), positiveMoney(price)])
@@ -172,6 +189,23 @@ const normalizeTcgdexSets = (payload) => {
     });
 };
 const safeFileName = (value) => String(value || 'pokemon-card').replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim() || 'pokemon-card';
+const inferTcgdexId = (item) => {
+  if (item?.source !== 'tcgdex') return '';
+  if (typeof item.tcgdexId === 'string' && item.tcgdexId.trim()) return item.tcgdexId.trim();
+  const nameMatch = String(item.name || '').match(/\s·\s([^/\\]+)\.(?:jpe?g|png|webp|gif|avif)$/i);
+  if (nameMatch?.[1]) return nameMatch[1];
+  try {
+    const url = new URL(String(item.src || ''));
+    if (url.origin !== TCGDEX_ASSET_CDN) return '';
+    const parts = url.pathname.split('/').filter(Boolean);
+    if (/^(?:low|high)\.(?:jpe?g|png|webp|avif)$/i.test(parts.at(-1) || '')) parts.pop();
+    const localId = parts.at(-1);
+    const setId = parts.at(-2);
+    return setId && localId ? `${setId}-${localId}` : '';
+  } catch {
+    return '';
+  }
+};
 const emptyPage = (sheetId = null, face = null) => ({
   id: uid('page'),
   sectionName: '',
@@ -505,13 +539,16 @@ function loadPersisted() {
     const parsed = JSON.parse(raw);
     if (!parsed || Number(parsed.version) > SCHEMA_VERSION) return fallback;
     const pages = normalizePhysicalPages(Array.isArray(parsed.pages) && parsed.pages.length ? parsed.pages.map(sanitizePage) : emptyPages());
-    const pool = Array.isArray(parsed.pool) ? parsed.pool.filter((item) => item && typeof item.id === 'string').map((item) => ({
-      id: item.id,
-      name: String(item.name || 'Card image'),
-      source: item.source === 'tcgdex' ? 'tcgdex' : 'upload',
-      ...(typeof item.src === 'string' ? { src: item.src } : {}),
-      ...(typeof item.tcgdexId === 'string' && item.tcgdexId ? { tcgdexId: item.tcgdexId } : {}),
-    })) : [];
+    const pool = Array.isArray(parsed.pool) ? parsed.pool.filter((item) => item && typeof item.id === 'string').map((item) => {
+      const tcgdexId = inferTcgdexId(item);
+      return {
+        id: item.id,
+        name: String(item.name || 'Card image'),
+        source: item.source === 'tcgdex' ? 'tcgdex' : 'upload',
+        ...(typeof item.src === 'string' ? { src: item.src } : {}),
+        ...(tcgdexId ? { tcgdexId } : {}),
+      };
+    }) : [];
     return {
       currentPage: clamp(Math.floor(Number(parsed.currentPage) || 0), 0, pages.length - 1),
       settings: sanitizeSettings(parsed.settings),
@@ -1847,12 +1884,15 @@ export default function CardBinder() {
         setPool((value) => {
           const present = new Set(value.map((item) => item.id));
           const kept = value.filter((item) => recordMap.has(item.id) || item.src || sessionIdsRef.current.has(item.id));
-          const orphans = records.filter((record) => !present.has(record.id)).sort((a, b) => (a.added || 0) - (b.added || 0)).map((record) => ({
-            id: record.id,
-            name: record.name || 'Card image',
-            source: record.source === 'tcgdex' ? 'tcgdex' : 'upload',
-            ...(typeof record.tcgdexId === 'string' && record.tcgdexId ? { tcgdexId: record.tcgdexId } : {}),
-          }));
+          const orphans = records.filter((record) => !present.has(record.id)).sort((a, b) => (a.added || 0) - (b.added || 0)).map((record) => {
+            const tcgdexId = inferTcgdexId(record);
+            return {
+              id: record.id,
+              name: record.name || 'Card image',
+              source: record.source === 'tcgdex' ? 'tcgdex' : 'upload',
+              ...(tcgdexId ? { tcgdexId } : {}),
+            };
+          });
           const reconciled = [...kept, ...orphans];
           const valid = new Set(reconciled.map((item) => item.id));
           setPages((currentPages) => {

@@ -2,7 +2,7 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.4.0
+## Current state — v4.4.1
 
 - **Ledger date:** 2026-10-20
 - **Application state entering this feature pass:** commit `8a7c7fc` / v4.3.4
@@ -548,6 +548,16 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Verified exchange conversion, positive-market and low-price fallback selection, schema-v5 persistence, canonical metadata, top-bar ordering, responsive containment, hover values, page navigation, removal updates, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.4.0.
 
+## [v4.4.1] — 2026-10-20
+
+### Fixed
+
+- Corrected TCGplayer extraction for the live TCGdex card-detail schema, where prices are grouped by print variant and use `marketPrice`, `lowPrice`, and `midPrice` rather than only top-level `market`, `low`, and `mid` fields.
+- Preserved the requested positive market → low → mid priority across normal, holofoil, reverse-holofoil, first-edition, and unlimited variant keys, including the naming variants currently documented by TCGdex.
+- Added a compatibility migration that recovers canonical TCGdex IDs from legacy imported filenames and validated CDN paths, allowing eligible cards imported before schema v5 to hydrate prices after reload.
+- Reverified nested market selection, nested low fallback, legacy-ID migration, persisted raw USD values, currency switching, portfolio/spread totals, removal updates, hover values, responsive containment, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
+- Advanced package and lockfile metadata to v4.4.1.
+
 ---
 
 ## Current architecture and engineering rationale
@@ -636,7 +646,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 
 - API base: `https://api.tcgdex.net/v2/en`; asset host: `https://assets.tcgdex.net`.
 - Card list records provide `id`, `localId`, `name`, and an extensionless image base. The UI appends `/low.jpg`; import appends `/high.jpg`.
-- Queried and persisted TCGdex cards hydrate `/cards/{id}` detail records. Raw USD selection accepts only positive values in `pricing.tcgplayer`, prioritized as `market`, `low`, then `mid`.
+- Queried and persisted TCGdex cards hydrate `/cards/{id}` detail records. Raw USD selection accepts only positive values, prioritizing market → low → mid across both direct `pricing.tcgplayer` fields and variant records such as `normal.marketPrice`, `holofoil.lowPrice`, or `reverse.midPrice`.
 - Set lists are normalized and sorted newest-first where release dates exist. Full set fetches provide the card list used by local infinite pagination.
 - Search is debounced and abortable. Pages append 40 normalized records at a time; detail-price requests are deduplicated by canonical card ID.
 - Only the TCGdex asset origin is accepted when normalizing absolute card-image bases.
