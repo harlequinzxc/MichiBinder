@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+@theme {
+  --font-sans: "Inter Variable", Inter, "SF Pro Text", "SF Pro Display", "Segoe UI Variable", ui-sans-serif, system-ui, sans-serif;
+}
+
 @font-face {
   font-family: "Inter Variable";
   font-style: normal;

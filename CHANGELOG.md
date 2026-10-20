@@ -473,6 +473,23 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Verified simultaneous collapse/restore, independent sidebar behavior, 16×16 icon geometry, zero-dimension closed timeline state, centered rail geometry, binder scaling, and absence of document overflow at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.3.0.
 
+## [v4.3.1] — 2026-10-20
+
+### Improved
+
+- Replaced transformed/ringed active timeline groups with a dimension-neutral two-pixel inner outline, transparent border, and neutral surface so thumbnail and label grids remain physically locked.
+- Standardized every right-rail dialog on the same trigger-relative `right-full`, `mr-3`, `top-0` projection; long Print Setup and Keyboard Shortcuts content now scrolls within a 40vh panel instead of switching to viewport-fixed coordinates.
+- Upgraded Database, Custom, and Density metrics to the self-hosted Inter sans stack with compact uppercase headers and crisp neutral gradient values.
+- Segmented History, Slot Structure, and Spread Navigation into visually distinct bottom-controller pockets with two non-interactive one-pixel dividers.
+
+### Fixed
+
+- Swapped the Zen Mode glyph mapping so standard view displays `Minimize2` and focused view displays `Maximize2`, while preserving the existing mode titles and state behavior.
+- Removed active-thumbnail scale and ring-offset geometry that could cross the Page/Pages label line.
+- Allowed trigger-relative rail panels to escape the preview band's clip boundary while retaining the main workspace boundary, preventing low-height panels from being truncated.
+- Verified fixed thumbnail geometry, a two-pixel post-outline label gap, all seven absolute rail projections, bounded long-panel scrolling, Inter typography, divider placement, icon state, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
+- Advanced package and lockfile metadata to v4.3.1.
+
 ---
 
 ## Current architecture and engineering rationale
@@ -529,12 +546,13 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 
 - The header is 48px tall and owns identity, sidebar toggle, save state, and the centralized Zen Mode toggle.
 - The source sidebar consumes width when open; the right-side main tree receives the remainder.
-- The preview surface is one flex row containing the scrollable stage and detached rail. The stage stops at the rail's left edge, including the rail padding zone.
+- The preview surface is one flex row containing the scrollable stage and detached rail. The stage stops at the rail's left edge, including the rail padding zone; the surface permits overflow so rail dialogs can overlay lower workspace bands while the main workspace remains the outer clip boundary.
 - The rail has no full-height edge divider and no `self-start`; its outer box is vertically centered against the **live preview surface**, not the complete main column. Collapsing the timeline changes preview height, so the rail's vertical center moves.
-- Database/Custom/Density is absolutely anchored to the preview bottom edge. It is not part of the timeline or bottom controller flow.
-- The bottom controller owns Undo/Redo, Merge/Unmerge/reset/clear, spread navigation, Add, Duplicate, Delete, and timeline toggle.
+- Every rail dialog is absolutely anchored at `right-full mr-3 top-0` relative to its trigger. Panels cap at 40vh and scroll internally when their content is longer.
+- Database/Custom/Density is absolutely anchored to the preview bottom edge. It uses the self-hosted Inter sans stack and is not part of the timeline or bottom controller flow.
+- The bottom controller owns Undo/Redo, Merge/Unmerge/reset/clear, spread navigation, Add, Duplicate, Delete, and timeline toggle. One-pixel dividers separate its History, Slot Structure, and Spread Navigation pockets.
 - The timeline is a sibling below the preview/controller inside the right-side main tree. Expanded, it reaches the right viewport edge; collapsed, it has zero height, padding, and border so the preview grows immediately.
-- Active groups use `data-active="true"`. Add/Duplicate use a requested page ID and then call `scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })` on its containing group.
+- Active groups use `data-active="true"` and a dimension-neutral two-pixel shadow outline without scale or ring offset. Add/Duplicate use a requested page ID and then call `scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })` on its containing group.
 
 ### Persistence and history
 
@@ -583,7 +601,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 8. **`CardBinder.jsx` is highly coupled.** Broad rewrites can cross persistence, printing, drag state, physical ownership, and layout geometry even when the request appears visual.
 9. **README has small UI drift.** Its workspace table still assigns sizing/preview/print controls to the top utility bar; those controls now live in the right rail and Print / PDF menu.
 10. **Large smooth-scroll jumps are not instantaneous.** Headless Chromium sometimes needed several seconds to settle after many rapid additions; the final target remained correct.
-11. **Fixed popovers under backdrop-filtered ancestors have a containment quirk.** Current compact content passes at tested heights, but lower landscape heights can alter effective fixed positioning and should be checked for clipping.
+11. **Long rail dialogs scroll internally.** Print Setup and Keyboard Shortcuts cap at 40vh to preserve uniform trigger-relative anchoring; their lower content is not visible all at once on short landscape viewports.
 12. **Custom compact print is intentionally lossy.** It preserves private images/crops, not live page labels or merged frames. That is current behavior, not an unfinished pagination loop.
 
 ## Historical dead ends and pitfalls

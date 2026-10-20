@@ -817,7 +817,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
           aria-pressed={isZenMode}
           data-zen-mode-toggle
         >
-          <Icon name={isZenMode ? 'minimize' : 'maximize'} />
+          <Icon name={isZenMode ? 'maximize' : 'minimize'} />
         </button>
       </div>
     </header>
@@ -842,15 +842,13 @@ function RailButton({ icon, label, active = false, expanded, onClick, className 
   );
 }
 
-function RailPopover({ title, icon, align = 'top', children }) {
-  const positionClass = align === 'viewport' ? 'fixed right-[72px] top-16' : `absolute right-full mr-3 ${align === 'bottom' ? 'bottom-0' : 'top-0'}`;
+function RailPopover({ title, icon, children }) {
   return (
     <div
       data-rail-popover
       role="dialog"
       aria-label={title}
-      className={`${positionClass} z-50 w-56 bg-neutral-950/95 border border-white/[0.08] rounded-xl shadow-[0_16px_40px_rgba(0,0,0,0.8)] backdrop-blur-xl animate-scaleIn origin-right p-3 flex flex-col gap-2`}
-      style={{ transformOrigin: 'right center' }}
+      className="absolute right-full mr-3 top-0 rounded-xl bg-neutral-950/95 border border-white/[0.08] p-3 z-50 flex max-h-[40vh] w-56 flex-col gap-2 overflow-y-auto shadow-[0_16px_40px_rgba(0,0,0,0.8)] backdrop-blur-xl animate-scaleIn origin-right"
       onPointerDown={(event) => event.stopPropagation()}
     >
       <div className="flex items-center gap-2 border-b border-white/[0.06] pb-2 text-[11px] font-semibold text-neutral-100">
@@ -987,11 +985,11 @@ function RightControlRail({
             <RailButton icon="sliders" label="Print setup" active={openPanel === 'print'} expanded={openPanel === 'print'} onClick={() => togglePanel('print')}>
               <span className={`absolute right-1 top-1 size-1.5 rounded-full ${fitInfo.fitsTrueSize ? 'bg-emerald-400' : 'bg-amber-400'}`} />
             </RailButton>
-            {openPanel === 'print' && <RailPopover title="Print setup" icon="sliders" align="viewport"><PrintSetupContent settings={settings} setSettings={setSettings} fitInfo={fitInfo} suggestedPaper={suggestedPaper} printCount={printCount} onReset={onReset} /></RailPopover>}
+            {openPanel === 'print' && <RailPopover title="Print setup" icon="sliders"><PrintSetupContent settings={settings} setSettings={setSettings} fitInfo={fitInfo} suggestedPaper={suggestedPaper} printCount={printCount} onReset={onReset} /></RailPopover>}
           </div>
           <div className="relative flex">
             <RailButton icon="keyboard" label="Keyboard shortcuts" active={openPanel === 'shortcuts'} expanded={openPanel === 'shortcuts'} onClick={() => togglePanel('shortcuts')} />
-            {openPanel === 'shortcuts' && <RailPopover title="Keyboard shortcuts" icon="keyboard" align="viewport"><ShortcutsContent /></RailPopover>}
+            {openPanel === 'shortcuts' && <RailPopover title="Keyboard shortcuts" icon="keyboard"><ShortcutsContent /></RailPopover>}
           </div>
           {installPrompt && <RailButton icon="install" label="Install app" onClick={onInstall} />}
         </div>
@@ -1038,14 +1036,16 @@ function FloatingNavigation({
             <button type="button" onClick={onUndo} disabled={!canUndo} aria-label="Undo" title="Undo" className={neutralIconButton}><Icon name="undo" /></button>
             <button type="button" onClick={onRedo} disabled={!canRedo} aria-label="Redo" title="Redo" className={neutralIconButton}><Icon name="redo" /></button>
           </div>
-          <div role="group" aria-label="Slot structure" className="flex shrink-0 items-center gap-1 border-l border-white/[0.06] pl-2 min-[1281px]:pl-4">
+          <span aria-hidden="true" className="h-4 w-px bg-white/[0.06] flex shrink-0" />
+          <div role="group" aria-label="Slot structure" className="flex shrink-0 items-center gap-1">
             <button type="button" onClick={onToggleCombine} aria-pressed={combineMode} aria-label="Combine slots" title="Combine slots (M)" className={`${bottomIconButton} ${combineMode ? '!border-red-500/30 !bg-red-950/70 text-red-300' : 'text-neutral-400 hover:text-neutral-200'}`}><Icon name="combine" /></button>
             <button type="button" onClick={onMerge} disabled={!canMerge} aria-label="Merge selected slots" title="Merge selected slots (Enter)" className={neutralIconButton}><Icon name="merge" /></button>
             <button type="button" onClick={onUnmerge} disabled={!selectedMergeCount} aria-label="Unmerge selected frame" title="Unmerge selected frame (U)" className={neutralIconButton}><Icon name="split" /></button>
             <button type="button" onClick={onResetLayout} disabled={!canResetLayout} aria-label="Reset merged layout" title="Reset merged layout" className={neutralIconButton}><Icon name="reset" /></button>
             <button type="button" onClick={onClearPage} disabled={!canClearPage} aria-label="Clear active page" title="Clear active page" className={`${bottomIconButton} text-neutral-500 hover:!bg-red-500/10 hover:text-red-400 disabled:pointer-events-none disabled:cursor-default disabled:text-neutral-700`}><Icon name="eraser" /></button>
           </div>
-          <div role="group" aria-label="Spread navigation" className="flex shrink-0 items-center gap-2 border-l border-white/[0.06] pl-2 min-[1281px]:pl-4">
+          <span aria-hidden="true" className="h-4 w-px bg-white/[0.06] flex shrink-0" />
+          <div role="group" aria-label="Spread navigation" className="flex shrink-0 items-center gap-2">
             <button type="button" onClick={onPrevious} disabled={!canPrevious} aria-label="Previous spread" title="Previous spread" className={neutralIconButton}><Icon name="chevronLeft" /></button>
             <div className="flex items-center gap-1 text-[11px] font-mono text-neutral-400 font-medium" aria-live="polite">
               <span className="max-[1280px]:sr-only">Spread</span>
@@ -3096,7 +3096,7 @@ export default function CardBinder() {
     const label = group.length === 1 ? `Page ${pageNumbers[0]}` : `Pages ${pageNumbers[0]}–${pageNumbers[1]}`;
     return (
       <div key={group.join('-')} data-page-group={pageNumbers.join('-')} data-active={active ? 'true' : undefined} className={`relative flex shrink-0 flex-col items-center gap-1 text-[10px] font-medium whitespace-nowrap ${active ? 'text-red-400' : 'text-neutral-500'}`}>
-        <div className={`flex items-center gap-0.5 p-1.5 ${active ? 'ring-2 ring-red-500 ring-offset-4 ring-offset-neutral-950 rounded-md scale-105 duration-200 transition-transform' : 'rounded-md duration-200 transition-transform'}`}>
+        <div className={`flex items-center gap-0.5 rounded-md border border-transparent p-1.5 transition-[background-color,box-shadow] duration-200 ${active ? 'shadow-[0_0_0_2px_#dc2626] border-transparent bg-neutral-900' : 'bg-transparent shadow-none'}`}>
           {group.map((pageIndex) => renderThumbnailLeaf(pages[pageIndex], pageIndex))}
         </div>
         <span>{label}</span>
@@ -3348,7 +3348,7 @@ export default function CardBinder() {
             onFetchedCardAdd={addFetchedCardToPage}
           />
           <main data-dynamic-workspace data-zen-mode={isZenMode} className="relative flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-neutral-950">
-            <div data-preview-surface className="relative flex min-h-0 w-full flex-1 items-center overflow-hidden">
+            <div data-preview-surface className="relative flex min-h-0 w-full flex-1 items-center overflow-visible">
               <div
                 ref={stageRef}
                 className="relative flex h-full min-w-0 flex-1 items-center justify-center overflow-auto bg-neutral-950 bg-[radial-gradient(ellipse_at_center,rgba(82,82,91,0.18),transparent_65%)] p-6"
@@ -3358,12 +3358,12 @@ export default function CardBinder() {
               onDragOver={(event) => { if (!combineMode && (['pool', 'remote', 'remote-batch'].includes(dragRef.current?.kind) || hasFiles(event.dataTransfer))) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; } }}
               onDrop={handleStageDrop}
             >
-              <div data-workspace-metrics aria-label={`Database ${fetchedCards.length} items, Custom ${customUploadedCards.length} uploaded, Density ${currentFilledCount} of ${layout.pockets} filled`} className="pointer-events-none absolute bottom-3 left-6 z-40 flex items-center gap-3 rounded-md border border-white/[0.06] bg-neutral-950/85 px-2.5 py-1.5 text-[10px] font-mono shadow-lg backdrop-blur-sm select-none">
-                <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="font-bold tracking-widest text-neutral-500 uppercase">Database</span><strong className="text-xs font-semibold text-neutral-100">{fetchedCards.length} items</strong></span>
+              <div data-workspace-metrics aria-label={`Database ${fetchedCards.length} items, Custom ${customUploadedCards.length} uploaded, Density ${currentFilledCount} of ${layout.pockets} filled`} className="pointer-events-none absolute bottom-3 left-6 z-40 flex items-center gap-3 rounded-md border border-white/[0.06] bg-neutral-950/85 px-2.5 py-1.5 font-sans shadow-lg backdrop-blur-sm select-none">
+                <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="text-neutral-500 font-semibold tracking-wider text-[9px] uppercase">Database</span><strong className="font-sans text-[10px] font-medium tracking-tight bg-gradient-to-r from-neutral-400 via-neutral-300 to-neutral-200 bg-clip-text text-transparent">{fetchedCards.length} items</strong></span>
                 <span aria-hidden="true" className="h-3 w-px bg-white/[0.08]" />
-                <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="font-bold tracking-widest text-neutral-500 uppercase">Custom</span><strong className="text-xs font-semibold text-red-300">{customUploadedCards.length} uploaded</strong></span>
+                <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="text-neutral-500 font-semibold tracking-wider text-[9px] uppercase">Custom</span><strong className="font-sans text-[10px] font-medium tracking-tight bg-gradient-to-r from-neutral-400 via-neutral-300 to-neutral-200 bg-clip-text text-transparent">{customUploadedCards.length} uploaded</strong></span>
                 <span aria-hidden="true" className="h-3 w-px bg-white/[0.08]" />
-                <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="font-bold tracking-widest text-neutral-500 uppercase">Density</span><strong className="text-xs font-semibold text-neutral-100">{currentFilledCount}/{layout.pockets} filled</strong></span>
+                <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="text-neutral-500 font-semibold tracking-wider text-[9px] uppercase">Density</span><strong className="font-sans text-[10px] font-medium tracking-tight bg-gradient-to-r from-neutral-400 via-neutral-300 to-neutral-200 bg-clip-text text-transparent">{currentFilledCount}/{layout.pockets} filled</strong></span>
               </div>
               {settings.view === 'binder' && (
                 <span
