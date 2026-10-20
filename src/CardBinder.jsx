@@ -584,15 +584,17 @@ const ICONS = {
   wand: WandSparkles,
   x: X,
 };
-const ICON_SIZES = { xs: 'size-3', sm: 'size-3.5', md: 'size-4', lg: 'size-5', xl: 'size-8', '2xl': 'size-12' };
-
-function Icon({ name, size = 'md', className = '', strokeWidth }) {
+function Icon({ name, className = '', strokeWidth }) {
   const Component = ICONS[name];
   if (!Component) {
     if (import.meta.env.DEV) console.warn(`Unknown icon: ${name}`);
     return null;
   }
-  return <Component className={`${ICON_SIZES[size] || ICON_SIZES.md} shrink-0 ${className}`} strokeWidth={strokeWidth ?? (size === 'xl' || size === '2xl' ? 1.5 : 2)} aria-hidden="true" />;
+  const appearanceClasses = className
+    .split(/\s+/)
+    .filter((token) => token && !/^(?:size|w|h)-/.test(token))
+    .join(' ');
+  return <Component size={16} className={`h-4 w-4 shrink-0 ${appearanceClasses}`} strokeWidth={strokeWidth ?? 2} aria-hidden="true" />;
 }
 
 function ToolButton({ icon, label, onClick, disabled = false, disabledReason, active, variant = 'ghost', title, kbd, className = '', dense = false, type = 'button' }) {
@@ -612,7 +614,7 @@ function ToolButton({ icon, label, onClick, disabled = false, disabledReason, ac
       title={!disabled ? title : undefined}
       className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:pointer-events-none disabled:text-zinc-500 ${variant === 'primary' ? 'font-semibold' : 'font-medium'} ${dense ? 'h-7 min-w-7 px-1.5 text-[12px]' : 'h-8 px-3 py-1.5 text-xs'} ${variants[variant]} ${className}`}
     >
-      {icon && <Icon name={icon} size={dense ? 'sm' : 'md'} />}
+      {icon && <Icon name={icon} />}
       {label && <span>{label}</span>}
       {kbd && <Kbd>{kbd}</Kbd>}
     </button>
@@ -675,7 +677,7 @@ function SegmentedControl({ value, onChange, options, ariaLabel, dense = false, 
           onClick={() => onChange(option.value)}
           className={`relative z-10 inline-flex w-auto min-w-fit items-center justify-center gap-1 font-medium whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${previewStyle ? 'rounded-md' : 'rounded-full'} ${dense ? 'px-2.5 text-xs' : 'px-3 text-xs'} ${index === currentIndex ? (previewStyle ? 'text-white' : 'text-red-400') : 'text-zinc-400 hover:text-zinc-100'}`}
         >
-          {option.icon && <Icon name={option.icon} size="sm" />}
+          {option.icon && <Icon name={option.icon} />}
           <span className={previewStyle ? 'max-[1349px]:hidden' : ''}>{option.label}</span>
         </button>
       ))}
@@ -760,15 +762,19 @@ function SheetGrid({ page, card, gap, unit, dims, animate = false, renderSlot, g
 }
 
 function SaveStatus({ status }) {
-  const config = status === 'error'
-    ? { dot: 'bg-red-400', text: 'Storage issue' }
-    : status === 'saving'
-      ? { dot: 'bg-amber-400', text: 'Saving' }
-      : { dot: 'bg-emerald-400', text: 'Active' };
+  const saving = status === 'saving';
+  const failed = status === 'error';
+  const label = failed ? 'Save failed' : saving ? 'Saving...' : 'Saved locally';
   return (
-    <div data-engine-badge className="flex shrink-0 items-center gap-1.5 rounded-full border border-white/[0.06] bg-neutral-950/70 px-2 py-1 text-[9px] font-bold tracking-wider text-neutral-400 uppercase shadow-inner" aria-live="polite" aria-label={`Local engine: ${config.text}`} title={`Local persistence engine · ${config.text}`}>
-      <span className={`size-1.5 rounded-full ${config.dot} shadow-[0_0_8px_currentColor]`} />
-      <span>Local engine</span>
+    <div
+      data-engine-badge
+      className={`shrink-0 text-xs flex items-center gap-1.5 ${failed ? 'font-medium text-red-300' : saving ? 'text-neutral-200 font-medium animate-pulse' : 'text-neutral-400 font-medium'}`}
+      aria-live="polite"
+      aria-label={`Local storage: ${label}`}
+      title="Local persistence status"
+    >
+      <span className={`size-1.5 rounded-full ${failed ? 'bg-red-400' : saving ? 'bg-amber-400' : 'bg-emerald-400'} shadow-[0_0_8px_currentColor]`} />
+      <span>{label}</span>
     </div>
   );
 }
@@ -785,7 +791,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, saveStatus }) {
           aria-label={isLeftSidebarOpen ? 'Collapse Sidebar' : 'Expand Sidebar'}
           aria-pressed={!isLeftSidebarOpen}
         >
-          <Icon name="menu" size="md" className="h-4 w-4" />
+          <Icon name="menu" />
         </button>
         <h1 className="select-none bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
         <SaveStatus status={saveStatus} />
@@ -806,24 +812,25 @@ function RailButton({ icon, label, active = false, expanded, onClick, className 
       title={label}
       className={`relative flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-lg border shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${active ? 'border-red-500/30 bg-red-950/70 text-red-300' : 'border-white/[0.08] bg-neutral-950 text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200'} ${className}`}
     >
-      {icon && <Icon name={icon} size="md" className="h-4 w-4" />}
+      {icon && <Icon name={icon} />}
       {children}
     </button>
   );
 }
 
 function RailPopover({ title, icon, align = 'top', children }) {
+  const positionClass = align === 'viewport' ? 'fixed right-[72px] top-16' : `absolute right-full mr-3 ${align === 'bottom' ? 'bottom-0' : 'top-0'}`;
   return (
     <div
       data-rail-popover
       role="dialog"
       aria-label={title}
-      className={`absolute right-full mr-3 ${align === 'bottom' ? 'bottom-0' : 'top-0'} z-50 w-56 bg-neutral-950/95 border border-white/[0.08] rounded-xl shadow-[0_16px_40px_rgba(0,0,0,0.8)] backdrop-blur-xl animate-scaleIn origin-right p-3 flex flex-col gap-2`}
+      className={`${positionClass} z-50 w-56 bg-neutral-950/95 border border-white/[0.08] rounded-xl shadow-[0_16px_40px_rgba(0,0,0,0.8)] backdrop-blur-xl animate-scaleIn origin-right p-3 flex flex-col gap-2`}
       style={{ transformOrigin: 'right center' }}
       onPointerDown={(event) => event.stopPropagation()}
     >
       <div className="flex items-center gap-2 border-b border-white/[0.06] pb-2 text-[11px] font-semibold text-neutral-100">
-        <Icon name={icon} size="sm" className="text-neutral-400" />
+        <Icon name={icon} className="text-neutral-400" />
         <span>{title}</span>
       </div>
       {children}
@@ -859,10 +866,10 @@ function RightControlRail({
   const chooseGrid = (layoutId) => { onChooseLayout(layoutId); setOpenPanel(null); };
 
   return (
-    <aside data-control-rail aria-label="Layout and print controls" className="no-print py-3 pr-3 h-full shrink-0 flex items-center justify-center z-40 select-none">
-      <div data-control-pod className="w-14 h-full bg-neutral-900/85 backdrop-blur-md border border-white/[0.06] rounded-2xl flex flex-col items-center py-4 justify-between shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)] hover:border-white/[0.12] transition-colors">
-        <div data-rail-zone="primary" className="flex flex-col items-center gap-2">
-          <button type="button" onClick={onPrint} aria-label="Print / PDF" title="Print / PDF" className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg border border-white/[0.08] bg-neutral-800 text-neutral-200 shadow-sm transition-all hover:bg-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="printer" size="md" className="h-4 w-4" /></button>
+    <aside data-control-rail aria-label="Layout and print controls" className="no-print py-3 pr-3 flex items-center justify-center z-40 select-none max-h-[calc(100vh-176px)] self-start shrink-0">
+      <div data-control-pod className="w-14 h-full bg-neutral-900/85 backdrop-blur-md border border-white/[0.06] rounded-2xl flex flex-col items-center py-4 gap-6 shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)] [@media(max-height:720px)]:gap-3">
+        <div data-rail-zone="primary" className="flex flex-col items-center gap-2 [@media(max-height:720px)]:gap-1">
+          <button type="button" onClick={onPrint} aria-label="Print / PDF" title="Print / PDF" className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg border border-white/[0.08] bg-neutral-800 text-neutral-200 shadow-sm transition-all hover:bg-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="printer" /></button>
           <div className="relative flex">
             <RailButton icon="filter" label={`Print scope: ${printScope === 'all' ? 'Include all' : 'Uploads only'}`} active={openPanel === 'print-scope'} expanded={openPanel === 'print-scope'} onClick={() => togglePanel('print-scope')}>
               <span className="absolute bottom-1 right-1 text-[7px] font-mono font-bold leading-none text-current">{printScope === 'all' ? 'A' : 'U'}</span>
@@ -885,7 +892,7 @@ function RightControlRail({
           </div>
         </div>
 
-        <div data-rail-zone="layout" className="flex flex-col items-center gap-2">
+        <div data-rail-zone="layout" className="flex flex-col gap-3.5 items-center [@media(max-height:720px)]:gap-2">
           <div className="relative flex">
             <RailButton icon={activeLayout.icon} label={`Grid selection: ${activeLayout.label}`} active={openPanel === 'grid'} expanded={openPanel === 'grid'} onClick={() => togglePanel('grid')}>
               <span className="absolute bottom-1 right-1 text-[7px] font-mono font-bold leading-none text-current">{activeLayout.pockets}</span>
@@ -895,9 +902,9 @@ function RightControlRail({
                 <div role="radiogroup" aria-label="Pocket layout" className="flex flex-col gap-1">
                   {GRID_LAYOUTS.map((layoutOption) => (
                     <button key={layoutOption.id} type="button" role="radio" aria-checked={settings.layout === layoutOption.id} aria-label={`${layoutOption.label} (${layoutOption.hint})`} onClick={() => chooseGrid(layoutOption.id)} className={`flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${settings.layout === layoutOption.id ? 'border-red-500/25 bg-red-950/55 text-red-200' : 'border-white/[0.05] bg-neutral-900/60 text-neutral-300 hover:bg-neutral-800'}`}>
-                      <span className="grid size-7 shrink-0 place-items-center rounded-md border border-white/[0.06] bg-neutral-950"><Icon name={layoutOption.icon} size="sm" /></span>
+                      <span className="grid size-7 shrink-0 place-items-center rounded-md border border-white/[0.06] bg-neutral-950"><Icon name={layoutOption.icon} /></span>
                       <span className="min-w-0 flex-1"><strong className="block text-[11px] font-semibold">{layoutOption.pockets} pockets</strong><span className="block text-[9px] text-neutral-500">{layoutOption.hint}</span></span>
-                      {settings.layout === layoutOption.id && <Icon name="check" size="xs" className="text-red-400" />}
+                      {settings.layout === layoutOption.id && <Icon name="check" className="text-red-400" />}
                     </button>
                   ))}
                 </div>
@@ -922,7 +929,7 @@ function RightControlRail({
           </div>
         </div>
 
-        <div data-rail-zone="material" className="flex flex-col items-center gap-2">
+        <div data-rail-zone="material" className="flex flex-col items-center gap-2 [@media(max-height:720px)]:gap-1">
           <div className="relative flex">
             <RailButton icon="layers" label={`Card size: ${custom ? 'Custom' : 'Pokémon'} ${round1(base.w)} × ${round1(base.h)} mm`} active={openPanel === 'card-size'} expanded={openPanel === 'card-size'} onClick={() => togglePanel('card-size')} />
             {openPanel === 'card-size' && (
@@ -937,12 +944,12 @@ function RightControlRail({
             <RailButton icon="sliders" label="Print setup" active={openPanel === 'print'} expanded={openPanel === 'print'} onClick={() => togglePanel('print')}>
               <span className={`absolute right-1 top-1 size-1.5 rounded-full ${fitInfo.fitsTrueSize ? 'bg-emerald-400' : 'bg-amber-400'}`} />
             </RailButton>
-            {openPanel === 'print' && <RailPopover title="Print setup" icon="sliders" align="bottom"><PrintSetupContent settings={settings} setSettings={setSettings} fitInfo={fitInfo} suggestedPaper={suggestedPaper} printCount={printCount} onReset={onReset} /></RailPopover>}
+            {openPanel === 'print' && <RailPopover title="Print setup" icon="sliders" align="viewport"><PrintSetupContent settings={settings} setSettings={setSettings} fitInfo={fitInfo} suggestedPaper={suggestedPaper} printCount={printCount} onReset={onReset} /></RailPopover>}
           </div>
           <RailButton icon="copy" label="Duplicate physical sheet" onClick={onDuplicate} />
           <div className="relative flex">
             <RailButton icon="keyboard" label="Keyboard shortcuts" active={openPanel === 'shortcuts'} expanded={openPanel === 'shortcuts'} onClick={() => togglePanel('shortcuts')} />
-            {openPanel === 'shortcuts' && <RailPopover title="Keyboard shortcuts" icon="keyboard" align="bottom"><ShortcutsContent /></RailPopover>}
+            {openPanel === 'shortcuts' && <RailPopover title="Keyboard shortcuts" icon="keyboard" align="viewport"><ShortcutsContent /></RailPopover>}
           </div>
           {installPrompt && <RailButton icon="install" label="Install app" onClick={onInstall} />}
         </div>
@@ -978,34 +985,35 @@ function FloatingNavigation({
   onDelete,
   canDelete,
 }) {
-  const historyButton = 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 p-1.5 rounded-md transition-all cursor-pointer disabled:pointer-events-none disabled:text-neutral-700 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500';
+  const bottomIconButton = 'w-8 h-8 flex items-center justify-center rounded-lg transition-all shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500';
+  const neutralIconButton = `${bottomIconButton} cursor-pointer text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200 disabled:pointer-events-none disabled:cursor-default disabled:text-neutral-700`;
   return (
     <div data-bottom-control-bar className="no-print relative flex w-full shrink-0 items-center justify-center border-t border-white/[0.06] bg-neutral-900/60 px-6 py-3 backdrop-blur-md select-none">
       <div className="flex w-full items-center justify-center">
         <div data-floating-navigation className="flex w-fit max-w-[calc(100%_-_10rem)] items-center gap-2 overflow-x-auto rounded-xl border border-white/[0.06] bg-neutral-950 px-4 py-2 shadow-2xl scrollbar-none [scrollbar-width:none] min-[1281px]:gap-4 [&::-webkit-scrollbar]:hidden">
           <div role="group" aria-label="History" className="flex shrink-0 items-center gap-1">
-            <button type="button" onClick={onUndo} disabled={!canUndo} aria-label="Undo" title="Undo" className={historyButton}><Icon name="undo" size="sm" className="w-3.5 h-3.5" /></button>
-            <button type="button" onClick={onRedo} disabled={!canRedo} aria-label="Redo" title="Redo" className={historyButton}><Icon name="redo" size="sm" className="w-3.5 h-3.5" /></button>
+            <button type="button" onClick={onUndo} disabled={!canUndo} aria-label="Undo" title="Undo" className={neutralIconButton}><Icon name="undo" /></button>
+            <button type="button" onClick={onRedo} disabled={!canRedo} aria-label="Redo" title="Redo" className={neutralIconButton}><Icon name="redo" /></button>
           </div>
           <div role="group" aria-label="Slot structure" className="flex shrink-0 items-center gap-1 border-l border-white/[0.06] pl-2 min-[1281px]:pl-4">
-            <button type="button" onClick={onToggleCombine} aria-pressed={combineMode} aria-label="Combine slots" title="Combine slots (M)" className={`p-1.5 rounded-md transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${combineMode ? 'bg-red-950/70 text-red-300' : 'text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200'}`}><Icon name="combine" size="sm" /></button>
-            <button type="button" onClick={onMerge} disabled={!canMerge} aria-label="Merge selected slots" title="Merge selected slots (Enter)" className="p-1.5 rounded-md text-neutral-400 transition-all hover:bg-neutral-800 hover:text-neutral-200 disabled:pointer-events-none disabled:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="merge" size="sm" /></button>
-            <button type="button" onClick={onUnmerge} disabled={!selectedMergeCount} aria-label="Unmerge selected frame" title="Unmerge selected frame (U)" className="p-1.5 rounded-md text-neutral-400 transition-all hover:bg-neutral-800 hover:text-neutral-200 disabled:pointer-events-none disabled:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="split" size="sm" /></button>
-            <button type="button" onClick={onResetLayout} disabled={!canResetLayout} aria-label="Reset merged layout" title="Reset merged layout" className="p-1.5 rounded-md text-neutral-400 transition-all hover:bg-neutral-800 hover:text-neutral-200 disabled:pointer-events-none disabled:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="reset" size="sm" /></button>
-            <button type="button" onClick={onClearPage} disabled={!canClearPage} aria-label="Clear active page" title="Clear active page" className="p-1.5 rounded-md text-neutral-500 transition-all hover:bg-red-500/10 hover:text-red-400 disabled:pointer-events-none disabled:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="eraser" size="sm" /></button>
+            <button type="button" onClick={onToggleCombine} aria-pressed={combineMode} aria-label="Combine slots" title="Combine slots (M)" className={`${bottomIconButton} ${combineMode ? 'bg-red-950/70 text-red-300' : 'text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200'}`}><Icon name="combine" /></button>
+            <button type="button" onClick={onMerge} disabled={!canMerge} aria-label="Merge selected slots" title="Merge selected slots (Enter)" className={neutralIconButton}><Icon name="merge" /></button>
+            <button type="button" onClick={onUnmerge} disabled={!selectedMergeCount} aria-label="Unmerge selected frame" title="Unmerge selected frame (U)" className={neutralIconButton}><Icon name="split" /></button>
+            <button type="button" onClick={onResetLayout} disabled={!canResetLayout} aria-label="Reset merged layout" title="Reset merged layout" className={neutralIconButton}><Icon name="reset" /></button>
+            <button type="button" onClick={onClearPage} disabled={!canClearPage} aria-label="Clear active page" title="Clear active page" className={`${bottomIconButton} cursor-pointer text-neutral-500 hover:bg-red-500/10 hover:text-red-400 disabled:pointer-events-none disabled:cursor-default disabled:text-neutral-700`}><Icon name="eraser" /></button>
           </div>
           <div role="group" aria-label="Spread navigation" className="flex shrink-0 items-center gap-2 border-l border-white/[0.06] pl-2 min-[1281px]:pl-4">
-            <button type="button" onClick={onPrevious} disabled={!canPrevious} aria-label="Previous spread" title="Previous spread" className="p-1 text-neutral-400 hover:text-neutral-200 transition-colors disabled:pointer-events-none disabled:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="chevronLeft" size="md" className="w-4 h-4" /></button>
+            <button type="button" onClick={onPrevious} disabled={!canPrevious} aria-label="Previous spread" title="Previous spread" className={neutralIconButton}><Icon name="chevronLeft" /></button>
             <div className="flex items-center gap-1 text-[11px] font-mono text-neutral-400 font-medium" aria-live="polite">
               <span className="max-[1280px]:sr-only">Spread</span>
               <span className="rounded border border-white/[0.04] bg-neutral-900 px-2 py-0.5 font-semibold text-neutral-200">{currentSpread}</span>
               <span>/</span>
               <span>{totalSpreads}</span>
             </div>
-            <button type="button" onClick={onNext} disabled={!canNext} aria-label="Next spread" title="Next spread" className="p-1 text-neutral-400 hover:text-neutral-200 transition-colors disabled:pointer-events-none disabled:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="chevronRight" size="md" className="w-4 h-4" /></button>
+            <button type="button" onClick={onNext} disabled={!canNext} aria-label="Next spread" title="Next spread" className={neutralIconButton}><Icon name="chevronRight" /></button>
           </div>
-          <button type="button" onClick={onAdd} aria-label="Add spread" className="flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-white/[0.04] bg-neutral-800 px-2 text-xs font-semibold text-neutral-200 shadow-sm transition-all hover:bg-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 min-[1281px]:ml-2 min-[1281px]:px-3" title="Insert a new two-page physical sheet"><Icon name="plus" size="sm" className="w-3.5 h-3.5" /><span className="max-[1280px]:sr-only">Add Spread</span></button>
-          <button type="button" onClick={onDelete} disabled={!canDelete} aria-label="Delete active sheet" title={canDelete ? 'Delete active sheet' : 'Keep at least one physical sheet'} className="shrink-0 cursor-pointer rounded-md p-1.5 text-neutral-500 transition-all hover:bg-red-500/10 hover:text-red-400 disabled:pointer-events-none disabled:cursor-default disabled:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 min-[1281px]:ml-2"><Icon name="trash" size="sm" className="w-3.5 h-3.5" /></button>
+          <button type="button" onClick={onAdd} aria-label="Add spread" className={`${bottomIconButton} border border-white/[0.04] bg-neutral-800 text-neutral-200 shadow-sm hover:bg-neutral-700 min-[1281px]:ml-2`} title="Insert a new two-page physical sheet"><Icon name="plus" /></button>
+          <button type="button" onClick={onDelete} disabled={!canDelete} aria-label="Delete active sheet" title={canDelete ? 'Delete active sheet' : 'Keep at least one physical sheet'} className={`${bottomIconButton} cursor-pointer text-neutral-500 hover:bg-red-500/10 hover:text-red-400 disabled:pointer-events-none disabled:cursor-default disabled:text-neutral-700 min-[1281px]:ml-2`}><Icon name="trash" /></button>
         </div>
       </div>
       <button
@@ -1017,7 +1025,7 @@ function FloatingNavigation({
         title={showBottomTimeline ? 'Collapse Timeline' : 'Expand Timeline'}
       >
         <span className="text-[10px] font-sans font-bold tracking-wider text-neutral-500 uppercase max-[1180px]:sr-only">Timeline</span>
-        <Icon name={showBottomTimeline ? 'chevronDown' : 'chevronUp'} size="sm" className="w-3.5 h-3.5" />
+        <Icon name={showBottomTimeline ? 'chevronDown' : 'chevronUp'} />
       </button>
     </div>
   );
@@ -1033,7 +1041,7 @@ function PrintSetupContent({ settings, setSettings, fitInfo, suggestedPaper, pri
         </select>
       </label>
       <div className={`flex items-center gap-2 rounded-lg p-2 ${fitInfo.fitsTrueSize ? 'bg-emerald-500/10 text-emerald-300' : 'bg-amber-500/10 text-amber-300'}`}>
-        <Icon name={fitInfo.fitsTrueSize ? 'check' : 'alert'} size="sm" />
+        <Icon name={fitInfo.fitsTrueSize ? 'check' : 'alert'} />
         <span>{fitInfo.fitsTrueSize ? `True size on ${PAPER_SIZES[settings.paper].short}` : `${PAPER_SIZES[settings.paper].short} prints at ${fmtPct(fitInfo.printFit)}`}</span>
         {!fitInfo.fitsTrueSize && suggestedPaper && <button type="button" onClick={() => setSettings((value) => ({ ...value, paper: suggestedPaper }))} className="ml-auto font-semibold underline decoration-white/30 underline-offset-2">Use {PAPER_SIZES[suggestedPaper].short}</button>}
       </div>
@@ -1156,7 +1164,7 @@ function CardPool({
               onClick={() => chooseTab(tab.id)}
               className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${activeTab === tab.id ? 'border border-red-500/25 bg-red-950/60 text-red-300 shadow-sm' : 'border border-transparent text-neutral-500 hover:bg-neutral-900 hover:text-neutral-200'}`}
             >
-              <Icon name={tab.icon} size="sm" className="w-3.5 h-3.5" />
+              <Icon name={tab.icon} />
               <span>{tab.label}</span>
             </button>
           ))}
@@ -1175,7 +1183,7 @@ function CardPool({
               onChange={handleLocalUploadEvent}
               className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
             />
-            <Icon name="upload" className="w-4 h-4 mx-auto text-neutral-500 group-hover:text-neutral-400 mb-1.5 transition-colors" />
+            <Icon name="upload" className="mx-auto text-neutral-500 group-hover:text-neutral-400 mb-1.5 transition-colors" />
             <span className="block text-xs font-semibold text-neutral-200">Upload custom card art</span>
             <span className="block text-[10px] font-mono text-neutral-500 tracking-normal mt-0.5">PNG, JPG, or WEBP files</span>
           </div>
@@ -1207,7 +1215,7 @@ function CardPool({
                   onDragEnd={onDragEnd}
                   className={`relative group/local aspect-[2.5/3.5] cursor-grab active:cursor-grabbing rounded-md overflow-hidden bg-neutral-900 outline-none transition-all duration-150 focus-visible:ring-2 focus-visible:ring-red-500 ${selectionIndex >= 0 ? 'ring-2 ring-red-500 scale-[0.98] brightness-110 shadow-lg' : 'border border-white/[0.03] opacity-80 hover:opacity-100 shadow-sm hover:shadow-lg hover:border-white/[0.15]'}`}
                 >
-                  {localCard.localUrlDataString ? <img src={localCard.localUrlDataString} className={`w-full h-full object-cover bg-neutral-950 pointer-events-none ${placed ? 'opacity-45 grayscale group-hover/local:opacity-75' : ''}`} alt="Uploaded Card" /> : <span className="absolute inset-0 grid place-items-center text-neutral-600"><Icon name="image" size="lg" /></span>}
+                  {localCard.localUrlDataString ? <img src={localCard.localUrlDataString} className={`w-full h-full object-cover bg-neutral-950 pointer-events-none ${placed ? 'opacity-45 grayscale group-hover/local:opacity-75' : ''}`} alt="Uploaded Card" /> : <span className="absolute inset-0 grid place-items-center text-neutral-600"><Icon name="image" /></span>}
                   <span className="absolute top-1 right-1 bg-neutral-950/80 backdrop-blur-sm text-[8px] font-mono text-neutral-400 border border-white/[0.08] px-1 py-0.5 rounded shadow-sm">LOCAL</span>
                   <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent px-1.5 pb-1 pt-5 text-[9px] font-medium text-neutral-200 opacity-0 transition-opacity group-hover/local:opacity-100 group-focus-visible/local:opacity-100"><span className="block truncate">{localCard.name || 'Custom Art'}</span></span>
                   {selectionIndex >= 0 && <span className="animate-scaleIn absolute top-1 left-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-mono font-bold text-white shadow-md">{selectionIndex + 1}</span>}
@@ -1261,7 +1269,7 @@ function CardPool({
                   onClick={onClearFilters}
                   className="flex items-center gap-1 text-[10px] font-medium tracking-wide text-neutral-400 hover:text-neutral-200 transition-colors cursor-pointer select-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-red-500/50 rounded-sm"
                 >
-                  <Icon name="x" size="xs" className="w-3 h-3" />
+                  <Icon name="x" />
                   <span>Clear Filters</span>
                 </button>
               </div>
@@ -1313,7 +1321,7 @@ function CardPool({
             </section>
           ) : (
             <div className="mx-4 mt-1 rounded-lg border border-dashed border-white/[0.05] bg-neutral-900/20 px-5 py-10 text-center">
-              <Icon name="sparkles" size="lg" className="mx-auto mb-2 text-neutral-600" />
+              <Icon name="sparkles" className="mx-auto mb-2 text-neutral-600" />
               <p className="text-xs font-medium text-neutral-400">Search the public card catalog</p>
               <p className="mt-1 text-[10px] leading-relaxed text-neutral-600">Enter a Pokémon name or select a set to browse TCGdex.</p>
             </div>
@@ -1330,10 +1338,10 @@ function CanvasHelper({ editing, multiDrag, flowCount, offsetX, onCenter, onCanc
   let content;
   if (editing) {
     tone = 'border-amber-400/30 bg-amber-950/90 text-amber-100';
-    content = <><Icon name="move" size="sm" /><span>Reposition image — drag inside the slot · arrows nudge · click outside to confirm</span><ToolButton label="Center" dense onClick={onCenter} /><ToolButton label="Cancel" dense onClick={onCancel} /><ToolButton label="Done" dense variant="primary" onClick={onDone} /></>;
+    content = <><Icon name="move" /><span>Reposition image — drag inside the slot · arrows nudge · click outside to confirm</span><ToolButton label="Center" dense onClick={onCenter} /><ToolButton label="Cancel" dense onClick={onCancel} /><ToolButton label="Done" dense variant="primary" onClick={onDone} /></>;
   } else if (multiDrag > 1) {
     tone = 'border-emerald-400/30 bg-emerald-950/90 text-emerald-100';
-    content = <><Icon name="wand" size="sm" /><span>Dropping {plural(multiDrag, 'card')} into the first empty slots{flowCount ? ` · ${flowCount} will flow to the next page(s)` : ''}</span></>;
+    content = <><Icon name="wand" /><span>Dropping {plural(multiDrag, 'card')} into the first empty slots{flowCount ? ` · ${flowCount} will flow to the next page(s)` : ''}</span></>;
   } else return null;
 
   return <div data-reposition-ui={editing ? '' : undefined} className={`absolute top-full z-30 mt-4 flex h-8 w-auto min-w-fit max-w-none -translate-x-1/2 items-center gap-1.5 rounded-full border px-3 text-[11px] whitespace-nowrap shadow-xl shadow-black/30 ${tone}`} style={{ left: `calc(50% + ${offsetX}px)` }}>{content}</div>;
@@ -2852,7 +2860,7 @@ export default function CardBinder() {
             onDoubleClick={stopSlotAction}
             className="grid size-6 place-items-center rounded-md bg-black/70 text-zinc-200 ring-1 ring-white/20 backdrop-blur transition-colors hover:bg-red-600 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
           >
-            <Icon name="split" size="sm" />
+            <Icon name="split" />
           </button>
         )}
         {imgId && (
@@ -2866,7 +2874,7 @@ export default function CardBinder() {
             onDoubleClick={stopSlotAction}
             className="grid size-6 place-items-center rounded-md bg-black/70 text-zinc-200 ring-1 ring-white/20 backdrop-blur transition-colors hover:bg-red-500 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
           >
-            <Icon name="x" size="sm" />
+            <Icon name="x" />
           </button>
         )}
       </div>
@@ -2887,7 +2895,7 @@ export default function CardBinder() {
             className={`group grid size-full cursor-pointer place-items-center overflow-hidden rounded-md border border-dashed outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-red-500 ${settings.view === 'binder' ? 'border-white/[0.05] bg-neutral-900/40 text-neutral-400 shadow-inner hover:border-white/[0.1] hover:bg-neutral-900/70 hover:text-neutral-200' : 'border-zinc-400 bg-white/30 text-zinc-700 hover:border-red-500 hover:text-red-800'}`}
             style={{ borderRadius: radius }}
           >
-            {labelVisible && <span className="flex flex-col items-center gap-1.5"><span className="text-neutral-700 transition-colors group-hover:text-neutral-500"><Icon name="plus" size="xs" className="h-2.5 w-2.5" strokeWidth={1.1} /></span><span className="text-[9px] font-mono font-medium tracking-widest text-neutral-600 uppercase transition-colors group-hover:text-neutral-400">{slot.cs * slot.rs > 1 ? `${boxDims(slot)} frame` : `Slot ${slotIndex + 1}`}</span></span>}
+            {labelVisible && <span className="flex flex-col items-center gap-1.5"><span className="text-neutral-700 transition-colors group-hover:text-neutral-500"><Icon name="plus" strokeWidth={1.1} /></span><span className="text-[9px] font-mono font-medium tracking-widest text-neutral-600 uppercase transition-colors group-hover:text-neutral-400">{slot.cs * slot.rs > 1 ? `${boxDims(slot)} frame` : `Slot ${slotIndex + 1}`}</span></span>}
           </button>
           {slotActions}
         </div>
@@ -2940,7 +2948,7 @@ export default function CardBinder() {
             }}
             className="size-full"
             style={{ objectFit: settings.fit, objectPosition: `${isEditing ? editing.x : crop.x}% ${isEditing ? editing.y : crop.y}%` }}
-          /> : <span className="absolute inset-0 grid place-items-center bg-zinc-800 text-zinc-500"><Icon name="image" size="xl" /></span>}
+          /> : <span className="absolute inset-0 grid place-items-center bg-zinc-800 text-zinc-500"><Icon name="image" /></span>}
         </div>
         {slotActions}
         {!dragInfo && !combineMode && !editing && dpi && <span title={`${dpi} effective DPI at print size`} className={`absolute bottom-1.5 right-1.5 z-40 hidden rounded-full px-1.5 py-0.5 text-[9px] font-bold shadow group-hover:block ${dpiTone}`}>{dpi} DPI</span>}
@@ -3353,7 +3361,7 @@ export default function CardBinder() {
                 {spreadGroups.map(renderThumbnailGroup)}
                 <div className="flex shrink-0 flex-col items-center gap-1 text-[10px] font-medium whitespace-nowrap text-neutral-500">
                   <button type="button" onClick={addPage} aria-label="Add page" className="group shrink-0 rounded-md bg-transparent p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500">
-                    <span className="flex aspect-[1/1.414] w-10 items-center justify-center overflow-hidden rounded-sm border border-dashed border-neutral-700 text-neutral-500 transition-colors group-hover:border-neutral-500 group-hover:bg-neutral-900 group-hover:text-neutral-200"><Icon name="plus" size="md" /></span>
+                    <span className="flex aspect-[1/1.414] w-10 items-center justify-center overflow-hidden rounded-sm border border-dashed border-neutral-700 text-neutral-500 transition-colors group-hover:border-neutral-500 group-hover:bg-neutral-900 group-hover:text-neutral-200"><Icon name="plus" /></span>
                   </button>
                   <span>Add page</span>
                 </div>
@@ -3380,10 +3388,10 @@ export default function CardBinder() {
           />
         </div>
         <div className="no-print pointer-events-none fixed bottom-10 right-20 z-[100] flex w-[360px] flex-col items-end gap-2">
-          {toasts.map((toast) => <div key={toast.id} role="status" className={`animate-toast pointer-events-auto flex max-w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-[12px] shadow-2xl shadow-black/40 ${toastTones[toast.tone] || toastTones.info}`}><span className="leading-relaxed">{toast.message}</span>{toast.action && <button type="button" onClick={() => { setToasts((value) => value.filter((item) => item.id !== toast.id)); toast.action.onClick(); }} className="shrink-0 rounded-md bg-white/10 px-2 py-1 font-semibold text-white hover:bg-white/20">{toast.action.label}</button>}<button type="button" title="Dismiss" aria-label="Dismiss notification" onClick={() => setToasts((value) => value.filter((item) => item.id !== toast.id))} className="grid size-6 shrink-0 place-items-center rounded-md text-current hover:bg-white/10"><Icon name="x" size="sm" /></button></div>)}
+          {toasts.map((toast) => <div key={toast.id} role="status" className={`animate-toast pointer-events-auto flex max-w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-[12px] shadow-2xl shadow-black/40 ${toastTones[toast.tone] || toastTones.info}`}><span className="leading-relaxed">{toast.message}</span>{toast.action && <button type="button" onClick={() => { setToasts((value) => value.filter((item) => item.id !== toast.id)); toast.action.onClick(); }} className="shrink-0 rounded-md bg-white/10 px-2 py-1 font-semibold text-white hover:bg-white/20">{toast.action.label}</button>}<button type="button" title="Dismiss" aria-label="Dismiss notification" onClick={() => setToasts((value) => value.filter((item) => item.id !== toast.id))} className="grid size-6 shrink-0 place-items-center rounded-md text-current hover:bg-white/10"><Icon name="x" /></button></div>)}
         </div>
       </div>
-      <div className="portrait-guard"><Icon name="rotate" size="2xl" className="text-red-400" /><h2 className="text-xl font-semibold text-white">Rotate to landscape</h2><p className="max-w-sm text-sm text-zinc-400">MichiBinder is designed as a desktop, landscape workspace.</p></div>
+      <div className="portrait-guard"><Icon name="rotate" className="text-red-400" /><h2 className="text-xl font-semibold text-white">Rotate to landscape</h2><p className="max-w-sm text-sm text-zinc-400">MichiBinder is designed as a desktop, landscape workspace.</p></div>
       {printTree}
     </>
   );
