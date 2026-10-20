@@ -16,6 +16,7 @@ import {
   Keyboard,
   Layers,
   LayoutGrid,
+  ListFilter,
   MonitorDown,
   Move,
   Menu,
@@ -563,6 +564,7 @@ const ICONS = {
   install: MonitorDown,
   keyboard: Keyboard,
   layers: Layers,
+  filter: ListFilter,
   merge: TableCellsMerge,
   menu: Menu,
   move: Move,
@@ -792,13 +794,15 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, saveStatus }) {
   );
 }
 
-function RailButton({ icon, label, active = false, onClick, className = '', children }) {
+function RailButton({ icon, label, active = false, expanded, onClick, className = '', children }) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-label={label}
       aria-pressed={active}
+      aria-expanded={expanded}
+      aria-haspopup={expanded === undefined ? undefined : 'dialog'}
       title={label}
       className={`relative flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-lg border shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${active ? 'border-red-500/30 bg-red-950/70 text-red-300' : 'border-white/[0.08] bg-neutral-950 text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200'} ${className}`}
     >
@@ -808,12 +812,22 @@ function RailButton({ icon, label, active = false, onClick, className = '', chil
   );
 }
 
-function RailPanel({ title, icon, position = 'top-4', children }) {
+function RailPopover({ title, icon, align = 'top', children }) {
   return (
-    <section className={`absolute right-full ${position} z-[80] mr-3 w-72 rounded-xl border border-white/[0.08] bg-neutral-900 p-4 text-left shadow-2xl shadow-black/70`} onPointerDown={(event) => event.stopPropagation()}>
-      <div className="mb-3 flex items-center gap-2 border-b border-white/[0.06] pb-3 text-xs font-semibold text-neutral-100"><Icon name={icon} size="sm" className="text-neutral-400" />{title}</div>
+    <div
+      data-rail-popover
+      role="dialog"
+      aria-label={title}
+      className={`absolute right-full mr-3 ${align === 'bottom' ? 'bottom-0' : 'top-0'} z-50 w-56 bg-neutral-950/95 border border-white/[0.08] rounded-xl shadow-[0_16px_40px_rgba(0,0,0,0.8)] backdrop-blur-xl animate-scaleIn origin-right p-3 flex flex-col gap-2`}
+      style={{ transformOrigin: 'right center' }}
+      onPointerDown={(event) => event.stopPropagation()}
+    >
+      <div className="flex items-center gap-2 border-b border-white/[0.06] pb-2 text-[11px] font-semibold text-neutral-100">
+        <Icon name={icon} size="sm" className="text-neutral-400" />
+        <span>{title}</span>
+      </div>
       {children}
-    </section>
+    </div>
   );
 }
 
@@ -838,59 +852,101 @@ function RightControlRail({
   const cleanSize = settings.cardSize;
   const base = baseCardSizeMm(cleanSize);
   const custom = cleanSize.preset === 'custom';
+  const activeLayout = getLayout(settings.layout);
   const setCardSize = (patch) => setSettings((value) => ({ ...value, cardSize: sanitizeCardSize({ ...value.cardSize, ...patch }) }));
   const togglePanel = (panel) => setOpenPanel((value) => value === panel ? null : panel);
+  const choosePrintScope = (scope) => { setPrintScope(scope); setOpenPanel(null); };
+  const chooseGrid = (layoutId) => { onChooseLayout(layoutId); setOpenPanel(null); };
+
   return (
-    <aside data-control-rail aria-label="Layout and print controls" className="no-print relative z-40 flex h-full w-16 shrink-0 select-none flex-col items-center justify-between border-l border-white/[0.06] bg-neutral-900 py-4">
-      <div data-rail-zone="primary" className="flex flex-col items-center gap-3">
-        <button type="button" onClick={onPrint} aria-label="Print / PDF" title="Print / PDF" className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg border border-white/[0.08] bg-neutral-800 text-neutral-200 shadow-sm transition-all hover:bg-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="printer" size="md" className="h-4 w-4" /></button>
-        <div role="group" aria-label="Print scope" className="flex w-12 flex-col gap-1 rounded-lg border border-white/[0.05] bg-neutral-950/70 p-1">
-          <button type="button" aria-pressed={printScope === 'all'} onClick={() => setPrintScope('all')} className={`rounded-md px-1 py-1 text-[9px] font-bold leading-[1.05] tracking-wider uppercase transition-all ${printScope === 'all' ? 'bg-neutral-800 text-neutral-200 shadow-sm' : 'text-neutral-500 hover:text-neutral-300'}`}><span className="block">Include</span><span className="block">All</span></button>
-          <button type="button" aria-pressed={printScope === 'custom'} onClick={() => setPrintScope('custom')} className={`rounded-md px-1 py-1 text-[9px] font-bold leading-[1.05] tracking-wider uppercase transition-all ${printScope === 'custom' ? 'bg-neutral-800 text-neutral-200 shadow-sm' : 'text-neutral-500 hover:text-neutral-300'}`}><span className="block">Uploads</span><span className="block">Only</span></button>
-        </div>
-      </div>
-
-      <div data-rail-zone="layout" className="flex flex-col items-center gap-2">
-        <div role="radiogroup" aria-label="Pocket layout" className="flex flex-col gap-1.5">
-          {GRID_LAYOUTS.map((layoutOption) => (
-            <button key={layoutOption.id} type="button" role="radio" aria-checked={settings.layout === layoutOption.id} aria-label={`${layoutOption.label} (${layoutOption.hint})`} title={`${layoutOption.label} · ${layoutOption.hint}`} onClick={() => onChooseLayout(layoutOption.id)} className={`flex h-9 w-10 items-center justify-center gap-1 rounded-lg border text-[10px] font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${settings.layout === layoutOption.id ? 'border-red-500/30 bg-red-950/70 text-red-300' : 'border-white/[0.06] bg-neutral-950 text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200'}`}><Icon name={layoutOption.icon} size="xs" /><span>{layoutOption.pockets}</span></button>
-          ))}
-        </div>
-        <span aria-hidden="true" className="my-1 h-px w-7 bg-white/[0.06]" />
-        <div role="radiogroup" aria-label="Preview mode" className="flex flex-col gap-1.5">
-          <RailButton icon="book" label="Binder preview" active={settings.view === 'binder'} onClick={() => onViewChange('binder')} className="h-9" />
-          <RailButton icon="file" label="Paper preview" active={settings.view === 'paper'} onClick={() => onViewChange('paper')} className="h-9" />
-        </div>
-        <button type="button" aria-expanded={openPanel === 'scale'} onClick={() => togglePanel('scale')} title="Card scale" className={`flex h-7 w-11 items-center justify-center rounded-full border text-[10px] font-mono font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${openPanel === 'scale' ? 'border-red-500/30 bg-red-950/70 text-red-300' : 'border-white/[0.08] bg-neutral-950 text-neutral-300 hover:bg-neutral-800'}`}>{Math.round(cleanSize.scale * 100)}%</button>
-      </div>
-
-      <div data-rail-zone="material" className="flex flex-col items-center gap-2">
-        <RailButton icon="layers" label={`Card size: ${custom ? 'Custom' : 'Pokémon'} ${round1(base.w)} × ${round1(base.h)} mm`} active={openPanel === 'card-size'} onClick={() => togglePanel('card-size')} />
-        <RailButton icon="sliders" label="Print setup" active={openPanel === 'print'} onClick={() => togglePanel('print')}>
-          <span className={`absolute right-1 top-1 size-1.5 rounded-full ${fitInfo.fitsTrueSize ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-        </RailButton>
-        <RailButton icon="copy" label="Duplicate physical sheet" onClick={onDuplicate} />
-        <RailButton icon="keyboard" label="Keyboard shortcuts" active={openPanel === 'shortcuts'} onClick={() => togglePanel('shortcuts')} />
-        {installPrompt && <RailButton icon="install" label="Install app" onClick={onInstall} />}
-      </div>
-
-      {openPanel === 'scale' && (
-        <RailPanel title="Card scale" icon="ruler" position="top-1/2 -translate-y-1/2">
-          <div className="flex items-center justify-center gap-6 py-2">
-            <input type="range" min={80} max={125} step={1} value={Math.round(cleanSize.scale * 100)} aria-label="Card scale" onChange={(event) => setCardSize({ scale: Number(event.target.value) / 100 })} onDoubleClick={() => setCardSize({ scale: 1 })} className="h-44 w-5 cursor-pointer accent-red-600 [direction:rtl] [writing-mode:vertical-lr] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500" />
-            <div className="flex flex-col items-center gap-3"><output className="text-2xl font-semibold tracking-tight text-neutral-100">{Math.round(cleanSize.scale * 100)}%</output><span className="text-[10px] font-mono tracking-widest text-neutral-500 uppercase">80–125%</span><button type="button" onClick={() => setCardSize({ scale: 1 })} className="rounded-md border border-white/[0.08] bg-neutral-950 px-2 py-1 text-[10px] font-semibold text-neutral-400 hover:text-neutral-200">Reset 100%</button></div>
+    <aside data-control-rail aria-label="Layout and print controls" className="no-print py-3 pr-3 h-full shrink-0 flex items-center justify-center z-40 select-none">
+      <div data-control-pod className="w-14 h-full bg-neutral-900/85 backdrop-blur-md border border-white/[0.06] rounded-2xl flex flex-col items-center py-4 justify-between shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)] hover:border-white/[0.12] transition-colors">
+        <div data-rail-zone="primary" className="flex flex-col items-center gap-2">
+          <button type="button" onClick={onPrint} aria-label="Print / PDF" title="Print / PDF" className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg border border-white/[0.08] bg-neutral-800 text-neutral-200 shadow-sm transition-all hover:bg-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="printer" size="md" className="h-4 w-4" /></button>
+          <div className="relative flex">
+            <RailButton icon="filter" label={`Print scope: ${printScope === 'all' ? 'Include all' : 'Uploads only'}`} active={openPanel === 'print-scope'} expanded={openPanel === 'print-scope'} onClick={() => togglePanel('print-scope')}>
+              <span className="absolute bottom-1 right-1 text-[7px] font-mono font-bold leading-none text-current">{printScope === 'all' ? 'A' : 'U'}</span>
+            </RailButton>
+            {openPanel === 'print-scope' && (
+              <RailPopover title="Print scope" icon="filter">
+                <div role="radiogroup" aria-label="Print scope" className="flex flex-col gap-1">
+                  {[
+                    { value: 'all', label: 'Include all', detail: 'Print every placed card' },
+                    { value: 'custom', label: 'Uploads only', detail: 'Print private uploads only' },
+                  ].map((option) => (
+                    <button key={option.value} type="button" role="radio" aria-checked={printScope === option.value} onClick={() => choosePrintScope(option.value)} className={`flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${printScope === option.value ? 'border-red-500/25 bg-red-950/55 text-red-200' : 'border-white/[0.05] bg-neutral-900/60 text-neutral-300 hover:bg-neutral-800'}`}>
+                      <span className={`grid size-4 shrink-0 place-items-center rounded-full border ${printScope === option.value ? 'border-red-400/50 bg-red-500/15' : 'border-white/10 bg-neutral-950'}`}>{printScope === option.value && <span className="size-1.5 rounded-full bg-red-400" />}</span>
+                      <span className="min-w-0"><strong className="block text-[11px] font-semibold">{option.label}</strong><span className="block truncate text-[9px] text-neutral-500">{option.detail}</span></span>
+                    </button>
+                  ))}
+                </div>
+              </RailPopover>
+            )}
           </div>
-        </RailPanel>
-      )}
-      {openPanel === 'card-size' && (
-        <RailPanel title="Card material" icon="layers" position="bottom-4">
-          <label className="block"><span className="mb-1.5 block text-[10px] font-bold tracking-widest text-neutral-500 uppercase">Card archetype</span><select value={custom ? 'custom' : cleanSize.preset} aria-label="Card size" onChange={(event) => { if (event.target.value === 'custom') setCardSize({ preset: 'custom', customWmm: base.w, customHmm: base.h }); else setCardSize({ preset: event.target.value }); }} className="h-9 w-full rounded-lg border border-white/[0.08] bg-neutral-950 px-2.5 text-xs font-medium text-neutral-200 outline-none focus-visible:ring-2 focus-visible:ring-red-500">{CARD_PRESETS.map((preset) => <option key={preset.id} value={preset.id}>{preset.label} · {preset.wMm} × {preset.hMm} mm</option>)}<option value="custom">Custom dimensions…</option></select></label>
-          {custom && <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-white/[0.06] bg-neutral-950/70 p-2"><MmField label="W" value={cleanSize.customWmm} onCommit={(customWmm) => setCardSize({ customWmm })} /><span className="text-neutral-600">×</span><MmField label="H" value={cleanSize.customHmm} onCommit={(customHmm) => setCardSize({ customHmm })} /><span className="text-[10px] text-neutral-500">mm</span></div>}
-          <div className="mt-3 flex items-center justify-between border-t border-white/[0.06] pt-3 text-[10px] font-mono text-neutral-500"><span>Effective size</span><strong className="text-neutral-200">{fmtMm(resolveCardSize(cleanSize).w)} × {fmtMm(resolveCardSize(cleanSize).h)} mm</strong></div>
-        </RailPanel>
-      )}
-      {openPanel === 'print' && <RailPanel title="Print setup" icon="sliders" position="top-4"><PrintSetupContent settings={settings} setSettings={setSettings} fitInfo={fitInfo} suggestedPaper={suggestedPaper} printCount={printCount} onReset={onReset} /></RailPanel>}
-      {openPanel === 'shortcuts' && <RailPanel title="Keyboard shortcuts" icon="keyboard" position="bottom-4"><ShortcutsContent /></RailPanel>}
+        </div>
+
+        <div data-rail-zone="layout" className="flex flex-col items-center gap-2">
+          <div className="relative flex">
+            <RailButton icon={activeLayout.icon} label={`Grid selection: ${activeLayout.label}`} active={openPanel === 'grid'} expanded={openPanel === 'grid'} onClick={() => togglePanel('grid')}>
+              <span className="absolute bottom-1 right-1 text-[7px] font-mono font-bold leading-none text-current">{activeLayout.pockets}</span>
+            </RailButton>
+            {openPanel === 'grid' && (
+              <RailPopover title="Grid selection" icon="grid">
+                <div role="radiogroup" aria-label="Pocket layout" className="flex flex-col gap-1">
+                  {GRID_LAYOUTS.map((layoutOption) => (
+                    <button key={layoutOption.id} type="button" role="radio" aria-checked={settings.layout === layoutOption.id} aria-label={`${layoutOption.label} (${layoutOption.hint})`} onClick={() => chooseGrid(layoutOption.id)} className={`flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${settings.layout === layoutOption.id ? 'border-red-500/25 bg-red-950/55 text-red-200' : 'border-white/[0.05] bg-neutral-900/60 text-neutral-300 hover:bg-neutral-800'}`}>
+                      <span className="grid size-7 shrink-0 place-items-center rounded-md border border-white/[0.06] bg-neutral-950"><Icon name={layoutOption.icon} size="sm" /></span>
+                      <span className="min-w-0 flex-1"><strong className="block text-[11px] font-semibold">{layoutOption.pockets} pockets</strong><span className="block text-[9px] text-neutral-500">{layoutOption.hint}</span></span>
+                      {settings.layout === layoutOption.id && <Icon name="check" size="xs" className="text-red-400" />}
+                    </button>
+                  ))}
+                </div>
+              </RailPopover>
+            )}
+          </div>
+          <span aria-hidden="true" className="my-1 h-px w-7 bg-white/[0.06]" />
+          <div role="radiogroup" aria-label="Preview mode" className="flex flex-col gap-1.5">
+            <RailButton icon="book" label="Binder preview" active={settings.view === 'binder'} onClick={() => onViewChange('binder')} className="h-9" />
+            <RailButton icon="file" label="Paper preview" active={settings.view === 'paper'} onClick={() => onViewChange('paper')} className="h-9" />
+          </div>
+          <div className="relative flex">
+            <button type="button" aria-label={`Card scale: ${Math.round(cleanSize.scale * 100)}%`} aria-expanded={openPanel === 'scale'} aria-haspopup="dialog" onClick={() => togglePanel('scale')} title="Card scale" className={`flex h-7 w-11 items-center justify-center rounded-full border text-[10px] font-mono font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${openPanel === 'scale' ? 'border-red-500/30 bg-red-950/70 text-red-300' : 'border-white/[0.08] bg-neutral-950 text-neutral-300 hover:bg-neutral-800'}`}>{Math.round(cleanSize.scale * 100)}%</button>
+            {openPanel === 'scale' && (
+              <RailPopover title="Card scale" icon="ruler">
+                <div className="flex items-center justify-center gap-5 py-1">
+                  <input type="range" min={80} max={125} step={1} value={Math.round(cleanSize.scale * 100)} aria-label="Card scale" onChange={(event) => setCardSize({ scale: Number(event.target.value) / 100 })} onDoubleClick={() => setCardSize({ scale: 1 })} className="h-40 w-5 cursor-pointer accent-red-600 [direction:rtl] [writing-mode:vertical-lr] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500" />
+                  <div className="flex flex-col items-center gap-3"><output className="text-xl font-semibold tracking-tight text-neutral-100">{Math.round(cleanSize.scale * 100)}%</output><span className="text-[9px] font-mono tracking-widest text-neutral-500 uppercase">80–125%</span><button type="button" onClick={() => setCardSize({ scale: 1 })} className="rounded-md border border-white/[0.08] bg-neutral-900 px-2 py-1 text-[9px] font-semibold text-neutral-400 hover:text-neutral-200">Reset</button></div>
+                </div>
+              </RailPopover>
+            )}
+          </div>
+        </div>
+
+        <div data-rail-zone="material" className="flex flex-col items-center gap-2">
+          <div className="relative flex">
+            <RailButton icon="layers" label={`Card size: ${custom ? 'Custom' : 'Pokémon'} ${round1(base.w)} × ${round1(base.h)} mm`} active={openPanel === 'card-size'} expanded={openPanel === 'card-size'} onClick={() => togglePanel('card-size')} />
+            {openPanel === 'card-size' && (
+              <RailPopover title="Card material" icon="layers">
+                <label className="block"><span className="mb-1.5 block text-[9px] font-bold tracking-widest text-neutral-500 uppercase">Card archetype</span><select value={custom ? 'custom' : cleanSize.preset} aria-label="Card size" onChange={(event) => { if (event.target.value === 'custom') setCardSize({ preset: 'custom', customWmm: base.w, customHmm: base.h }); else setCardSize({ preset: event.target.value }); }} className="h-9 w-full rounded-lg border border-white/[0.08] bg-neutral-900 px-2 text-[11px] font-medium text-neutral-200 outline-none focus-visible:ring-2 focus-visible:ring-red-500">{CARD_PRESETS.map((preset) => <option key={preset.id} value={preset.id}>{preset.label} · {preset.wMm} × {preset.hMm} mm</option>)}<option value="custom">Custom dimensions…</option></select></label>
+                {custom && <div className="flex items-center justify-between gap-1 rounded-lg border border-white/[0.06] bg-neutral-900/70 p-2"><MmField label="W" value={cleanSize.customWmm} onCommit={(customWmm) => setCardSize({ customWmm })} /><span className="text-neutral-600">×</span><MmField label="H" value={cleanSize.customHmm} onCommit={(customHmm) => setCardSize({ customHmm })} /></div>}
+                <div className="flex items-center justify-between border-t border-white/[0.06] pt-2 text-[9px] font-mono text-neutral-500"><span>Effective</span><strong className="text-neutral-200">{fmtMm(resolveCardSize(cleanSize).w)} × {fmtMm(resolveCardSize(cleanSize).h)} mm</strong></div>
+              </RailPopover>
+            )}
+          </div>
+          <div className="relative flex">
+            <RailButton icon="sliders" label="Print setup" active={openPanel === 'print'} expanded={openPanel === 'print'} onClick={() => togglePanel('print')}>
+              <span className={`absolute right-1 top-1 size-1.5 rounded-full ${fitInfo.fitsTrueSize ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+            </RailButton>
+            {openPanel === 'print' && <RailPopover title="Print setup" icon="sliders" align="bottom"><PrintSetupContent settings={settings} setSettings={setSettings} fitInfo={fitInfo} suggestedPaper={suggestedPaper} printCount={printCount} onReset={onReset} /></RailPopover>}
+          </div>
+          <RailButton icon="copy" label="Duplicate physical sheet" onClick={onDuplicate} />
+          <div className="relative flex">
+            <RailButton icon="keyboard" label="Keyboard shortcuts" active={openPanel === 'shortcuts'} expanded={openPanel === 'shortcuts'} onClick={() => togglePanel('shortcuts')} />
+            {openPanel === 'shortcuts' && <RailPopover title="Keyboard shortcuts" icon="keyboard" align="bottom"><ShortcutsContent /></RailPopover>}
+          </div>
+          {installPrompt && <RailButton icon="install" label="Install app" onClick={onInstall} />}
+        </div>
+      </div>
     </aside>
   );
 }
@@ -969,7 +1025,7 @@ function FloatingNavigation({
 
 function PrintSetupContent({ settings, setSettings, fitInfo, suggestedPaper, printCount, onReset }) {
   return (
-    <div className="space-y-3 text-[12px] text-zinc-300">
+    <div className="space-y-2.5 text-[11px] text-zinc-300">
       <label className="block">
         <span className="mb-1 block text-[11px] font-medium text-zinc-400">Paper size</span>
         <select value={settings.paper} onChange={(event) => setSettings((value) => ({ ...value, paper: event.target.value }))} className="h-8 w-full rounded-lg border border-zinc-800 bg-[#0B0B0C] px-2 text-[12px] text-zinc-200 outline-none focus-visible:ring-2 focus-visible:ring-red-500">
@@ -1008,7 +1064,16 @@ function ShortcutsContent() {
     ['← / →', 'Previous / next spread'], ['PageUp / PageDown', 'Previous / next spread'], ['F', 'Fill active page'],
     ['Double-click', 'Reposition an image'],
   ];
-  return <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-[12px]">{rows.map(([key, action]) => <div key={key} className="contents"><dt><Kbd>{key}</Kbd></dt><dd className="text-zinc-300">{action}</dd></div>)}</dl>;
+  return (
+    <dl className="flex flex-col gap-1">
+      {rows.map(([key, action]) => (
+        <div key={key} className="flex items-center gap-2 rounded-md border border-white/[0.04] bg-neutral-900/45 px-2 py-1">
+          <dt className="shrink-0"><Kbd className="text-[8px]">{key}</Kbd></dt>
+          <dd className="min-w-0 text-[9px] leading-tight text-neutral-400">{action}</dd>
+        </div>
+      ))}
+    </dl>
+  );
 }
 
 function CardPool({
