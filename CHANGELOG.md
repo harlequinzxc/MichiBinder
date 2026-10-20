@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.6.0
+## Current state — v4.6.1
 
 - **Ledger date:** 2026-10-20
-- **Application state entering this feature pass:** commit `80ca79a` / v4.5.1
+- **Application state entering this feature pass:** commit `03f24e2` / v4.6.0
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,8 +14,8 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets plus the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, required secret, or environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** Cardmarket EUR fallback pricing with live USD conversion while retaining TCGplayer precedence and the hardware-accelerated card-motion system
-- **Last verified behavior:** production build plus dedicated three-viewport motion, Cardmarket valuation/conversion, sidebar hierarchy, selection marquee, document containment, and zero-browser-error checks
+- **Last functional change:** catalogue filter spacing and label-contrast polish in the left sidebar
+- **Last verified behavior:** production build plus focused catalogue-sidebar inspection for metadata-row spacing and Card Set label legibility
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## SemVer reconstruction
@@ -601,6 +601,14 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Kept positive TCGplayer market → low → mid as the primary source, prevented non-positive provider data from fabricating a value, and retained canonical `cardPrices[tcgdexId]` persistence.
 - Verified Cardmarket fallback from detailed variants, live EUR-to-USD conversion, Total Value, Spread Value, placed-card badges, deduplicated detail requests, persistence, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.6.0.
+
+## [v4.6.1] — 2026-10-20
+
+### Fixed
+
+- Added explicit top spacing to the catalogue metadata and Clear Filters row so it no longer crowds the Card Set selector frame.
+- Raised the uppercase Card Set label from muted neutral-500 semibold text to neutral-400 bold text with the established compact sans-serif tracking, improving contrast against the dark sidebar.
+- Advanced package and lockfile metadata to v4.6.1.
 
 ---
 

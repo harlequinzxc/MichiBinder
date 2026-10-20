@@ -1387,7 +1387,7 @@ function CardPool({
             </form>
             <div className="mt-3.5">
               <label className="block">
-                <span className="mb-1 block text-[9px] uppercase tracking-widest font-semibold text-neutral-500">Card set</span>
+                <span className="mb-1 block text-[9px] font-bold tracking-widest text-neutral-400 uppercase font-sans">Card set</span>
                 <select
                   value={selectedSet}
                   aria-label="Filter by Pokémon set"
@@ -1403,7 +1403,7 @@ function CardPool({
 
           {searchActive ? (
             <section aria-label="TCGdex search results" className="flex min-h-0 flex-1 flex-col px-3 pb-4">
-              <div className="flex items-center justify-between w-full px-1 py-1 border-b border-white/[0.04] mb-2">
+              <div className="mt-4 flex items-center justify-between w-full px-1 py-1 border-b border-white/[0.04] mb-2">
                 <span aria-live="polite" className="text-[10px] font-sans font-medium text-neutral-400 tracking-normal border-0 bg-transparent p-0">{isLoading && !fetchedCards.length ? 'Loading…' : plural(fetchedCards.length, 'item')}</span>
                 <button
                   type="button"
