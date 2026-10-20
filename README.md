@@ -20,7 +20,8 @@ MichiBinder is a private, desktop-first card-layout workspace for arranging trad
 
 | Area | Purpose |
 | --- | --- |
-| App bar | Page navigation, installation, shortcuts, print settings, and Print / PDF |
+| App bar | Product identity, installation, shortcuts, print settings, and Print / PDF |
+| Floating navigation | Undo, redo, spread navigation, physical-sheet insertion, and active-sheet deletion |
 | Sizing toolbar | Card dimensions, scale, pocket layout, preview mode, and true-size status |
 | Cards / Michi sidebar | TCGdex browsing, local image upload, multi-selection, batch fill, and image deletion |
 | Canvas toolbar | Combine mode, Merge, Unmerge, reset layout, and clear page |

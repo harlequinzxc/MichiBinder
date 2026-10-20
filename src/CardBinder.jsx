@@ -20,6 +20,7 @@ import {
   Move,
   Plus,
   Printer,
+  Redo2,
   RotateCcw,
   RotateCw,
   Ruler,
@@ -29,6 +30,7 @@ import {
   TableCellsMerge,
   TableCellsSplit,
   Trash2,
+  Undo2,
   Upload,
   WandSparkles,
   X,
@@ -562,6 +564,7 @@ const ICONS = {
   move: Move,
   plus: Plus,
   printer: Printer,
+  redo: Redo2,
   reset: RotateCcw,
   rotate: RotateCw,
   ruler: Ruler,
@@ -570,6 +573,7 @@ const ICONS = {
   split: TableCellsSplit,
   sparkles: Sparkles,
   trash: Trash2,
+  undo: Undo2,
   upload: Upload,
   wand: WandSparkles,
   x: X,
@@ -714,7 +718,7 @@ function SheetGrid({ page, card, gap, unit, dims, animate = false, renderSlot, g
           data-r={slot.r}
           data-c={slot.c}
           data-key={slot.key}
-          className="slot-area relative"
+          className="slot-area relative after:pointer-events-none data-[drop-active]:after:absolute data-[drop-active]:after:inset-0 data-[drop-active]:after:z-[60] data-[drop-active]:after:rounded-md data-[drop-active]:after:ring-2 data-[drop-active]:after:ring-inset data-[drop-active]:after:ring-red-500 data-[drop-active]:after:shadow-[0_0_20px_rgba(220,38,38,0.28)]"
           style={{ '--col-start': slot.c + 1, '--col-span': slot.cs, '--row-start': slot.r + 1, '--row-span': slot.rs }}
           {...(getSlotProps?.(slot, index) || {})}
         >
@@ -796,15 +800,7 @@ function HeaderCardControls({ settings, setSettings }) {
 function AppBar({
   settings,
   setSettings,
-  pageLabel,
-  canPrevious,
-  canNext,
-  onPrevious,
-  onNext,
-  onAdd,
   onDuplicate,
-  onDelete,
-  canDelete,
   saveStatus,
   installPrompt,
   onInstall,
@@ -828,24 +824,11 @@ function AppBar({
         <HeaderCardControls settings={settings} setSettings={setSettings} />
       </div>
 
-      <nav aria-label="Pages" className="flex shrink-0 items-center justify-center px-3">
-        <div className="flex h-8 items-center rounded-md border border-white/[0.08] bg-neutral-950/65 p-0.5 shadow-inner shadow-black/30">
-          <button type="button" aria-label="Previous page" title="Previous spread" onClick={onPrevious} disabled={!canPrevious} className="grid size-7 place-items-center rounded text-neutral-400 transition-colors hover:bg-white/10 hover:text-white disabled:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="chevronLeft" size="sm" /></button>
-          <span className="min-w-[118px] px-2 text-center text-[11px] font-medium tracking-wide text-neutral-200">{pageLabel}</span>
-          <button type="button" aria-label="Next page" title="Next spread" onClick={onNext} disabled={!canNext} className="grid size-7 place-items-center rounded text-neutral-400 transition-colors hover:bg-white/10 hover:text-white disabled:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="chevronRight" size="sm" /></button>
-        </div>
-      </nav>
-
       <div className="relative flex min-w-0 flex-1 items-center justify-end gap-1.5">
         {installPrompt && <ToolButton icon="install" variant="outline" onClick={onInstall} title="Install App" />}
         <ToolButton icon="keyboard" onClick={() => setOpenPanel(openPanel === 'shortcuts' ? null : 'shortcuts')} active={openPanel === 'shortcuts'} title="Keyboard shortcuts" className="hidden min-[1560px]:inline-flex" />
-        <div className="flex items-center justify-center gap-2 self-center h-8">
-          <button type="button" onClick={onAdd} title="Insert a new two-page physical sheet" className="h-8 px-3.5 flex items-center justify-center gap-1.5 text-xs font-semibold rounded-md bg-red-600 text-white shadow-lg shadow-red-950/40 transition-colors hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500">
-            <Icon name="plus" size="md" />
-            <span className="max-[1420px]:hidden">Add Page</span>
-          </button>
+        <div className="flex h-8 items-center justify-center gap-2 self-center">
           <ToolButton icon="copy" onClick={onDuplicate} title="Duplicate physical sheet" className="max-[1180px]:hidden" />
-          <ToolButton icon="trash" label="Delete" onClick={onDelete} disabled={!canDelete} disabledReason="Keep at least one physical sheet" title="Delete physical sheet" className="[&>span]:hidden !text-neutral-500 hover:!bg-red-500/10 hover:!text-red-300" />
           <ToolButton icon="sliders" label="Print Setup" onClick={() => setOpenPanel(openPanel === 'print' ? null : 'print')} active={openPanel === 'print'} title="Print setup" className="[&>span]:hidden" />
         </div>
         <div className="flex items-center gap-4 border-l border-white/[0.06] pl-4 ml-2">
@@ -879,6 +862,44 @@ function AppBar({
         {openPanel === 'shortcuts' && shortcuts}
       </div>
     </header>
+  );
+}
+
+function FloatingNavigation({
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
+  currentSpread,
+  totalSpreads,
+  canPrevious,
+  canNext,
+  onPrevious,
+  onNext,
+  onAdd,
+  onDelete,
+  canDelete,
+}) {
+  const historyButton = 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 p-1.5 rounded-md transition-all cursor-pointer disabled:pointer-events-none disabled:text-neutral-700 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500';
+  return (
+    <div data-floating-navigation className="no-print absolute bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-4 px-4 py-2 bg-neutral-900/90 backdrop-blur-md border border-white/[0.06] rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.5)] select-none">
+      <div role="group" aria-label="History" className="flex items-center gap-1">
+        <button type="button" onClick={onUndo} disabled={!canUndo} aria-label="Undo" title="Undo" className={historyButton}><Icon name="undo" size="sm" className="w-3.5 h-3.5" /></button>
+        <button type="button" onClick={onRedo} disabled={!canRedo} aria-label="Redo" title="Redo" className={historyButton}><Icon name="redo" size="sm" className="w-3.5 h-3.5" /></button>
+      </div>
+      <div className="flex items-center gap-2 border-l border-white/[0.06] pl-4">
+        <button type="button" onClick={onPrevious} disabled={!canPrevious} aria-label="Previous spread" title="Previous spread" className="p-1 text-neutral-400 hover:text-neutral-200 transition-colors disabled:pointer-events-none disabled:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="chevronLeft" size="md" className="w-4 h-4" /></button>
+        <div className="flex items-center gap-1 text-[11px] font-mono text-neutral-400 font-medium" aria-live="polite">
+          <span>Spread</span>
+          <span className="bg-neutral-950 px-2 py-0.5 rounded border border-white/[0.04] text-neutral-200 font-semibold">{currentSpread}</span>
+          <span>/</span>
+          <span>{totalSpreads}</span>
+        </div>
+        <button type="button" onClick={onNext} disabled={!canNext} aria-label="Next spread" title="Next spread" className="p-1 text-neutral-400 hover:text-neutral-200 transition-colors disabled:pointer-events-none disabled:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="chevronRight" size="md" className="w-4 h-4" /></button>
+      </div>
+      <button type="button" onClick={onAdd} className="h-7 px-3 bg-neutral-800 hover:bg-neutral-700 border border-white/[0.04] shadow-sm text-neutral-200 text-xs font-semibold rounded-md flex items-center gap-1.5 transition-all ml-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500" title="Insert a new two-page physical sheet"><Icon name="plus" size="sm" className="w-3.5 h-3.5" /><span>Add Spread</span></button>
+      <button type="button" onClick={onDelete} disabled={!canDelete} aria-label="Delete active sheet" title={canDelete ? 'Delete active sheet' : 'Keep at least one physical sheet'} className="p-1.5 text-neutral-500 hover:text-red-400 hover:bg-red-500/10 rounded-md transition-all ml-2 cursor-pointer disabled:pointer-events-none disabled:text-neutral-700 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="trash" size="sm" className="w-3.5 h-3.5" /></button>
+    </div>
   );
 }
 
@@ -1347,7 +1368,6 @@ export default function CardBinder() {
   const [pageFlip, setPageFlip] = useState({ animating: false, turned: false, direction: 1, token: 0, plan: null });
   const [marqueeActive, setMarqueeActive] = useState(false);
   const [dragInfo, setDragInfo] = useState(null);
-  const [dropPreview, setDropPreview] = useState([]);
   const [sidebarDropActive, setSidebarDropActive] = useState(false);
   const [editing, setEditing] = useState(null);
   const [stageSize, setStageSize] = useState({ w: 1000, h: 620 });
@@ -1362,7 +1382,6 @@ export default function CardBinder() {
   const marqueeRef = useRef(null);
   const selBoxRef = useRef(selBox);
   const selectionPageIdRef = useRef(selectionPageId);
-  const dropPreviewRef = useRef(dropPreview);
   const suppressClickRef = useRef(false);
   const slotActionGuardRef = useRef(0);
   const editingRef = useRef(null);
@@ -1421,7 +1440,6 @@ export default function CardBinder() {
   useEffect(() => { editingRef.current = editing; }, [editing]);
   useEffect(() => { selBoxRef.current = selBox; }, [selBox]);
   useEffect(() => { selectionPageIdRef.current = selectionPageId; }, [selectionPageId]);
-  useEffect(() => { dropPreviewRef.current = dropPreview; }, [dropPreview]);
 
   const notify = useCallback((message, tone = 'info', action = null) => {
     const id = uid('toast');
@@ -1824,7 +1842,6 @@ export default function CardBinder() {
     if (selBoxRef.current) { selBoxRef.current = null; setSelBox(null); }
     if (selectionPageIdRef.current) { selectionPageIdRef.current = null; setSelectionPageId(null); }
     if (marqueeRef.current) { marqueeRef.current = null; setMarqueeActive(false); }
-    if (dropPreviewRef.current.length) { dropPreviewRef.current = []; setDropPreview([]); }
     if (editingRef.current) { editingRef.current = null; setEditing(null); }
   }, []);
 
@@ -2087,7 +2104,7 @@ export default function CardBinder() {
     } catch { /* live ref is authoritative */ }
     event.dataTransfer.effectAllowed = 'copy';
     makeDragGhost(event, ids);
-    requestAnimationFrame(() => setDragInfo(payload));
+    setDragInfo(payload);
   }, [commitEditing, selectedOrdered, pool, images, makeDragGhost]);
 
   const startFetchedCardDrag = useCallback((event, item, highResImageUrl) => {
@@ -2104,7 +2121,7 @@ export default function CardBinder() {
       event.dataTransfer.setData('text/plain', highResImageUrl);
     } catch { /* The live ref remains authoritative for in-app drops. */ }
     event.dataTransfer.effectAllowed = 'copy';
-    requestAnimationFrame(() => setDragInfo(payload));
+    setDragInfo(payload);
   }, [commitEditing]);
 
   const startSlotDrag = useCallback((event, pageId, key, imgId) => {
@@ -2116,15 +2133,43 @@ export default function CardBinder() {
     try { event.dataTransfer.setData(DRAG_MIME, JSON.stringify(payload)); } catch { /* live ref is authoritative */ }
     event.dataTransfer.effectAllowed = 'move';
     makeDragGhost(event, [imgId]);
-    requestAnimationFrame(() => setDragInfo(payload));
+    setDragInfo(payload);
   }, [commitEditing, activateCanvasPage, makeDragGhost]);
 
-  const resetDrag = useCallback(() => {
-    dragRef.current = null;
-    setDragInfo(null);
-    setDropPreview([]);
-    setSidebarDropActive(false);
+  const clearNativeDropTargets = useCallback(() => {
+    stageRef.current?.querySelectorAll('[data-drop-active]').forEach((element) => {
+      element.removeAttribute('data-drop-active');
+      element.removeAttribute('data-drop-order');
+    });
   }, []);
+
+  const markNativeDropTargets = useCallback((targets) => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const targetKeys = new Set(targets.map((target) => `${target.pageIndex}:${target.key}`));
+    stage.querySelectorAll('[data-drop-active]').forEach((element) => {
+      const canvas = element.closest('[data-canvas]');
+      const token = `${canvas?.dataset.pageIndex}:${element.dataset.key}`;
+      if (!targetKeys.has(token)) {
+        element.removeAttribute('data-drop-active');
+        element.removeAttribute('data-drop-order');
+      }
+    });
+    targets.forEach((target, index) => {
+      const element = stage.querySelector(`[data-canvas][data-page-index="${target.pageIndex}"] [data-key="${target.key}"]`);
+      if (!element) return;
+      element.setAttribute('data-drop-active', '');
+      element.setAttribute('data-drop-order', String(index + 1));
+    });
+  }, []);
+
+  const resetDrag = useCallback((event) => {
+    dragRef.current = null;
+    clearNativeDropTargets();
+    try { event?.dataTransfer?.clearData(); } catch { /* Some browsers lock the transfer store after drop. */ }
+    setDragInfo(null);
+    setSidebarDropActive(false);
+  }, [clearNativeDropTargets]);
 
   const getPayload = useCallback((event) => {
     if (dragRef.current) return dragRef.current;
@@ -2135,72 +2180,90 @@ export default function CardBinder() {
   }, []);
 
   const handleSlotDragOver = useCallback((event, slot, pageIndex = currentPageRef.current) => {
-    if (combineMode || editingRef.current) return;
-    const payload = dragRef.current;
-    if (!payload && !hasFiles(event.dataTransfer)) return;
     event.preventDefault();
     event.stopPropagation();
+    const payload = dragRef.current;
+    if (combineMode || editingRef.current || (!payload && !hasFiles(event.dataTransfer))) {
+      event.dataTransfer.dropEffect = 'none';
+      return;
+    }
     event.dataTransfer.dropEffect = payload?.kind === 'slot' ? 'move' : 'copy';
-    if (payload?.kind === 'pool') setDropPreview(planPlacement(pagesRef.current, pageIndex, slot.key, payload.ids.length, dimsRef.current));
-    else setDropPreview([{ pageIndex, key: slot.key }]);
-  }, [combineMode]);
+    const targets = payload?.kind === 'pool'
+      ? planPlacement(pagesRef.current, pageIndex, slot.key, payload.ids.length, dimsRef.current)
+      : [{ pageIndex, key: slot.key }];
+    markNativeDropTargets(targets);
+  }, [combineMode, markNativeDropTargets]);
+
+  const handleSlotDragEnter = useCallback((event) => {
+    event.preventDefault();
+    event.stopPropagation();
+  }, []);
 
   const handleSlotDrop = useCallback(async (event, slot, pageIndex = currentPageRef.current) => {
     event.preventDefault();
     event.stopPropagation();
     const payload = getPayload(event);
+    const carriesFiles = hasFiles(event.dataTransfer);
+    const files = Array.from(event.dataTransfer.files || []);
+    resetDrag(event);
+    if (combineMode || editingRef.current) return;
     activateCanvasPage(pageIndex);
-    if (hasFiles(event.dataTransfer)) {
-      const ids = await addFiles(event.dataTransfer.files);
+    if (carriesFiles) {
+      const ids = await addFiles(files);
       placeCards(ids, pageIndex, slot.key);
     } else if (payload?.kind === 'pool') placeCards(payload.ids, pageIndex, slot.key);
     else if (payload?.kind === 'remote') {
       const ids = await importFetchedCard(payload.card, payload.url);
       placeCards(ids, pageIndex, slot.key);
     } else if (payload?.kind === 'slot') moveSlotCard(payload, pageIndex, slot.key);
-    resetDrag();
-  }, [getPayload, activateCanvasPage, addFiles, importFetchedCard, placeCards, moveSlotCard, resetDrag]);
+  }, [combineMode, getPayload, activateCanvasPage, addFiles, importFetchedCard, placeCards, moveSlotCard, resetDrag]);
 
   const handleStageDrop = useCallback(async (event) => {
-    if (combineMode || editingRef.current) return;
     event.preventDefault();
     const payload = getPayload(event);
-    if (hasFiles(event.dataTransfer)) {
-      const ids = await addFiles(event.dataTransfer.files);
+    const carriesFiles = hasFiles(event.dataTransfer);
+    const files = Array.from(event.dataTransfer.files || []);
+    resetDrag(event);
+    if (combineMode || editingRef.current) return;
+    if (carriesFiles) {
+      const ids = await addFiles(files);
       placeCards(ids, currentPageRef.current, null);
     } else if (payload?.kind === 'pool') placeCards(payload.ids, currentPageRef.current, null);
     else if (payload?.kind === 'remote') {
       const ids = await importFetchedCard(payload.card, payload.url);
       placeCards(ids, currentPageRef.current, null);
     }
-    resetDrag();
   }, [combineMode, getPayload, addFiles, importFetchedCard, placeCards, resetDrag]);
 
   const handleSidebarDrop = useCallback(async (event) => {
     event.preventDefault();
     const payload = getPayload(event);
-    if (hasFiles(event.dataTransfer)) await addFiles(event.dataTransfer.files);
+    const carriesFiles = hasFiles(event.dataTransfer);
+    const files = Array.from(event.dataTransfer.files || []);
+    resetDrag(event);
+    if (carriesFiles) await addFiles(files);
     else if (payload?.kind === 'remote') await importFetchedCard(payload.card, payload.url);
     else if (payload?.kind === 'slot') {
       removeSlotCard(payload.pageId, payload.key);
       notify('Card removed from the binder.', 'info');
     }
-    resetDrag();
   }, [getPayload, addFiles, importFetchedCard, removeSlotCard, notify, resetDrag]);
 
   const handleThumbDrop = useCallback(async (event, pageIndex) => {
     event.preventDefault();
     event.stopPropagation();
     const payload = getPayload(event);
-    if (hasFiles(event.dataTransfer)) {
-      const ids = await addFiles(event.dataTransfer.files);
+    const carriesFiles = hasFiles(event.dataTransfer);
+    const files = Array.from(event.dataTransfer.files || []);
+    resetDrag(event);
+    if (carriesFiles) {
+      const ids = await addFiles(files);
       placeCards(ids, pageIndex, null);
     } else if (payload?.kind === 'pool') placeCards(payload.ids, pageIndex, null);
     else if (payload?.kind === 'remote') {
       const ids = await importFetchedCard(payload.card, payload.url);
       placeCards(ids, pageIndex, null);
     } else if (payload?.kind === 'slot') moveSlotCard(payload, pageIndex, null);
-    resetDrag();
   }, [getPayload, addFiles, importFetchedCard, placeCards, moveSlotCard, resetDrag]);
 
   const performMerge = useCallback((box, pageIndex = currentPageRef.current) => {
@@ -2383,7 +2446,7 @@ export default function CardBinder() {
     const safety = (event) => {
       if ((event.type === 'dragover' || event.type === 'drop') && hasFiles(event.dataTransfer)) event.preventDefault();
       if (event.type === 'dragstart' && event.target?.matches?.('img, a')) event.preventDefault();
-      if (event.type === 'dragend' || event.type === 'drop') window.setTimeout(resetDrag, 0);
+      if (event.type === 'dragend' || event.type === 'drop') resetDrag(event);
       if (event.type === 'pointermove') moveMarquee(event);
       if (event.type === 'pointerup' || event.type === 'pointercancel') finishMarquee();
     };
@@ -2674,7 +2737,6 @@ export default function CardBinder() {
     const source = images[imgId] || pool.find((item) => item.id === imgId)?.src;
     const crop = imgId ? getCrop(page, slot.key, imgId) : { x: 50, y: 50 };
     const isEditing = editing?.pageId === page.id && editing.key === slot.key && editing.imgId === imgId;
-    const previewIndex = dropPreview.findIndex((target) => target.pageIndex === pageIndex && target.key === slot.key);
     const pageMerges = activeMerges(page, dims);
     const radius = Math.max(settings.view === 'binder' ? 3 : 1, gridPpi * (settings.view === 'binder' ? 0.09 : 0.04));
     const frameW = spanW(slot.cs, settings.gap, card);
@@ -2738,11 +2800,10 @@ export default function CardBinder() {
               if (combineMode) { setSelectionPageId(page.id); setSelBox(expandBox(mergeBox(slot), pageMerges)); return; }
               if (selectedOrdered.length) placeCards(selectedOrdered, pageIndex, slot.key);
             }}
-            className={`group grid size-full cursor-pointer place-items-center overflow-hidden rounded-md border outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-red-500 ${settings.view === 'binder' ? 'border-white/[0.03] bg-neutral-900/50 text-neutral-300 shadow-inner hover:border-white/[0.08] hover:bg-neutral-900/80 hover:text-neutral-100' : 'border-dashed border-zinc-400 bg-white/30 text-zinc-700 hover:border-red-500 hover:text-red-800'} ${previewIndex >= 0 ? '!border-red-500 !bg-red-950/20 !shadow-[inset_0_0_0_2px_rgba(239,68,68,0.25),0_0_20px_rgba(220,38,38,0.18)]' : ''}`}
+            className={`group grid size-full cursor-pointer place-items-center overflow-hidden rounded-md border outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-red-500 ${settings.view === 'binder' ? 'border-white/[0.03] bg-neutral-900/50 text-neutral-300 shadow-inner hover:border-white/[0.08] hover:bg-neutral-900/80 hover:text-neutral-100' : 'border-dashed border-zinc-400 bg-white/30 text-zinc-700 hover:border-red-500 hover:text-red-800'}`}
             style={{ borderRadius: radius }}
           >
             {labelVisible && <span className="flex flex-col items-center gap-1.5"><span className="text-xs font-light text-neutral-600 transition-colors group-hover:text-neutral-400"><Icon name="plus" size="xs" strokeWidth={1.25} /></span><span className="text-[9px] font-mono font-medium tracking-widest text-neutral-500 uppercase transition-colors group-hover:text-neutral-400">{slot.cs * slot.rs > 1 ? `${boxDims(slot)} frame` : `Slot ${slotIndex + 1}`}</span></span>}
-            {previewIndex >= 0 && <span className="absolute left-1.5 top-1.5 grid size-5 place-items-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-lg shadow-red-950/60">{previewIndex + 1}</span>}
           </button>
           {slotActions}
         </div>
@@ -2784,7 +2845,7 @@ export default function CardBinder() {
             }}
           />
         )}
-        <div className={`relative size-full overflow-hidden border bg-white transition-all duration-200 ${settings.view === 'binder' ? 'sleeve-sheen rounded-md border-white/[0.03] bg-neutral-900/50 shadow-inner hover:border-white/[0.08] hover:bg-neutral-900/80' : 'border-transparent'} ${isEditing ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-zinc-900' : ''} ${previewIndex >= 0 ? 'ring-2 ring-inset ring-red-500 shadow-[0_0_20px_rgba(220,38,38,0.25)]' : ''}`} style={{ borderRadius: radius }}>
+        <div className={`relative size-full overflow-hidden border bg-white transition-all duration-200 ${settings.view === 'binder' ? 'sleeve-sheen rounded-md border-white/[0.03] bg-neutral-900/50 shadow-inner hover:border-white/[0.08] hover:bg-neutral-900/80' : 'border-transparent'} ${isEditing ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-zinc-900' : ''}`} style={{ borderRadius: radius }}>
           {source ? <img
             data-img-id={imgId}
             src={source}
@@ -2801,14 +2862,16 @@ export default function CardBinder() {
         {!dragInfo && !combineMode && !editing && dpi && <span title={`${dpi} effective DPI at print size`} className={`absolute bottom-1.5 right-1.5 z-40 hidden rounded-full px-1.5 py-0.5 text-[9px] font-bold shadow group-hover:block ${dpiTone}`}>{dpi} DPI</span>}
         {slot.mergeId && <span className="absolute bottom-1.5 left-1.5 z-40 rounded-full bg-red-700/90 px-1.5 py-0.5 text-[9px] font-bold text-white shadow">{boxDims(slot)}</span>}
         {isEditing && <span className="absolute left-1/2 top-2 z-50 -translate-x-1/2 rounded-full bg-amber-500 px-2 py-0.5 text-[9px] font-bold text-amber-950 shadow">Drag to reposition</span>}
-        {previewIndex >= 0 && <span className="absolute left-1.5 top-1.5 z-50 grid size-5 place-items-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-lg shadow-red-950/60">{previewIndex + 1}</span>}
       </div>
     );
   };
 
   const slotDropProps = (pageIndex) => (slot) => ({
     onDragOver: (event) => handleSlotDragOver(event, slot, pageIndex),
-    onDragLeave: (event) => { if (!event.currentTarget.contains(event.relatedTarget)) setDropPreview([]); },
+    onDragEnter: handleSlotDragEnter,
+    onDragLeave: (event) => {
+      if (!event.currentTarget.contains(event.relatedTarget) && !stageRef.current?.contains(event.relatedTarget)) clearNativeDropTargets();
+    },
     onDrop: (event) => handleSlotDrop(event, slot, pageIndex),
   });
 
@@ -3098,15 +3161,7 @@ export default function CardBinder() {
           <AppBar
             settings={settings}
             setSettings={setSettings}
-            pageLabel={activeSpread.length === 1 ? `Page ${activeSpread[0] + 1} / ${pages.length}` : `Pages ${activeSpread[0] + 1}–${activeSpread[1] + 1} / ${pages.length}`}
-            canPrevious={activeSpreadIndex > 0}
-            canNext={activeSpreadIndex < spreadGroups.length - 1}
-            onPrevious={() => goToAdjacentSpread(-1)}
-            onNext={() => goToAdjacentSpread(1)}
-            onAdd={addPage}
             onDuplicate={duplicatePage}
-            onDelete={deletePage}
-            canDelete={pages.length > 2}
             saveStatus={saveStatus}
             installPrompt={installPrompt}
             onInstall={async () => { await installPrompt.prompt(); setInstallPrompt(null); }}
@@ -3168,6 +3223,7 @@ export default function CardBinder() {
               className={`relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-neutral-950 bg-[radial-gradient(ellipse_at_center,rgba(82,82,91,0.18),transparent_65%)] transition-[height] duration-200 ${showBottomPreview ? 'h-[calc(100vh-180px)]' : 'h-[calc(100vh-60px)]'}`}
               onPointerMove={moveMarquee}
               onPointerDown={(event) => { if (event.target === event.currentTarget && combineMode) { setSelBox(null); setSelectionPageId(null); } }}
+              onDragEnter={(event) => { if (!combineMode && (['pool', 'remote'].includes(dragRef.current?.kind) || hasFiles(event.dataTransfer))) event.preventDefault(); }}
               onDragOver={(event) => { if (!combineMode && (['pool', 'remote'].includes(dragRef.current?.kind) || hasFiles(event.dataTransfer))) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; } }}
               onDrop={handleStageDrop}
             >
@@ -3220,6 +3276,21 @@ export default function CardBinder() {
                   )}
                 </div>
               </div>
+              <FloatingNavigation
+                canUndo={pastRef.current.length > 0}
+                canRedo={futureRef.current.length > 0}
+                onUndo={undoAction}
+                onRedo={redoAction}
+                currentSpread={activeSpreadIndex + 1}
+                totalSpreads={spreadGroups.length}
+                canPrevious={activeSpreadIndex > 0 && !pageFlip.animating}
+                canNext={activeSpreadIndex < spreadGroups.length - 1 && !pageFlip.animating}
+                onPrevious={() => goToAdjacentSpread(-1)}
+                onNext={() => goToAdjacentSpread(1)}
+                onAdd={addPage}
+                onDelete={deletePage}
+                canDelete={pages.length > 2}
+              />
             </div>
             {showBottomPreview && (
               <footer data-page-tray className="no-print scroll-area w-full border-t border-white/[0.04] bg-neutral-900/30 backdrop-blur-sm py-4 px-6 relative flex justify-center items-center shrink-0 overflow-x-auto">
