@@ -6,7 +6,7 @@ MichiBinder is a private, desktop-first card-layout workspace for arranging trad
 
 - Upload PNG, JPG, WEBP, GIF, and AVIF card images into the reusable Michi library.
 - Search the free TCGdex catalogue in real time, browse chronologically sorted sets with seamless infinite scrolling, and drag Pokémon cards directly into binder pockets.
-- Select and drag one card or a batch into binder pockets.
+- Select from TCGdex or Michi with standard Shift and Ctrl/Command gestures, then drag the batch into consecutive binder pockets.
 - Use 4-pocket (2 × 2), 9-pocket (3 × 3), or 12-pocket (4 × 3) layouts.
 - Combine adjacent pockets into oversized frames and split them again.
 - Reposition cropped images inside their frames with pointer or keyboard controls.
@@ -23,7 +23,7 @@ MichiBinder is a private, desktop-first card-layout workspace for arranging trad
 | Top utility bar | Product identity, sidebar toggle, card sizing, pocket layout, preview mode, print settings, and Print / PDF |
 | Collapsible Cards / Michi sidebar | TCGdex browsing, local image upload, multi-selection, batch fill, and image deletion; its width fluidly resizes the workspace |
 | Dynamic Binder / Paper workspace | Centered card editing, DPI and density tracking, Merge/Unmerge, history, spread navigation, insertion, and sheet deletion |
-| Collapsible page timeline | Cushioned active-spread thumbnails, direct page switching, cross-page drops, and page insertion without permanently reducing the canvas |
+| Collapsible page timeline | Workspace-docked active-spread thumbnails, direct page switching, cross-page drops, and page insertion without clipping beneath the sidebar |
 
 ## Card size and print accuracy
 

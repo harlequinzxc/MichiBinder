@@ -1060,7 +1060,7 @@ function SetupToolbar({ settings, setSettings, fitInfo, suggestedPaper, onChoose
 function CardPool({
   isOpen,
   customUploadedCards,
-  selected,
+  selectedCardIds,
   placedIds,
   images,
   inputRef,
@@ -1168,7 +1168,7 @@ function CardPool({
 
           <div role="listbox" aria-label="Custom uploaded cards" aria-multiselectable="true" className="scroll-area grid grid-cols-3 gap-2 overflow-y-auto max-h-[calc(100vh-320px)] scrollbar-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden p-0.5" onClick={(event) => { if (event.target === event.currentTarget) onClearSelection(); }}>
             {customCards.map((localCard) => {
-              const selectionIndex = selected.indexOf(localCard.id);
+              const selectionIndex = selectedCardIds.indexOf(localCard.id);
               const placed = placedIds.has(localCard.id);
               return (
                 <div
@@ -1186,12 +1186,12 @@ function CardPool({
                   onKeyDown={(event) => { if (event.key === 'Enter') onPoolDoubleClick(localCard.id); }}
                   onDragStart={(event) => onPoolDragStart(event, localCard.id)}
                   onDragEnd={onDragEnd}
-                  className={`relative group/local aspect-[2.5/3.5] cursor-grab active:cursor-grabbing rounded overflow-hidden bg-neutral-900 border border-white/[0.04] shadow-sm transition-all hover:scale-[1.05] hover:shadow-lg hover:border-white/[0.15] outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${selectionIndex >= 0 ? 'ring-2 ring-red-500 ring-offset-2 ring-offset-neutral-950' : ''}`}
+                  className={`relative group/local aspect-[2.5/3.5] cursor-grab active:cursor-grabbing rounded-md overflow-hidden bg-neutral-900 outline-none transition-all duration-150 focus-visible:ring-2 focus-visible:ring-red-500 ${selectionIndex >= 0 ? 'ring-2 ring-red-500 scale-[0.98] brightness-110 shadow-lg' : 'border border-white/[0.03] opacity-80 hover:opacity-100 shadow-sm hover:shadow-lg hover:border-white/[0.15]'}`}
                 >
                   {localCard.localUrlDataString ? <img src={localCard.localUrlDataString} className={`w-full h-full object-cover bg-neutral-950 pointer-events-none ${placed ? 'opacity-45 grayscale group-hover/local:opacity-75' : ''}`} alt="Uploaded Card" /> : <span className="absolute inset-0 grid place-items-center text-neutral-600"><Icon name="image" size="lg" /></span>}
                   <span className="absolute top-1 right-1 bg-neutral-950/80 backdrop-blur-sm text-[8px] font-mono text-neutral-400 border border-white/[0.08] px-1 py-0.5 rounded shadow-sm">LOCAL</span>
                   <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent px-1.5 pb-1 pt-5 text-[9px] font-medium text-neutral-200 opacity-0 transition-opacity group-hover/local:opacity-100 group-focus-visible/local:opacity-100"><span className="block truncate">{localCard.name || 'Custom Art'}</span></span>
-                  {selectionIndex >= 0 && <span className="absolute left-1 top-1 grid size-4 place-items-center rounded-full bg-red-600 text-[9px] font-bold text-white shadow">{selectionIndex + 1}</span>}
+                  {selectionIndex >= 0 && <span className="animate-scaleIn absolute top-1 left-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-mono font-bold text-white shadow-md">{selectionIndex + 1}</span>}
                 </div>
               );
             })}
@@ -1254,30 +1254,34 @@ function CardPool({
                   aria-label="Pokémon card search results"
                   aria-busy={isLoading}
                   onScroll={handleCatalogScroll}
+                  onClick={(event) => { if (event.target === event.currentTarget) onClearSelection(); }}
                   className="scroll-area grid grid-cols-2 gap-3 p-2 overflow-y-auto max-h-[calc(100vh-220px)] scrollbar-none will-change-transform [scrollbar-width:none] [&::-webkit-scrollbar]:hidden group rounded-md border border-white/[0.04]"
                 >
                   {isLoading && !fetchedCards.length && Array.from({ length: 6 }, (_, index) => <span key={index} aria-hidden="true" className="aspect-[245/337] animate-pulse rounded-lg border border-white/[0.04] bg-neutral-900" />)}
                   {fetchedCards.map((item) => {
                     const fullImageUrl = item.image ? `${item.image}/low.jpg` : '/placeholder.png';
                     const highResImageUrl = item.image ? `${item.image}/high.jpg` : '/placeholder.png';
+                    const selectionIndex = selectedCardIds.indexOf(item.id);
                     return (
                       <div
                         key={item.id}
                         data-tcgdex-card={item.id}
                         role="option"
-                        aria-selected="false"
+                        aria-selected={selectionIndex >= 0}
                         aria-label={`${item.name}, drag to binder`}
                         tabIndex={0}
                         draggable="true"
-                        title={`${item.name} · drag to a binder slot`}
-                        onDragStart={(event) => onFetchedCardDragStart(event, item, highResImageUrl)}
+                        title={`${item.name} · click to select · drag to a binder slot`}
+                        onClick={(event) => onPoolClick(event, item.id, fetchedCards)}
+                        onDragStart={(event) => onFetchedCardDragStart(event, item)}
                         onDragEnd={onDragEnd}
                         onDoubleClick={() => onFetchedCardAdd(item, highResImageUrl)}
                         onKeyDown={(event) => { if (event.key === 'Enter') onFetchedCardAdd(item, highResImageUrl); }}
-                        className="relative group/card aspect-[245/337] cursor-grab active:cursor-grabbing rounded-md overflow-hidden bg-neutral-900 border border-white/[0.03] shadow-sm outline-none transition-all hover:scale-[1.04] hover:shadow-xl hover:border-white/[0.1] hover:ring-1 hover:ring-red-500/30 focus-visible:ring-2 focus-visible:ring-red-500"
+                        className={`relative group/card aspect-[245/337] cursor-grab active:cursor-grabbing rounded-md overflow-hidden bg-neutral-900 outline-none transition-all duration-150 focus-visible:ring-2 focus-visible:ring-red-500 ${selectionIndex >= 0 ? 'ring-2 ring-red-500 scale-[0.98] brightness-110 shadow-lg' : 'border border-white/[0.03] opacity-80 hover:opacity-100 shadow-sm hover:shadow-xl hover:border-white/[0.1]'}`}
                       >
-                        <img src={fullImageUrl} alt={item.name} draggable={false} loading="lazy" className="w-full h-auto object-contain bg-neutral-950 transition-opacity duration-200" onError={(event) => { if (!event.currentTarget.src.endsWith('/placeholder.png')) event.currentTarget.src = '/placeholder.png'; }} />
+                        <img data-img-id={item.id} src={fullImageUrl} alt={item.name} draggable={false} loading="lazy" className="w-full h-auto object-contain bg-neutral-950 transition-opacity duration-200" onError={(event) => { if (!event.currentTarget.src.endsWith('/placeholder.png')) event.currentTarget.src = '/placeholder.png'; }} />
                         <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover/card:opacity-100 group-focus-visible/card:opacity-100 transition-opacity p-2 flex items-end"><span className="text-[9px] font-mono font-medium tracking-wide text-neutral-200 truncate w-full">{item.name}</span></span>
+                        {selectionIndex >= 0 && <span className="animate-scaleIn absolute top-1 left-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-mono font-bold text-white shadow-md">{selectionIndex + 1}</span>}
                       </div>
                     );
                   })}
@@ -1369,8 +1373,8 @@ export default function CardBinder() {
   const [settings, setSettings] = useState(boot.settings);
   const [images, setImages] = useState(() => Object.fromEntries(boot.pool.filter((item) => item.src).map((item) => [item.id, item.src])));
   const [imageDims, setImageDims] = useState({});
-  const [selected, setSelected] = useState([]);
-  const [selectionAnchor, setSelectionAnchor] = useState(null);
+  const [selectedCardIds, setSelectedCardIds] = useState([]);
+  const [selectionAnchorId, setSelectionAnchorId] = useState(null);
   const [saveStatus, setSaveStatus] = useState('saved');
   const [storageMode, setStorageMode] = useState('indexeddb');
   const [hydrated, setHydrated] = useState(false);
@@ -1437,7 +1441,8 @@ export default function CardBinder() {
   const hidden = useMemo(() => hiddenAssignments(pages, dims), [pages, dims]);
   const placedIds = useMemo(() => new Set(visible.map((assignment) => assignment.id)), [visible]);
   const visiblePool = useMemo(() => pool.filter((item) => !settings.hidePlaced || !placedIds.has(item.id)), [pool, settings.hidePlaced, placedIds]);
-  const selectedOrdered = useMemo(() => pool.filter((item) => selected.includes(item.id)).map((item) => item.id), [pool, selected]);
+  const selectedOrdered = useMemo(() => pool.filter((item) => selectedCardIds.includes(item.id)).map((item) => item.id), [pool, selectedCardIds]);
+  const selectedFetchedCards = useMemo(() => fetchedCards.filter((item) => selectedCardIds.includes(item.id)), [fetchedCards, selectedCardIds]);
   const customUploadedCards = useMemo(() => pool.filter((item) => item.source !== 'tcgdex'), [pool]);
   const customUploadedIds = useMemo(() => new Set(customUploadedCards.map((item) => item.id)), [customUploadedCards]);
   const allPoolIds = useMemo(() => new Set(pool.map((item) => item.id)), [pool]);
@@ -1489,6 +1494,8 @@ export default function CardBinder() {
     setFetchedCards([]);
     setSearchError('');
     setIsLoading(false);
+    setSelectedCardIds([]);
+    setSelectionAnchorId(null);
   }, []);
 
   const updateSearchQuery = useCallback((value) => {
@@ -1745,12 +1752,12 @@ export default function CardBinder() {
         return [];
       }
     }
-    notify(`${plural(entries.length, 'image')} added to MichiBinder.`, 'success');
+    if (!options.silent) notify(`${plural(entries.length, 'image')} added to MichiBinder.`, 'success');
     return entries.map((entry) => entry.id);
   }, [notify, pool.length, storageMode]);
 
-  const importFetchedCard = useCallback(async (item, highResImageUrl) => {
-    const requestedSource = highResImageUrl || (item.image ? `${item.image}/high.jpg` : '/placeholder.png');
+  const importFetchedCard = useCallback(async (item, highResImageUrl, options = {}) => {
+    const requestedSource = highResImageUrl || item.url || (item.image ? `${item.image}/high.jpg` : '/placeholder.png');
     const source = requestedSource === '/placeholder.png' || requestedSource.startsWith(`${TCGDEX_ASSET_CDN}/`) ? requestedSource : '/placeholder.png';
     try {
       const response = await fetch(source);
@@ -1758,7 +1765,7 @@ export default function CardBinder() {
       const blob = await response.blob();
       if (!blob.type?.startsWith('image/')) throw new Error('TCGdex returned a non-image asset');
       const file = new File([blob], `${safeFileName(item.name)} · ${safeFileName(item.id)}.jpg`, { type: blob.type || 'image/jpeg' });
-      const ids = await addFiles([file], { source: 'tcgdex' });
+      const ids = await addFiles([file], { source: 'tcgdex', silent: options.silent });
       if (ids.length) return ids;
     } catch {
       // Some privacy extensions block cross-origin blob downloads. The live CDN URL
@@ -1768,9 +1775,17 @@ export default function CardBinder() {
     sessionIdsRef.current.add(id);
     setImages((value) => ({ ...value, [id]: source }));
     setPool((value) => [...value, { id, name: item.name || 'Pokémon card', source: 'tcgdex', src: source }]);
-    notify(`${item.name || 'Pokémon card'} added from TCGdex.`, 'success');
+    if (!options.silent) notify(`${item.name || 'Pokémon card'} added from TCGdex.`, 'success');
     return [id];
   }, [addFiles, notify]);
+
+  const importFetchedCards = useCallback(async (cards) => {
+    if (!cards?.length) return [];
+    const imported = await Promise.all(cards.map((item) => importFetchedCard(item, item.url, { silent: true })));
+    const ids = imported.flat();
+    if (ids.length) notify(`${plural(ids.length, 'card')} added from TCGdex.`, 'success');
+    return ids;
+  }, [importFetchedCard, notify]);
 
   useEffect(() => {
     if (!('launchQueue' in window)) return undefined;
@@ -1984,8 +1999,8 @@ export default function CardBinder() {
       result = applyPlacement(value, ids, pageIndex, startKey, dimsRef.current);
       return result.pages;
     });
-    setSelected([]);
-    setSelectionAnchor(null);
+    setSelectedCardIds([]);
+    setSelectionAnchorId(null);
     requestAnimationFrame(() => {
       if (!result) return;
       const flowed = result.targets.filter((target) => target.pageIndex > pageIndex).length;
@@ -2001,13 +2016,14 @@ export default function CardBinder() {
     placeCards(ids, currentPageRef.current, null);
   }, [importFetchedCard, placeCards]);
 
-  const fillSelection = useCallback(() => {
-    const ids = selectedOrdered;
-    if (!ids.length) return;
-    const targets = planPlacement(pagesRef.current, currentPageRef.current, null, ids.length, dimsRef.current);
+  const fillSelection = useCallback(async () => {
+    const selectedCount = activeTab === 'cards' ? selectedFetchedCards.length : selectedOrdered.length;
+    if (!selectedCount) return;
+    const targets = planPlacement(pagesRef.current, currentPageRef.current, null, selectedCount, dimsRef.current);
     if (!targets.length) { notify(`Page ${currentPageRef.current + 1} is full.`, 'warn'); return; }
+    const ids = activeTab === 'cards' ? await importFetchedCards(selectedFetchedCards) : selectedOrdered;
     placeCards(ids, currentPageRef.current, null);
-  }, [selectedOrdered, placeCards, notify]);
+  }, [activeTab, selectedFetchedCards, selectedOrdered, importFetchedCards, placeCards, notify]);
 
   const removeSlotCard = useCallback((pageId, key) => {
     commitEditing();
@@ -2101,8 +2117,8 @@ export default function CardBinder() {
     commitEditing();
     const ids = selectedOrdered.includes(imageId) ? selectedOrdered : [imageId];
     if (!selectedOrdered.includes(imageId)) {
-      setSelected([imageId]);
-      setSelectionAnchor(imageId);
+      setSelectedCardIds([imageId]);
+      setSelectionAnchorId(imageId);
     }
     const cards = ids.map((id) => {
       const item = pool.find((candidate) => candidate.id === id);
@@ -2117,29 +2133,38 @@ export default function CardBinder() {
     dragRef.current = payload;
     try {
       event.dataTransfer.setData(DRAG_MIME, JSON.stringify(payload));
-      if (cards.length === 1 && cards[0].isLocalUpload) event.dataTransfer.setData('text/plain', JSON.stringify(cards[0]));
+      event.dataTransfer.setData('text/plain', JSON.stringify({ cards }));
     } catch { /* live ref is authoritative */ }
     event.dataTransfer.effectAllowed = 'copy';
     makeDragGhost(event, ids);
     setDragInfo(payload);
   }, [commitEditing, selectedOrdered, pool, images, makeDragGhost]);
 
-  const startFetchedCardDrag = useCallback((event, item, highResImageUrl) => {
+  const startFetchedCardDrag = useCallback((event, item) => {
     commitEditing();
-    const payload = {
-      kind: 'remote',
-      card: { id: item.id, name: item.name, image: item.image },
-      url: highResImageUrl,
-    };
+    const batch = selectedCardIds.includes(item.id) ? selectedFetchedCards : [item];
+    if (!selectedCardIds.includes(item.id)) {
+      setSelectedCardIds([item.id]);
+      setSelectionAnchorId(item.id);
+    }
+    const cards = batch.map((cardItem) => ({
+      id: cardItem.id,
+      name: cardItem.name,
+      image: cardItem.image,
+      url: cardItem.image ? `${cardItem.image}/high.jpg` : '/placeholder.png',
+      isLocalUpload: false,
+    }));
+    const payload = { kind: 'remote-batch', cards, isLocalUpload: false };
     dragRef.current = payload;
     try {
       event.dataTransfer.setData(DRAG_MIME, JSON.stringify(payload));
-      event.dataTransfer.setData('text/uri-list', highResImageUrl);
-      event.dataTransfer.setData('text/plain', highResImageUrl);
+      event.dataTransfer.setData('text/plain', JSON.stringify({ cards: cards.map(({ id, name, url, isLocalUpload }) => ({ id, name, image: url, isLocalUpload })) }));
+      if (cards.length === 1) event.dataTransfer.setData('text/uri-list', cards[0].url);
     } catch { /* The live ref remains authoritative for in-app drops. */ }
     event.dataTransfer.effectAllowed = 'copy';
+    makeDragGhost(event, cards.map((cardItem) => cardItem.id));
     setDragInfo(payload);
-  }, [commitEditing]);
+  }, [commitEditing, selectedCardIds, selectedFetchedCards, makeDragGhost]);
 
   const startSlotDrag = useCallback((event, pageId, key, imgId) => {
     commitEditing();
@@ -2205,8 +2230,9 @@ export default function CardBinder() {
       return;
     }
     event.dataTransfer.dropEffect = payload?.kind === 'slot' ? 'move' : 'copy';
-    const targets = payload?.kind === 'pool'
-      ? planPlacement(pagesRef.current, pageIndex, slot.key, payload.ids.length, dimsRef.current)
+    const batchSize = payload?.kind === 'pool' ? payload.ids.length : payload?.kind === 'remote-batch' ? payload.cards.length : 1;
+    const targets = ['pool', 'remote-batch'].includes(payload?.kind)
+      ? planPlacement(pagesRef.current, pageIndex, slot.key, batchSize, dimsRef.current)
       : [{ pageIndex, key: slot.key }];
     markNativeDropTargets(targets);
   }, [combineMode, markNativeDropTargets]);
@@ -2229,11 +2255,14 @@ export default function CardBinder() {
       const ids = await addFiles(files);
       placeCards(ids, pageIndex, slot.key);
     } else if (payload?.kind === 'pool') placeCards(payload.ids, pageIndex, slot.key);
-    else if (payload?.kind === 'remote') {
+    else if (payload?.kind === 'remote-batch') {
+      const ids = await importFetchedCards(payload.cards);
+      placeCards(ids, pageIndex, slot.key);
+    } else if (payload?.kind === 'remote') {
       const ids = await importFetchedCard(payload.card, payload.url);
       placeCards(ids, pageIndex, slot.key);
     } else if (payload?.kind === 'slot') moveSlotCard(payload, pageIndex, slot.key);
-  }, [combineMode, getPayload, activateCanvasPage, addFiles, importFetchedCard, placeCards, moveSlotCard, resetDrag]);
+  }, [combineMode, getPayload, activateCanvasPage, addFiles, importFetchedCards, importFetchedCard, placeCards, moveSlotCard, resetDrag]);
 
   const handleStageDrop = useCallback(async (event) => {
     event.preventDefault();
@@ -2246,11 +2275,14 @@ export default function CardBinder() {
       const ids = await addFiles(files);
       placeCards(ids, currentPageRef.current, null);
     } else if (payload?.kind === 'pool') placeCards(payload.ids, currentPageRef.current, null);
-    else if (payload?.kind === 'remote') {
+    else if (payload?.kind === 'remote-batch') {
+      const ids = await importFetchedCards(payload.cards);
+      placeCards(ids, currentPageRef.current, null);
+    } else if (payload?.kind === 'remote') {
       const ids = await importFetchedCard(payload.card, payload.url);
       placeCards(ids, currentPageRef.current, null);
     }
-  }, [combineMode, getPayload, addFiles, importFetchedCard, placeCards, resetDrag]);
+  }, [combineMode, getPayload, addFiles, importFetchedCards, importFetchedCard, placeCards, resetDrag]);
 
   const handleSidebarDrop = useCallback(async (event) => {
     event.preventDefault();
@@ -2259,12 +2291,13 @@ export default function CardBinder() {
     const files = Array.from(event.dataTransfer.files || []);
     resetDrag(event);
     if (carriesFiles) await addFiles(files);
+    else if (payload?.kind === 'remote-batch') await importFetchedCards(payload.cards);
     else if (payload?.kind === 'remote') await importFetchedCard(payload.card, payload.url);
     else if (payload?.kind === 'slot') {
       removeSlotCard(payload.pageId, payload.key);
       notify('Card removed from the binder.', 'info');
     }
-  }, [getPayload, addFiles, importFetchedCard, removeSlotCard, notify, resetDrag]);
+  }, [getPayload, addFiles, importFetchedCards, importFetchedCard, removeSlotCard, notify, resetDrag]);
 
   const handleThumbDrop = useCallback(async (event, pageIndex) => {
     event.preventDefault();
@@ -2277,11 +2310,14 @@ export default function CardBinder() {
       const ids = await addFiles(files);
       placeCards(ids, pageIndex, null);
     } else if (payload?.kind === 'pool') placeCards(payload.ids, pageIndex, null);
-    else if (payload?.kind === 'remote') {
+    else if (payload?.kind === 'remote-batch') {
+      const ids = await importFetchedCards(payload.cards);
+      placeCards(ids, pageIndex, null);
+    } else if (payload?.kind === 'remote') {
       const ids = await importFetchedCard(payload.card, payload.url);
       placeCards(ids, pageIndex, null);
     } else if (payload?.kind === 'slot') moveSlotCard(payload, pageIndex, null);
-  }, [getPayload, addFiles, importFetchedCard, placeCards, moveSlotCard, resetDrag]);
+  }, [getPayload, addFiles, importFetchedCards, importFetchedCard, placeCards, moveSlotCard, resetDrag]);
 
   const performMerge = useCallback((box, pageIndex = currentPageRef.current) => {
     if (!box || box.rs * box.cs <= 1) return;
@@ -2482,7 +2518,7 @@ export default function CardBinder() {
     pagesRef.current = nextPages;
     setPages(nextPages);
     clearHistory();
-    setSelected([]);
+    setSelectedCardIds([]);
     setImages((value) => {
       const next = { ...value };
       ids.forEach((id) => {
@@ -2555,7 +2591,7 @@ export default function CardBinder() {
     clearHistory();
     setPool([]);
     setImages({});
-    setSelected([]);
+    setSelectedCardIds([]);
     setSelBox(null);
     setSelectionPageId(null);
     setSettings(sanitizeSettings());
@@ -2658,28 +2694,28 @@ export default function CardBinder() {
     const item = sourceItems[itemIndex];
     if (!item) return;
     const toggle = event.ctrlKey || event.metaKey;
-    const range = event.shiftKey && selectionAnchor;
+    const range = event.shiftKey && selectionAnchorId;
     if (range) {
-      const anchorIndex = sourceItems.findIndex((entry) => entry.id === selectionAnchor);
+      const anchorIndex = sourceItems.findIndex((entry) => entry.id === selectionAnchorId);
       const start = anchorIndex < 0 ? itemIndex : Math.min(anchorIndex, itemIndex);
       const end = anchorIndex < 0 ? itemIndex : Math.max(anchorIndex, itemIndex);
       const ids = sourceItems.slice(start, end + 1).map((entry) => entry.id);
-      setSelected((value) => toggle ? Array.from(new Set([...value, ...ids])) : ids);
+      setSelectedCardIds((value) => toggle ? Array.from(new Set([...value, ...ids])) : ids);
     } else if (toggle) {
-      setSelected((value) => value.includes(item.id) ? value.filter((id) => id !== item.id) : [...value, item.id]);
-      setSelectionAnchor(item.id);
+      setSelectedCardIds((value) => value.includes(item.id) ? value.filter((id) => id !== item.id) : [...value, item.id]);
+      setSelectionAnchorId(item.id);
     } else {
-      setSelected([item.id]);
-      setSelectionAnchor(item.id);
+      setSelectedCardIds([item.id]);
+      setSelectionAnchorId(item.id);
     }
-  }, [visiblePool, selectionAnchor]);
+  }, [visiblePool, selectionAnchorId]);
 
   const selectAllVisible = useCallback((requestedIds) => {
-    const defaultItems = activeTab === 'michi' ? pool.filter((item) => item.source !== 'tcgdex') : visiblePool;
+    const defaultItems = activeTab === 'michi' ? pool.filter((item) => item.source !== 'tcgdex') : fetchedCards;
     const ids = Array.isArray(requestedIds) ? requestedIds : defaultItems.map((item) => item.id);
-    setSelected(ids);
-    setSelectionAnchor(ids[0] || null);
-  }, [activeTab, pool, visiblePool]);
+    setSelectedCardIds(ids);
+    setSelectionAnchorId(ids[0] || null);
+  }, [activeTab, pool, fetchedCards]);
 
   useEffect(() => {
     const keydown = (event) => {
@@ -2712,20 +2748,27 @@ export default function CardBinder() {
         else if (openPanel) setOpenPanel(null);
         else if (selBox) { setSelBox(null); setSelectionPageId(null); }
         else if (combineMode) setCombineMode(false);
-        else if (selected.length) setSelected([]);
+        else if (selectedCardIds.length) { setSelectedCardIds([]); setSelectionAnchorId(null); }
         return;
       }
-      if (event.key === 'Delete' || event.key === 'Backspace') { if (selected.length) { event.preventDefault(); deleteImages(selected); } return; }
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        if (selectedCardIds.length) {
+          event.preventDefault();
+          if (activeTab === 'michi') deleteImages(selectedCardIds);
+          else { setSelectedCardIds([]); setSelectionAnchorId(null); }
+        }
+        return;
+      }
       if (event.key.toLowerCase() === 'm') { event.preventDefault(); setCombineMode((state) => !state); return; }
       if (event.key === 'Enter' && canMerge) { event.preventDefault(); performMerge(selBox, selectionPageIndex); return; }
       if (event.key.toLowerCase() === 'u' && selectedMerges.length) { event.preventDefault(); unmergeBox(); return; }
-      if (event.key.toLowerCase() === 'f' && selected.length) { event.preventDefault(); fillSelection(); return; }
+      if (event.key.toLowerCase() === 'f' && selectedCardIds.length) { event.preventDefault(); fillSelection(); return; }
       if (event.key === 'ArrowLeft' || event.key === 'PageUp') { event.preventDefault(); goToAdjacentSpread(-1); return; }
       if (event.key === 'ArrowRight' || event.key === 'PageDown') { event.preventDefault(); goToAdjacentSpread(1); }
     };
     window.addEventListener('keydown', keydown);
     return () => window.removeEventListener('keydown', keydown);
-  }, [undoAction, redoAction, cancelEditing, commitEditing, selectAllVisible, openPanel, selBox, combineMode, selected, deleteImages, setCombineMode, canMerge, performMerge, selectionPageIndex, selectedMerges.length, unmergeBox, fillSelection, goToAdjacentSpread]);
+  }, [undoAction, redoAction, cancelEditing, commitEditing, selectAllVisible, openPanel, selBox, combineMode, selectedCardIds, activeTab, deleteImages, setCombineMode, canMerge, performMerge, selectionPageIndex, selectedMerges.length, unmergeBox, fillSelection, goToAdjacentSpread]);
 
   useEffect(() => {
     if (!openPanel) return undefined;
@@ -2747,7 +2790,8 @@ export default function CardBinder() {
   const frameHeight = frameHIn * ppi;
   const spreadWidth = frameWidth * 2 + spineGap;
   const helperOffsetX = settings.view === 'binder' ? ((SHEET_PAD.left - SHEET_PAD.right) / 2) * ppi : 0;
-  const multiFlow = dragInfo?.kind === 'pool' && dragInfo.ids.length > 1 ? Math.max(0, planPlacement(pages, currentPage, null, dragInfo.ids.length, dims).filter((target) => target.pageIndex > currentPage).length) : 0;
+  const dragBatchSize = dragInfo?.kind === 'pool' ? dragInfo.ids.length : dragInfo?.kind === 'remote-batch' ? dragInfo.cards.length : 0;
+  const multiFlow = dragBatchSize > 1 ? Math.max(0, planPlacement(pages, currentPage, null, dragBatchSize, dims).filter((target) => target.pageIndex > currentPage).length) : 0;
 
   const renderEditorSlot = (page, pageIndex, slot, slotIndex) => {
     const imgId = page.slots[slot.key];
@@ -2985,7 +3029,7 @@ export default function CardBinder() {
             {renderEditorGrid(page, pageIndex)}
           </div>
         )}
-        {showHelper && pageIndex === currentPage && <CanvasHelper editing={editing} multiDrag={dragInfo?.kind === 'pool' ? dragInfo.ids.length : 0} flowCount={multiFlow} offsetX={side === 'left' ? -helperOffsetX : helperOffsetX} onCenter={() => { const value = editingRef.current; if (value) { const next = { ...value, x: 50, y: 50 }; editingRef.current = next; setEditing(next); } }} onCancel={cancelEditing} onDone={commitEditing} />}
+        {showHelper && pageIndex === currentPage && <CanvasHelper editing={editing} multiDrag={dragBatchSize} flowCount={multiFlow} offsetX={side === 'left' ? -helperOffsetX : helperOffsetX} onCenter={() => { const value = editingRef.current; if (value) { const next = { ...value, x: 50, y: 50 }; editingRef.current = next; setEditing(next); } }} onCancel={cancelEditing} onDone={commitEditing} />}
       </div>
     );
   };
@@ -3178,7 +3222,7 @@ export default function CardBinder() {
           <CardPool
             isOpen={isLeftSidebarOpen}
             customUploadedCards={customUploadedCards}
-            selected={selected}
+            selectedCardIds={selectedCardIds}
             placedIds={placedIds}
             images={images}
             inputRef={inputRef}
@@ -3187,7 +3231,7 @@ export default function CardBinder() {
             onPoolDoubleClick={(id) => placeCards([id], currentPage, null)}
             onPoolDragStart={startPoolDrag}
             onDragEnd={resetDrag}
-            onClearSelection={() => { setSelected([]); setSelectionAnchor(null); }}
+            onClearSelection={() => { setSelectedCardIds([]); setSelectionAnchorId(null); }}
             sidebarDropActive={sidebarDropActive}
             slotDropActive={sidebarDropActive && dragInfo?.kind === 'slot'}
             onDragOver={(event) => { if (dragRef.current || hasFiles(event.dataTransfer)) { event.preventDefault(); setSidebarDropActive(true); event.dataTransfer.dropEffect = dragRef.current?.kind === 'slot' ? 'move' : 'copy'; } }}
@@ -3216,8 +3260,8 @@ export default function CardBinder() {
               className="relative flex min-h-0 w-full flex-1 items-center justify-center overflow-auto bg-neutral-950 bg-[radial-gradient(ellipse_at_center,rgba(82,82,91,0.18),transparent_65%)] p-6"
               onPointerMove={moveMarquee}
               onPointerDown={(event) => { if (event.target === event.currentTarget && combineMode) { setSelBox(null); setSelectionPageId(null); } }}
-              onDragEnter={(event) => { if (!combineMode && (['pool', 'remote'].includes(dragRef.current?.kind) || hasFiles(event.dataTransfer))) event.preventDefault(); }}
-              onDragOver={(event) => { if (!combineMode && (['pool', 'remote'].includes(dragRef.current?.kind) || hasFiles(event.dataTransfer))) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; } }}
+              onDragEnter={(event) => { if (!combineMode && (['pool', 'remote', 'remote-batch'].includes(dragRef.current?.kind) || hasFiles(event.dataTransfer))) event.preventDefault(); }}
+              onDragOver={(event) => { if (!combineMode && (['pool', 'remote', 'remote-batch'].includes(dragRef.current?.kind) || hasFiles(event.dataTransfer))) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; } }}
               onDrop={handleStageDrop}
             >
               <div data-workspace-metrics aria-label={`Database ${fetchedCards.length} items, Custom ${customUploadedCards.length} uploaded, Density ${currentFilledCount} of ${layout.pockets} filled`} className="pointer-events-none absolute bottom-3 left-6 z-40 flex items-center gap-3 rounded-md border border-white/[0.06] bg-neutral-950/85 px-2.5 py-1.5 text-[10px] font-mono shadow-lg backdrop-blur-sm select-none">
@@ -3299,9 +3343,9 @@ export default function CardBinder() {
               aria-label="Page timeline"
               aria-hidden={!showBottomTimeline}
               inert={showBottomTimeline ? undefined : ''}
-              className={`no-print relative flex w-full shrink-0 items-center justify-center gap-4 bg-neutral-900/40 backdrop-blur-sm transition-all duration-300 ease-in-out select-none ${showBottomTimeline ? 'h-28 py-4 px-6 border-t border-white/[0.04] border-opacity-100 opacity-100 overflow-x-auto' : 'h-0 py-0 px-6 border-0 border-opacity-0 opacity-0 overflow-hidden pointer-events-none'}`}
+              className={`no-print relative flex min-w-0 w-full shrink-0 items-center justify-start gap-4 bg-neutral-900/40 backdrop-blur-sm transition-all duration-300 ease-in-out select-none ${showBottomTimeline ? 'h-28 py-4 px-6 border-t border-white/[0.04] border-opacity-100 opacity-100 overflow-x-auto overscroll-x-contain' : 'h-0 py-0 px-6 border-0 border-opacity-0 opacity-0 overflow-hidden pointer-events-none'}`}
             >
-              <div data-page-timeline-inner className="mx-auto flex h-full w-max items-center justify-center gap-4">
+              <div data-page-timeline-inner className="mx-auto flex h-full min-w-max w-max items-center justify-center gap-4">
                 {spreadGroups.map(renderThumbnailGroup)}
                 <div className="flex shrink-0 flex-col items-center gap-1 text-[10px] font-medium whitespace-nowrap text-neutral-500">
                   <button type="button" onClick={addPage} aria-label="Add page" className="group shrink-0 rounded-md bg-transparent p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500">
