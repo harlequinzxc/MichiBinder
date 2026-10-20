@@ -675,7 +675,7 @@ function ToolButton({ icon, label, onClick, disabled = false, disabledReason, ac
       aria-pressed={active === undefined ? undefined : active}
       aria-label={label || title || disabledReason}
       title={!disabled ? title : undefined}
-      className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:pointer-events-none disabled:text-zinc-500 ${variant === 'primary' ? 'font-semibold' : 'font-medium'} ${dense ? 'h-7 min-w-7 px-1.5 text-[12px]' : 'h-8 px-3 py-1.5 text-xs'} ${variants[variant]} ${className}`}
+      className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md whitespace-nowrap transition-all duration-100 active:scale-[0.93] transform-gpu will-change-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:pointer-events-none disabled:text-zinc-500 ${variant === 'primary' ? 'font-semibold' : 'font-medium'} ${dense ? 'h-7 min-w-7 px-1.5 text-[12px]' : 'h-8 px-3 py-1.5 text-xs'} ${variants[variant]} ${className}`}
     >
       {icon && <Icon name={icon} />}
       {label && <span>{label}</span>}
@@ -898,7 +898,7 @@ function RailButton({ icon, label, active = false, expanded, onClick, className 
       aria-expanded={expanded}
       aria-haspopup={expanded === undefined ? undefined : 'dialog'}
       title={label}
-      className={`relative w-8 h-8 flex shrink-0 items-center justify-center rounded-lg bg-neutral-800/40 hover:bg-neutral-700/60 border border-white/[0.03] transition-all cursor-pointer shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${active ? '!border-red-500/30 !bg-red-950/70 text-red-300' : 'text-neutral-400 hover:text-neutral-200'} ${className}`}
+      className={`relative w-8 h-8 flex shrink-0 items-center justify-center rounded-lg bg-neutral-800/40 hover:bg-neutral-700/60 border border-white/[0.03] transition-all duration-100 active:scale-[0.93] transform-gpu will-change-transform cursor-pointer shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${active ? '!border-red-500/30 !bg-red-950/70 text-red-300' : 'text-neutral-400 hover:text-neutral-200'} ${className}`}
     >
       {icon && <Icon name={icon} />}
       {children}
@@ -1090,7 +1090,7 @@ function FloatingNavigation({
   onDelete,
   canDelete,
 }) {
-  const bottomIconButton = 'w-8 h-8 flex items-center justify-center rounded-lg bg-neutral-800/40 hover:bg-neutral-700/60 border border-white/[0.03] transition-all cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500';
+  const bottomIconButton = 'w-8 h-8 flex items-center justify-center rounded-lg bg-neutral-800/40 hover:bg-neutral-700/60 border border-white/[0.03] transition-all duration-100 active:scale-[0.93] transform-gpu will-change-transform cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500';
   const neutralIconButton = `${bottomIconButton} text-neutral-400 hover:text-neutral-200 disabled:pointer-events-none disabled:cursor-default disabled:text-neutral-700`;
   return (
     <div data-bottom-control-bar className="no-print relative flex w-full shrink-0 items-center justify-center border-t border-white/[0.06] bg-neutral-900/60 px-6 py-3 backdrop-blur-md select-none">
@@ -1399,7 +1399,7 @@ function CardPool({
                   className="scroll-area grid grid-cols-2 gap-3 p-2 overflow-y-auto max-h-[calc(100vh-220px)] scrollbar-none will-change-transform [scrollbar-width:none] [&::-webkit-scrollbar]:hidden group rounded-md border border-white/[0.04]"
                 >
                   {isLoading && !fetchedCards.length && Array.from({ length: 6 }, (_, index) => <span key={index} aria-hidden="true" className="aspect-[245/337] animate-pulse rounded-lg border border-white/[0.04] bg-neutral-900" />)}
-                  {fetchedCards.map((item) => {
+                  {fetchedCards.map((item, index) => {
                     const fullImageUrl = item.image ? `${item.image}/low.jpg` : '/placeholder.png';
                     const highResImageUrl = item.image ? `${item.image}/high.jpg` : '/placeholder.png';
                     const selectionIndex = selectedCardIds.indexOf(item.id);
@@ -1418,7 +1418,8 @@ function CardPool({
                         onDragEnd={onDragEnd}
                         onDoubleClick={() => onFetchedCardAdd(item, highResImageUrl)}
                         onKeyDown={(event) => { if (event.key === 'Enter') onFetchedCardAdd(item, highResImageUrl); }}
-                        className={`relative group/card aspect-[245/337] cursor-grab active:cursor-grabbing rounded-md overflow-hidden bg-neutral-900 outline-none transition-all duration-150 focus-visible:ring-2 focus-visible:ring-red-500 ${selectionIndex >= 0 ? 'ring-2 ring-red-500 scale-[0.98] brightness-110 shadow-lg' : 'border border-white/[0.03] opacity-80 hover:opacity-100 shadow-sm hover:shadow-xl hover:border-white/[0.1]'}`}
+                        style={{ animationDelay: `${index * 25}ms` }}
+                        className={`relative group/card aspect-[245/337] cursor-grab active:cursor-grabbing rounded-md overflow-hidden bg-neutral-900 outline-none animate-fadeIn transition-all opacity-0 translate-y-2 duration-300 ease-out will-change-[transform,opacity] transform-gpu focus-visible:ring-2 focus-visible:ring-red-500 ${selectionIndex >= 0 ? 'ring-2 ring-red-500 scale-[0.98] brightness-110 shadow-lg' : 'border border-white/[0.03] hover:opacity-100 shadow-sm hover:shadow-xl hover:border-white/[0.1]'}`}
                       >
                         <img data-img-id={item.id} src={fullImageUrl} alt={item.name} draggable={false} loading="lazy" className="w-full h-auto object-contain bg-neutral-950 transition-opacity duration-200" onError={(event) => { if (!event.currentTarget.src.endsWith('/placeholder.png')) event.currentTarget.src = '/placeholder.png'; }} />
                         <span className="pointer-events-none absolute inset-0 flex items-end bg-gradient-to-t from-black/80 via-transparent to-transparent p-2 opacity-0 transition-opacity group-hover/card:opacity-100 group-focus-visible/card:opacity-100"><span className="w-full truncate text-xs font-medium text-neutral-200">{item.name}</span></span>
@@ -3114,6 +3115,27 @@ export default function CardBinder() {
     const cardMarketValueLabel = currencyDisplay === 'SGD' ? `S$${(cardMarketValueUSD * sgdRate).toFixed(2)}` : `$${cardMarketValueUSD.toFixed(2)}`;
     const labelVisible = (frameW * gridPpi) >= 72;
     const slotActionsAvailable = !combineMode && !dragInfo && !marqueeActive && !editing;
+    const updateCardTilt = (event) => {
+      if (editing || combineMode || dragInfo || marqueeActive || event.buttons) return;
+      const rect = event.currentTarget.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+      const rotateX = -1 * ((y / rect.height) - 0.5) * 12;
+      const rotateY = ((x / rect.width) - 0.5) * 12;
+      const sheenX = (x / rect.width) * 100;
+      const sheenY = (y / rect.height) * 100;
+      event.currentTarget.style.setProperty('--rx', `${rotateX}deg`);
+      event.currentTarget.style.setProperty('--ry', `${rotateY}deg`);
+      event.currentTarget.style.setProperty('--mx', `${sheenX}%`);
+      event.currentTarget.style.setProperty('--my', `${sheenY}%`);
+    };
+    const resetCardTilt = (event) => {
+      event.currentTarget.style.setProperty('--rx', '0deg');
+      event.currentTarget.style.setProperty('--ry', '0deg');
+      event.currentTarget.style.setProperty('--mx', '50%');
+      event.currentTarget.style.setProperty('--my', '50%');
+    };
     const stopSlotAction = (event) => event.stopPropagation();
     const activateSlotAction = (event, action) => {
       event.stopPropagation();
@@ -3178,14 +3200,16 @@ export default function CardBinder() {
 
     return (
       <div
+        data-card-tilt
         data-editing-slot={isEditing ? '' : undefined}
         draggable={!combineMode && !editing}
-        onDragStart={(event) => startSlotDrag(event, page.id, slot.key, imgId)}
+        onDragStart={(event) => { resetCardTilt(event); startSlotDrag(event, page.id, slot.key, imgId); }}
         onDragEnd={resetDrag}
         onPointerDown={(event) => isEditing ? beginPan(event) : beginMarquee(event, slot, false, page, pageIndex)}
-        onPointerMove={isEditing ? movePan : undefined}
+        onPointerMove={(event) => { if (isEditing) movePan(event); else updateCardTilt(event); }}
+        onPointerLeave={resetCardTilt}
         onPointerUp={isEditing ? endPan : undefined}
-        onPointerCancel={isEditing ? endPan : undefined}
+        onPointerCancel={(event) => { resetCardTilt(event); if (isEditing) endPan(event); }}
         onDoubleClick={(event) => {
           if (performance.now() < slotActionGuardRef.current) { event.stopPropagation(); return; }
           activateCanvasPage(pageIndex);
@@ -3196,7 +3220,15 @@ export default function CardBinder() {
           activateCanvasPage(pageIndex);
           if (combineMode) { setSelectionPageId(page.id); setSelBox(expandBox(mergeBox(slot), pageMerges)); }
         }}
-        className={`group group/slot relative size-full transition-transform duration-150 ease-out hover:z-30 hover:scale-[1.02] ${!combineMode && !editing ? 'cursor-grab active:cursor-grabbing' : ''}`}
+        className={`group group/slot relative size-full transform-gpu transition-all duration-200 [transition-timing-function:cubic-bezier(0.1,1,0.1,1)] ease-out hover:z-40 [transform-style:preserve-3d] will-change-transform ${!combineMode && !editing ? 'cursor-grab active:cursor-grabbing' : ''}`}
+        style={{
+          '--rx': '0deg',
+          '--ry': '0deg',
+          '--mx': '50%',
+          '--my': '50%',
+          transform: 'perspective(600px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) scale3d(1.02, 1.02, 1.02)',
+          transitionTimingFunction: 'cubic-bezier(0.1, 1, 0.1, 1)',
+        }}
       >
         {isEditing && editing.geometry && (
           <img
@@ -3211,7 +3243,7 @@ export default function CardBinder() {
             }}
           />
         )}
-        <div className={`relative size-full overflow-hidden border bg-white transition-all duration-150 ${settings.view === 'binder' ? 'sleeve-sheen rounded-md border-white/[0.06] bg-neutral-900/50 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),inset_0_-8px_18px_rgba(0,0,0,0.22),0_8px_22px_rgba(0,0,0,0.24)] hover:border-white/[0.12] hover:bg-neutral-900/80 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.09),0_14px_30px_rgba(0,0,0,0.42)]' : 'border-transparent'} ${isEditing ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-zinc-900' : ''}`} style={{ borderRadius: radius }}>
+        <div className={`relative size-full overflow-hidden border bg-white transition-all duration-150 after:absolute after:inset-0 after:pointer-events-none after:bg-[radial-gradient(circle_at_var(--mx,50%)_var(--my,50%),rgba(255,255,255,0.14)_0%,transparent_60%)] after:opacity-0 hover:after:opacity-100 after:transition-opacity after:duration-300 ${settings.view === 'binder' ? 'sleeve-sheen rounded-md border-white/[0.06] bg-neutral-900/50 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),inset_0_-8px_18px_rgba(0,0,0,0.22),0_8px_22px_rgba(0,0,0,0.24)] hover:border-white/[0.12] hover:bg-neutral-900/80 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.09),0_14px_30px_rgba(0,0,0,0.42)]' : 'border-transparent'} ${isEditing ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-zinc-900' : ''}`} style={{ borderRadius: radius }}>
           {source ? <img
             data-img-id={imgId}
             src={source}
@@ -3417,7 +3449,7 @@ export default function CardBinder() {
         data-back-page={backPageIndex + 1}
         data-turn-state={pageFlip.turned ? 'turning' : 'resting'}
         inert
-        className={`absolute top-0 z-50 transform-gpu pointer-events-none transition-transform duration-500 [transition-timing-function:cubic-bezier(0.37,0,0.63,1)] [transform-style:preserve-3d] will-change-transform ${originClass}`}
+        className={`absolute top-0 z-50 transform-gpu pointer-events-none transition-transform duration-500 [transition-timing-function:cubic-bezier(0.25,1,0.5,1)] [transform-style:preserve-3d] will-change-transform ${originClass}`}
         style={{
           width: frameWidth,
           height: frameHeight,
@@ -3440,7 +3472,7 @@ export default function CardBinder() {
           style: {
             width: '100%',
             height: '100%',
-            transform: 'rotateY(0deg) translateZ(0.5px)',
+            transform: 'rotateY(0deg) translateZ(0.8px)',
           },
         })}
 
@@ -3457,7 +3489,7 @@ export default function CardBinder() {
           style: {
             width: '100%',
             height: '100%',
-            transform: `rotateY(${backRotation}) translateZ(0.5px)`,
+            transform: `rotateY(${backRotation}) translateZ(0.8px)`,
           },
         })}
 
@@ -3659,7 +3691,7 @@ export default function CardBinder() {
               aria-label="Page timeline"
               aria-hidden={!showBottomTimeline}
               inert={showBottomTimeline ? undefined : true}
-              className={`no-print w-full bg-neutral-900/40 backdrop-blur-sm transition-all duration-300 ease-in-out shrink-0 relative flex justify-start items-center select-none scrollbar-none min-w-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${showBottomTimeline ? 'h-28 border-t border-white/[0.04] overflow-x-auto overscroll-x-contain gap-4 p-4 opacity-100' : 'h-0 border-0 overflow-hidden gap-0 p-0 opacity-0 pointer-events-none'}`}
+              className={`no-print w-full bg-neutral-900/40 backdrop-blur-sm transform-gpu transition-all duration-300 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] will-change-[height,opacity,padding,margin] shrink-0 relative flex justify-start items-center select-none scrollbar-none min-w-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${showBottomTimeline ? 'h-28 border-t border-white/[0.04] overflow-x-auto overscroll-x-contain gap-4 px-4 py-4 opacity-100 translate-y-0' : 'h-0 border-0 overflow-hidden gap-0 px-0 py-0 opacity-0 translate-y-4 pointer-events-none'}`}
             >
               <div data-page-timeline-inner className="flex h-full min-w-max w-max items-center justify-start gap-4">
                 {spreadGroups.map(renderThumbnailGroup)}

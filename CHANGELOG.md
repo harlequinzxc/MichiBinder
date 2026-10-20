@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.4.1
+## Current state — v4.5.0
 
 - **Ledger date:** 2026-10-20
-- **Application state entering this feature pass:** commit `8a7c7fc` / v4.3.4
+- **Application state entering this feature pass:** commit `4f1413b` / v4.4.1
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,8 +14,8 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets plus the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, required secret, or environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** live TCGplayer market valuation with canonical TCGdex price identity, USD/SGD switching, portfolio/spread totals, and per-card hover values
-- **Last verified behavior:** production build plus mocked TCGdex detail and exchange responses covering market/low fallback selection, persisted canonical IDs and prices, currency switching, instance totals, active-spread totals, removal updates, hover values, and zero browser errors at 1600×1000, 1366×768, and 1200×700
+- **Last functional change:** hardware-accelerated card tilt/sheens, weighted page turns, elastic timeline motion, tactile button compression, and staggered catalogue entry
+- **Last verified behavior:** production build plus dedicated three-viewport motion checks for exact tilt vectors and reset, reactive sheen, timeline collapse geometry, page-face depth, button classes, stagger timing, catalogue final state, market valuation, sidebar hierarchy, selection marquee, document containment, and zero browser errors
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## SemVer reconstruction
@@ -558,6 +558,23 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Reverified nested market selection, nested low fallback, legacy-ID migration, persisted raw USD values, currency switching, portfolio/spread totals, removal updates, hover values, responsive containment, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.4.1.
 
+## [v4.5.0] — 2026-10-20
+
+### Added
+
+- Added pointer-relative 3D physics to placed cards using local `--rx`, `--ry`, `--mx`, and `--my` channels, a 600px perspective, 12-degree rotational range, 3D scale, and deterministic pointer-leave reset without React render churn.
+- Added a cursor-tracking radial specular sheen on card sleeves, with composited opacity and transform transitions isolated through GPU layers and `will-change` hints.
+- Added a staggered 25ms catalogue entrance track so asynchronous TCGdex result batches fade and rise into the grid instead of appearing abruptly.
+
+### Improved
+
+- Reweighted physical page turns to a 500ms `cubic-bezier(0.25, 1, 0.5, 1)` deceleration curve and separated both face surfaces by 0.8px to reduce midpoint flicker.
+- Reworked the timeline drawer into a 300ms elastic height, opacity, padding, and translated-rest transition while preserving literal zero-height, zero-padding collapsed geometry.
+- Added 100ms GPU-backed 0.93 active compression to shared ToolButton, RailButton, and floating navigation controls.
+- Preserved crop repositioning, marquee selection, drag/drop, market-value badges, page ownership, and reduced-motion behavior while introducing the new pointer and compositing paths.
+- Verified exact tilt coordinates, baseline reset, sheen response, page-face transforms, timeline states, button feedback classes, catalogue stagger/final visibility, valuation behavior, sidebar and selection regressions, viewport containment, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
+- Advanced package and lockfile metadata to v4.5.0.
+
 ---
 
 ## Current architecture and engineering rationale
@@ -591,7 +608,8 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - The workspace perspective is fixed at 1200px and the current spine gap is `gap-4`.
 - The turning sheet is pinned to the center line with direction-specific left/right origins. Forward and backward rotations have opposite signs, while the reverse face starts at ±180 degrees.
 - A turn plan stores front face ID, back face ID, stable left/right base page IDs, direction, and boundary type. IDs—not array positions—keep the animation coherent while insertion or duplication changes page arrays.
-- `translateZ` separation, backface visibility, a two-pixel edge, face shading, and cast shadow sell depth. These effects must not alter width, origin, or grid-column geometry.
+- The 500ms turn uses a weighted `cubic-bezier(0.25, 1, 0.5, 1)` track. Both front and reverse canvases use 0.8px `translateZ` separation, backface visibility, a two-pixel edge, face shading, and cast shadow without altering width, origin, or grid-column geometry.
+- Placed cards update local tilt/specular CSS variables directly from pointer coordinates. The DOM write path avoids React state, resets on leave/cancel, and is disabled while crop editing, marquee selection, or dragging owns the pointer.
 - Tokenized timers cancel superseded turns. Without token checks, rapid navigation can let an old 40ms/560ms callback overwrite a newer animation.
 - The spread clip deliberately opens beyond its nominal width during animation; ordinary state uses normal clipping to prevent horizontal workspace overflow.
 
@@ -628,7 +646,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Every rail dialog is absolutely anchored at `right-full mr-3 top-0` relative to its trigger. Panels cap at 40vh and scroll internally when their content is longer.
 - Database/Custom/Density is absolutely anchored to the preview bottom edge. It uses the self-hosted Inter sans stack and is not part of the timeline or bottom controller flow.
 - The bottom controller owns Undo/Redo, Merge/Unmerge/reset/clear, spread navigation, Add, Duplicate, Delete, and timeline toggle. One-pixel dividers separate its History, Slot Structure, and Spread Navigation pockets.
-- The timeline is a sibling below the preview/controller inside the right-side main tree. Expanded, it reaches the right viewport edge; collapsed, it has zero height, padding, and border so the preview grows immediately.
+- The timeline is a sibling below the preview/controller inside the right-side main tree. Its 300ms elastic slide/fade transitions height, opacity, and padding; collapsed geometry still resolves to zero height, padding, and border so the preview reclaims the full band.
 - Active groups use `data-active="true"` and a dimension-neutral two-pixel shadow outline without scale or ring offset. Add/Duplicate use a requested page ID and then call `scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })` on its containing group.
 
 ### Persistence and history
@@ -648,7 +666,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Card list records provide `id`, `localId`, `name`, and an extensionless image base. The UI appends `/low.jpg`; import appends `/high.jpg`.
 - Queried and persisted TCGdex cards hydrate `/cards/{id}` detail records. Raw USD selection accepts only positive values, prioritizing market → low → mid across both direct `pricing.tcgplayer` fields and variant records such as `normal.marketPrice`, `holofoil.lowPrice`, or `reverse.midPrice`.
 - Set lists are normalized and sorted newest-first where release dates exist. Full set fetches provide the card list used by local infinite pagination.
-- Search is debounced and abortable. Pages append 40 normalized records at a time; detail-price requests are deduplicated by canonical card ID.
+- Search is debounced and abortable. Pages append 40 normalized records at a time; new result wrappers use a 300ms fade/rise animation staggered by 25ms per result, and detail-price requests are deduplicated by canonical card ID.
 - Only the TCGdex asset origin is accepted when normalizing absolute card-image bases.
 - If high-resolution fetch succeeds, the blob becomes a local asset. If browser privacy/CORS policy blocks it, the validated CDN URL remains the persisted fallback.
 - `https://open.er-api.com/v6/latest/USD` supplies the optional live SGD rate. Invalid or unavailable responses retain the local 1.35 fallback; raw persisted card prices remain USD.
