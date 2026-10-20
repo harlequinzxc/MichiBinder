@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.5.1
+## Current state — v4.6.0
 
 - **Ledger date:** 2026-10-20
-- **Application state entering this feature pass:** commit `4f1413b` / v4.4.1
+- **Application state entering this feature pass:** commit `80ca79a` / v4.5.1
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,8 +14,8 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets plus the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, required secret, or environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** hardware-accelerated card tilt/sheens, weighted page turns, elastic timeline motion, tactile button compression, and staggered catalogue entry
-- **Last verified behavior:** production build plus dedicated three-viewport motion checks for exact tilt vectors and reset, reactive sheen, timeline collapse geometry, page-face depth, button classes, stagger timing, catalogue final state, market valuation, sidebar hierarchy, selection marquee, document containment, and zero browser errors
+- **Last functional change:** Cardmarket EUR fallback pricing with live USD conversion while retaining TCGplayer precedence and the hardware-accelerated card-motion system
+- **Last verified behavior:** production build plus dedicated three-viewport motion, Cardmarket valuation/conversion, sidebar hierarchy, selection marquee, document containment, and zero-browser-error checks
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## SemVer reconstruction
@@ -586,6 +586,21 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Extended TCGdex extraction to inspect `variants_detailed`/`variantsDetailed` pricing when the card-level `pricing.tcgplayer` provider is null, without treating genuinely unavailable provider data as a fabricated value.
 - Verified stable outer geometry, exact pointer vectors, inner-only transforms, 0.98 edit transforms, sheen/reset behavior, catalogue final visibility without forced animation completion, detailed-variant price fallback, valuation badges, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.5.1.
+
+## [v4.6.0] — 2026-10-20
+
+### Added
+
+- Added Cardmarket as a real-value fallback when TCGdex has no positive TCGplayer market, low, or mid price, scanning both card-level and `variants_detailed`/`variantsDetailed` provider data.
+- Added Cardmarket priority selection across positive trend, average, and low EUR values, with normal-versus-holo preference aligned to the card's declared variants.
+- Extended the existing USD exchange-rate request to read `rates.EUR` and convert Cardmarket EUR amounts into canonical persisted USD before the established optional SGD display conversion.
+- Cached raw Cardmarket EUR quotes so fallback prices are recalculated when the live EUR-per-USD rate arrives; a static 0.92 EUR-per-USD default covers the interval before a successful rate response.
+
+### Preserved and verified
+
+- Kept positive TCGplayer market → low → mid as the primary source, prevented non-positive provider data from fabricating a value, and retained canonical `cardPrices[tcgdexId]` persistence.
+- Verified Cardmarket fallback from detailed variants, live EUR-to-USD conversion, Total Value, Spread Value, placed-card badges, deduplicated detail requests, persistence, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
+- Advanced package and lockfile metadata to v4.6.0.
 
 ---
 

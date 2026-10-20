@@ -74,6 +74,7 @@ const TCGDEX_SETS_ENDPOINT = `${TCGDEX_API_BASE}/sets`;
 const TCGDEX_ASSET_CDN = 'https://assets.tcgdex.net';
 const TCGDEX_RESULT_LIMIT = 40;
 const SGD_RATE_ENDPOINT = 'https://open.er-api.com/v6/latest/USD';
+const EUR_PER_USD_FALLBACK = 0.92;
 const IDB_NAME = 'digital-card-binder';
 const IDB_STORE = 'images';
 const IDB_VERSION = 1;
@@ -132,6 +133,7 @@ const positiveMoney = (value) => {
   const amount = Number(candidate);
   return Number.isFinite(amount) && amount > 0 ? amount : 0;
 };
+const eurToUsd = (priceEUR, eurPerUsd) => Math.round(((priceEUR / eurPerUsd) + Number.EPSILON) * 100) / 100;
 const tcgplayerMarketPrice = (payload) => {
   const card = payload?.data && !Array.isArray(payload.data) ? payload.data : payload;
   const detailedVariants = Array.isArray(card?.variants_detailed)
@@ -161,6 +163,23 @@ const tcgplayerMarketPrice = (payload) => {
     || variants.reduce((price, variant) => price || positiveMoney(variant[variantField]) || positiveMoney(variant[directField]), 0)
   );
   return selectPrice('market', 'marketPrice') || selectPrice('low', 'lowPrice') || selectPrice('mid', 'midPrice');
+};
+const cardmarketPriceEUR = (payload) => {
+  const card = payload?.data && !Array.isArray(payload.data) ? payload.data : payload;
+  const detailedVariants = Array.isArray(card?.variants_detailed)
+    ? card.variants_detailed
+    : Array.isArray(card?.variantsDetailed) ? card.variantsDetailed : [];
+  const pricingSources = [card, ...detailedVariants]
+    .map((item) => item?.pricing?.cardmarket || item?.pricing?.cardMarket || item?.cardmarket)
+    .filter((pricing) => pricing && typeof pricing === 'object');
+  if (!pricingSources.length) return 0;
+  const holoFirst = card?.variants?.holo && !card?.variants?.normal;
+  const priorities = holoFirst
+    ? [['trend-holo', 'trendHolo', 'trend'], ['avg-holo', 'avgHolo', 'avg'], ['low-holo', 'lowHolo', 'low']]
+    : [['trend', 'trend-holo', 'trendHolo'], ['avg', 'avg-holo', 'avgHolo'], ['low', 'low-holo', 'lowHolo']];
+  return priorities.reduce((selected, fields) => selected || pricingSources.reduce((price, pricing) => (
+    price || fields.reduce((fieldPrice, field) => fieldPrice || positiveMoney(pricing[field]), 0)
+  ), 0), 0);
 };
 const sanitizePriceMap = (value) => Object.fromEntries(Object.entries(value || {})
   .map(([id, price]) => [String(id), positiveMoney(price)])
@@ -1420,7 +1439,7 @@ function CardPool({
                           if (!node || node.dataset.catalogEntrance) return;
                           node.dataset.catalogEntrance = 'pending';
                           window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
-                            if (node.isConnected) node.dataset.catalogEntrance = 'complete';
+                            if (node.isConnected && node.dataset.catalogEntrance === 'pending') node.dataset.catalogEntrance = 'complete';
                           }));
                           window.setTimeout(() => {
                             if (node.isConnected) node.dataset.catalogEntrance = 'settled';
@@ -1574,6 +1593,8 @@ export default function CardBinder() {
   const searchDebounceRef = useRef(null);
   const setCardsCacheRef = useRef(new Map());
   const cardPricesRef = useRef(cardPrices);
+  const cardmarketPricesEURRef = useRef(new Map());
+  const eurPerUsdRef = useRef(EUR_PER_USD_FALLBACK);
   const priceRequestsRef = useRef(new Map());
   const priceHydratedRef = useRef(new Set());
   const marqueeRef = useRef(null);
@@ -1684,12 +1705,23 @@ export default function CardBinder() {
   const hydrateCardPrice = useCallback((cardId, payload = null) => {
     const id = String(cardId || '').trim();
     if (!id) return Promise.resolve(0);
-    const inlinePrice = positiveMoney(payload?.marketPriceUSD) || tcgplayerMarketPrice(payload);
     const commitPrice = (price) => {
       if (!(price > 0)) return;
       cardPricesRef.current = { ...cardPricesRef.current, [id]: price };
       setCardPrices((currentPrices) => currentPrices[id] === price ? currentPrices : { ...currentPrices, [id]: price });
     };
+    const resolvePayloadPriceUSD = (pricePayload) => {
+      const tcgplayerPrice = positiveMoney(pricePayload?.marketPriceUSD) || tcgplayerMarketPrice(pricePayload);
+      if (tcgplayerPrice) {
+        cardmarketPricesEURRef.current.delete(id);
+        return tcgplayerPrice;
+      }
+      const priceEUR = cardmarketPriceEUR(pricePayload);
+      if (!priceEUR) return 0;
+      cardmarketPricesEURRef.current.set(id, priceEUR);
+      return eurToUsd(priceEUR, eurPerUsdRef.current);
+    };
+    const inlinePrice = resolvePayloadPriceUSD(payload);
     if (inlinePrice) commitPrice(inlinePrice);
     const cachedPrice = inlinePrice || positiveMoney(cardPricesRef.current[id]);
     const pendingRequest = priceRequestsRef.current.get(id);
@@ -1704,7 +1736,7 @@ export default function CardBinder() {
         return response.json();
       })
       .then((cardDetail) => {
-        const freshPrice = tcgplayerMarketPrice(cardDetail);
+        const freshPrice = resolvePayloadPriceUSD(cardDetail);
         if (freshPrice) commitPrice(freshPrice);
         return freshPrice || cachedPrice;
       })
@@ -1725,8 +1757,20 @@ export default function CardBinder() {
         return response.json();
       })
       .then((payload) => {
-        const rate = positiveMoney(payload?.rates?.SGD ?? payload?.conversion_rates?.SGD ?? payload?.SGD);
-        if (rate) setSgdRate(rate);
+        const sgd = positiveMoney(payload?.rates?.SGD ?? payload?.conversion_rates?.SGD ?? payload?.SGD);
+        const eur = positiveMoney(payload?.rates?.EUR ?? payload?.conversion_rates?.EUR ?? payload?.EUR);
+        if (sgd) setSgdRate(sgd);
+        if (eur) {
+          eurPerUsdRef.current = eur;
+          if (cardmarketPricesEURRef.current.size) {
+            setCardPrices((currentPrices) => {
+              const nextPrices = { ...currentPrices };
+              cardmarketPricesEURRef.current.forEach((priceEUR, cardId) => { nextPrices[cardId] = eurToUsd(priceEUR, eur); });
+              cardPricesRef.current = nextPrices;
+              return nextPrices;
+            });
+          }
+        }
       })
       .catch(() => {});
     return () => controller.abort();
