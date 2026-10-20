@@ -2,10 +2,8 @@ import {
   AlertTriangle,
   BookOpen,
   Check,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
-  ChevronUp,
   Columns4,
   Copy,
   Eraser,
@@ -18,6 +16,7 @@ import {
   LayoutGrid,
   MonitorDown,
   Move,
+  Menu,
   Plus,
   Printer,
   Redo2,
@@ -73,7 +72,6 @@ const IDB_STORE = 'images';
 const IDB_VERSION = 1;
 const HISTORY_LIMIT = 30;
 const SHEET_PAD = { top: 0.3, right: 0.3, bottom: 0.3, left: 0.62 };
-const THUMB_BOX = { w: 56, h: 56 * 1.414, pad: 4 };
 const PAPER_SIZES = {
   a4: { label: 'A4 (210 × 297 mm)', short: 'A4', w: '210mm', h: '297mm', wIn: 210 * MM, hIn: 297 * MM },
   letter: { label: 'US Letter (216 × 279 mm)', short: 'Letter', w: '8.5in', h: '11in', wIn: 8.5, hIn: 11 },
@@ -544,10 +542,8 @@ const ICONS = {
   alert: AlertTriangle,
   book: BookOpen,
   check: Check,
-  chevronDown: ChevronDown,
   chevronLeft: ChevronLeft,
   chevronRight: ChevronRight,
-  chevronUp: ChevronUp,
   combine: SquareDashedMousePointer,
   copy: Copy,
   eraser: Eraser,
@@ -561,6 +557,7 @@ const ICONS = {
   keyboard: Keyboard,
   layers: Layers,
   merge: TableCellsMerge,
+  menu: Menu,
   move: Move,
   plus: Plus,
   printer: Printer,
@@ -674,7 +671,7 @@ function SegmentedControl({ value, onChange, options, ariaLabel, dense = false, 
           className={`relative z-10 inline-flex w-auto min-w-fit items-center justify-center gap-1 font-medium whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${previewStyle ? 'rounded-md' : 'rounded-full'} ${dense ? 'px-2.5 text-xs' : 'px-3 text-xs'} ${index === currentIndex ? (previewStyle ? 'text-white' : 'text-red-400') : 'text-zinc-400 hover:text-zinc-100'}`}
         >
           {option.icon && <Icon name={option.icon} size="sm" />}
-          <span>{option.label}</span>
+          <span className={previewStyle ? 'max-[1349px]:hidden' : ''}>{option.label}</span>
         </button>
       ))}
     </div>
@@ -800,6 +797,9 @@ function HeaderCardControls({ settings, setSettings }) {
 function AppBar({
   settings,
   setSettings,
+  isLeftSidebarOpen,
+  setIsLeftSidebarOpen,
+  workspaceControls,
   onDuplicate,
   saveStatus,
   installPrompt,
@@ -813,22 +813,33 @@ function AppBar({
   shortcuts,
 }) {
   return (
-    <header className="titlebar no-print relative z-[70] flex items-center justify-between px-6 py-2.5 bg-neutral-900/90 backdrop-blur-md border-b border-white/[0.06] shadow-[0_1px_0_rgba(255,255,255,0.02)]">
-      <div className="flex min-w-0 flex-1 items-center gap-3">
-        <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-lg border border-white/[0.06] bg-neutral-900 shadow-lg shadow-black/40"><img src="/icons/icon.svg" alt="" className="size-9" /></span>
-        <div className="flex min-w-0 flex-col justify-center">
-          <h1 className="shrink-0 text-xs font-semibold tracking-tight bg-gradient-to-r from-neutral-100 to-neutral-300 bg-clip-text text-transparent select-none whitespace-nowrap max-[1180px]:hidden">MichiBinder</h1>
+    <header className="titlebar no-print relative z-[70] h-12 bg-neutral-900 border-b border-white/[0.06] flex items-center justify-between px-4 shrink-0">
+      <div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setIsLeftSidebarOpen((value) => !value)}
+          className="p-1.5 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 rounded-md transition-all cursor-pointer mr-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+          title={isLeftSidebarOpen ? 'Collapse Sidebar' : 'Expand Sidebar'}
+          aria-label={isLeftSidebarOpen ? 'Collapse Sidebar' : 'Expand Sidebar'}
+          aria-pressed={!isLeftSidebarOpen}
+        >
+          <Icon name="menu" size="md" className="w-4 h-4" />
+        </button>
+        <span className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-lg border border-white/[0.06] bg-neutral-900 shadow-lg shadow-black/40"><img src="/icons/icon.svg" alt="" className="size-8" /></span>
+        <div className="flex min-w-0 flex-col justify-center max-[1180px]:hidden">
+          <h1 className="shrink-0 text-xs font-semibold tracking-tight bg-gradient-to-r from-neutral-100 to-neutral-300 bg-clip-text text-transparent select-none whitespace-nowrap">MichiBinder</h1>
           <SaveStatus status={saveStatus} />
         </div>
         <ToolbarDivider />
         <HeaderCardControls settings={settings} setSettings={setSettings} />
+        {workspaceControls}
       </div>
 
-      <div className="relative flex min-w-0 flex-1 items-center justify-end gap-1.5">
+      <div className="relative flex shrink-0 items-center justify-end gap-1.5">
         {installPrompt && <ToolButton icon="install" variant="outline" onClick={onInstall} title="Install App" />}
         <ToolButton icon="keyboard" onClick={() => setOpenPanel(openPanel === 'shortcuts' ? null : 'shortcuts')} active={openPanel === 'shortcuts'} title="Keyboard shortcuts" className="hidden min-[1560px]:inline-flex" />
         <div className="flex h-8 items-center justify-center gap-2 self-center">
-          <ToolButton icon="copy" onClick={onDuplicate} title="Duplicate physical sheet" className="max-[1180px]:hidden" />
+          <ToolButton icon="copy" onClick={onDuplicate} title="Duplicate physical sheet" className="max-[1420px]:hidden" />
           <ToolButton icon="sliders" label="Print Setup" onClick={() => setOpenPanel(openPanel === 'print' ? null : 'print')} active={openPanel === 'print'} title="Print setup" className="[&>span]:hidden" />
         </div>
         <div className="flex items-center gap-4 border-l border-white/[0.06] pl-4 ml-2">
@@ -855,7 +866,7 @@ function AppBar({
           </div>
           <button type="button" onClick={onPrint} className="h-8 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-white/[0.08] shadow-sm px-3 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 mt-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500">
             <Icon name="printer" size="sm" className="opacity-70" />
-            <span className="max-[1240px]:hidden">Print / PDF</span>
+            <span className="max-[1420px]:hidden">Print / PDF</span>
           </button>
         </div>
         {openPanel === 'print' && printSetup}
@@ -870,6 +881,16 @@ function FloatingNavigation({
   canRedo,
   onUndo,
   onRedo,
+  combineMode,
+  onToggleCombine,
+  canMerge,
+  onMerge,
+  selectedMergeCount,
+  onUnmerge,
+  canResetLayout,
+  onResetLayout,
+  canClearPage,
+  onClearPage,
   currentSpread,
   totalSpreads,
   canPrevious,
@@ -886,6 +907,13 @@ function FloatingNavigation({
       <div role="group" aria-label="History" className="flex items-center gap-1">
         <button type="button" onClick={onUndo} disabled={!canUndo} aria-label="Undo" title="Undo" className={historyButton}><Icon name="undo" size="sm" className="w-3.5 h-3.5" /></button>
         <button type="button" onClick={onRedo} disabled={!canRedo} aria-label="Redo" title="Redo" className={historyButton}><Icon name="redo" size="sm" className="w-3.5 h-3.5" /></button>
+      </div>
+      <div role="group" aria-label="Slot structure" className="flex items-center gap-1 border-l border-white/[0.06] pl-4">
+        <button type="button" onClick={onToggleCombine} aria-pressed={combineMode} aria-label="Combine slots" title="Combine slots (M)" className={`p-1.5 rounded-md transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${combineMode ? 'bg-red-950/70 text-red-300' : 'text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200'}`}><Icon name="combine" size="sm" /></button>
+        <button type="button" onClick={onMerge} disabled={!canMerge} aria-label="Merge selected slots" title="Merge selected slots (Enter)" className="p-1.5 rounded-md text-neutral-400 transition-all hover:bg-neutral-800 hover:text-neutral-200 disabled:pointer-events-none disabled:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="merge" size="sm" /></button>
+        <button type="button" onClick={onUnmerge} disabled={!selectedMergeCount} aria-label="Unmerge selected frame" title="Unmerge selected frame (U)" className="p-1.5 rounded-md text-neutral-400 transition-all hover:bg-neutral-800 hover:text-neutral-200 disabled:pointer-events-none disabled:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="split" size="sm" /></button>
+        <button type="button" onClick={onResetLayout} disabled={!canResetLayout} aria-label="Reset merged layout" title="Reset merged layout" className="p-1.5 rounded-md text-neutral-400 transition-all hover:bg-neutral-800 hover:text-neutral-200 disabled:pointer-events-none disabled:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="reset" size="sm" /></button>
+        <button type="button" onClick={onClearPage} disabled={!canClearPage} aria-label="Clear active page" title="Clear active page" className="p-1.5 rounded-md text-neutral-500 transition-all hover:bg-red-500/10 hover:text-red-400 disabled:pointer-events-none disabled:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="eraser" size="sm" /></button>
       </div>
       <div className="flex items-center gap-2 border-l border-white/[0.06] pl-4">
         <button type="button" onClick={onPrevious} disabled={!canPrevious} aria-label="Previous spread" title="Previous spread" className="p-1 text-neutral-400 hover:text-neutral-200 transition-colors disabled:pointer-events-none disabled:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Icon name="chevronLeft" size="md" className="w-4 h-4" /></button>
@@ -976,7 +1004,7 @@ function SetupToolbar({ settings, setSettings, fitInfo, suggestedPaper, onChoose
   const custom = cleanSize.preset === 'custom';
   const setCardSize = (patch) => setSettings((value) => ({ ...value, cardSize: sanitizeCardSize({ ...value.cardSize, ...patch }) }));
   return (
-    <div role="toolbar" aria-label="Card sizing" className="no-print flex w-full shrink-0 items-center justify-between gap-3 overflow-x-auto border-b border-white/5 bg-neutral-950/80 px-6 py-1.5 shadow-[0_1px_0_rgba(255,255,255,0.02)] backdrop-blur-xl">
+    <div data-utility-controls role="toolbar" aria-label="Card sizing" className="flex min-w-0 items-center gap-3 overflow-hidden">
       <div className="flex shrink-0 items-center gap-2 text-xs font-medium text-neutral-400">
         {custom && (
           <div className="flex h-8 shrink-0 items-center gap-2 rounded-lg border border-white/5 bg-neutral-900/60 px-2">
@@ -988,7 +1016,7 @@ function SetupToolbar({ settings, setSettings, fitInfo, suggestedPaper, onChoose
           </div>
         )}
         <div className="flex h-8 shrink-0 items-center gap-2 rounded-lg border border-white/5 bg-neutral-900/60 px-2">
-          <span className="shrink-0 text-[10px] font-bold tracking-widest text-neutral-500 uppercase">Grid</span>
+          <span className="shrink-0 text-[10px] font-bold tracking-widest text-neutral-500 uppercase max-[1249px]:hidden">Grid</span>
           <SegmentedControl
             ariaLabel="Pocket layout"
             value={settings.layout}
@@ -998,16 +1026,17 @@ function SetupToolbar({ settings, setSettings, fitInfo, suggestedPaper, onChoose
           />
         </div>
       </div>
-      <div className="ml-auto flex shrink-0 items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2">
         <span className="hidden shrink-0 text-[10px] font-bold tracking-wider text-neutral-500 uppercase min-[1380px]:inline">Preview</span>
-        <SegmentedControl ariaLabel="Preview" value={settings.view} onChange={onViewChange} options={[{ value: 'binder', label: 'Binder' }, { value: 'paper', label: 'Paper' }]} dense={custom} appearance="preview" />
-        <PrintFitBadge fitInfo={fitInfo} paperKey={settings.paper} suggestedPaper={suggestedPaper} onUsePaper={(paper) => setSettings((value) => ({ ...value, paper }))} />
+        <SegmentedControl ariaLabel="Preview" value={settings.view} onChange={onViewChange} options={[{ value: 'binder', label: 'Binder', icon: 'book' }, { value: 'paper', label: 'Paper', icon: 'file' }]} dense={custom} appearance="preview" />
+        <div className="hidden min-[1700px]:block"><PrintFitBadge fitInfo={fitInfo} paperKey={settings.paper} suggestedPaper={suggestedPaper} onUsePaper={(paper) => setSettings((value) => ({ ...value, paper }))} /></div>
       </div>
     </div>
   );
 }
 
 function CardPool({
+  isOpen,
   customUploadedCards,
   selected,
   placedIds,
@@ -1065,7 +1094,9 @@ function CardPool({
   };
   return (
     <aside
-      className={`no-print relative flex w-[340px] shrink-0 flex-col border-r border-white/5 bg-neutral-950/80 shadow-[8px_0_28px_rgba(0,0,0,0.18)] ${sidebarDropActive ? 'ring-2 ring-inset ring-red-600' : ''}`}
+      data-left-sidebar
+      aria-hidden={!isOpen}
+      className={`no-print absolute inset-y-0 left-0 z-50 flex h-full shrink-0 flex-col bg-neutral-900 transition-all duration-300 ease-in-out shadow-[8px_0_28px_rgba(0,0,0,0.28)] ${isOpen ? 'w-80 opacity-100 visible border-r border-white/[0.06]' : 'w-0 opacity-0 invisible overflow-hidden pointer-events-none border-r-0'} ${sidebarDropActive ? 'ring-2 ring-inset ring-red-600' : ''}`}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
@@ -1249,30 +1280,7 @@ function CardPool({
   );
 }
 
-function CanvasToolbar({ combineMode, setCombineMode, selBox, canMerge, mergeLabel, onMerge, selectedMergeCount, onUnmerge, onResetLayout, onClearPage, filled, total, mergedCount, layout, pageNumber }) {
-  return (
-    <div data-workspace-toolbar data-active-page={pageNumber} role="toolbar" aria-label={`Grid tools for page ${pageNumber}`} className="@container absolute inset-x-0 bottom-full z-40 mb-3 flex h-10 w-full max-w-full items-center justify-between rounded-xl border border-zinc-800 bg-[#121214]/95 px-1.5 shadow-xl shadow-black/40 backdrop-blur">
-      <div className="flex shrink-0 items-center">
-        <ToolButton icon="combine" dense active={combineMode} onClick={() => setCombineMode((value) => !value)} title="Combine Slots (M)" className="@[21rem]:hidden">
-        </ToolButton>
-        <button type="button" aria-pressed={combineMode} onClick={() => setCombineMode((value) => !value)} title="Combine Slots (M)" className="hidden h-7 shrink-0 items-center gap-1.5 rounded-md px-1.5 text-[12px] font-medium text-zinc-300 hover:bg-white/10 @[21rem]:inline-flex @[32.25rem]:hidden"><Icon name="combine" size="sm" /><span className="hidden @[24.25rem]:inline">Combine</span></button>
-        <button type="button" aria-pressed={combineMode} onClick={() => setCombineMode((value) => !value)} title="Combine Slots (M)" className={`hidden h-7 shrink-0 items-center gap-1.5 rounded-md px-1.5 text-[12px] font-medium @[32.25rem]:inline-flex ${combineMode ? 'bg-red-950/60 text-red-400 ring-1 ring-inset ring-red-800/60' : 'text-zinc-300 hover:bg-white/10'}`}><Icon name="combine" size="sm" /><span>Combine Slots</span><Kbd>M</Kbd></button>
-        <ToolbarDivider slim />
-        <ToolButton icon="merge" label={canMerge ? mergeLabel : 'Merge'} dense variant={canMerge ? 'primary' : 'ghost'} onClick={onMerge} disabled={!canMerge} disabledReason={!combineMode ? 'Turn on Combine mode and drag across slots' : selBox ? 'Select more than one slot' : 'Drag across two or more slots'} className="[&>span]:hidden @[18rem]:[&>span]:inline" />
-        <ToolButton icon="split" label={selectedMergeCount > 1 ? `Unmerge ${selectedMergeCount}` : 'Unmerge'} dense onClick={onUnmerge} disabled={!selectedMergeCount} disabledReason="Select a merged frame to unmerge" className="[&>span]:hidden @[18rem]:[&>span]:inline" />
-      </div>
-      <div className="flex shrink-0 items-center">
-        <span className="mr-1 hidden text-[10px] font-bold tracking-widest whitespace-nowrap text-neutral-500 uppercase @[24rem]:inline">Page {pageNumber}</span>
-        <ToolButton icon={layout.icon} dense title={`Reset ${layout.label} layout`} onClick={onResetLayout} disabled={!mergedCount} disabledReason="No merged frames to reset" />
-        <ToolButton icon="eraser" dense variant="danger" title="Clear page" onClick={onClearPage} disabled={!filled} disabledReason="Page is already empty" />
-        <ToolbarDivider slim />
-        <span title={`${filled} of ${total} slots filled · ${plural(mergedCount, 'merged frame')}`} className="hidden h-6 shrink-0 items-center rounded-full bg-zinc-800 px-2 text-[10px] font-medium whitespace-nowrap text-zinc-300 @[18rem]:inline-flex">{filled}/{total}<span className="hidden @[32.25rem]:inline">&nbsp;filled</span></span>
-      </div>
-    </div>
-  );
-}
-
-function CanvasHelper({ editing, multiDrag, flowCount, combineMode, offsetX, onCenter, onCancel, onDone }) {
+function CanvasHelper({ editing, multiDrag, flowCount, offsetX, onCenter, onCancel, onDone }) {
   let tone = 'border-zinc-800 bg-[#121214] text-zinc-200';
   let content;
   if (editing) {
@@ -1281,24 +1289,9 @@ function CanvasHelper({ editing, multiDrag, flowCount, combineMode, offsetX, onC
   } else if (multiDrag > 1) {
     tone = 'border-emerald-400/30 bg-emerald-950/90 text-emerald-100';
     content = <><Icon name="wand" size="sm" /><span>Dropping {plural(multiDrag, 'card')} into the first empty slots{flowCount ? ` · ${flowCount} will flow to the next page(s)` : ''}</span></>;
-  } else if (combineMode) {
-    tone = 'border-red-800/60 bg-red-950/80 text-red-100';
-    content = <><Icon name="combine" size="sm" /><span>Combine mode · drag across slots, then Enter to merge · click a frame, then U to unmerge · Esc to exit</span></>;
   } else return null;
 
   return <div data-reposition-ui={editing ? '' : undefined} className={`absolute top-full z-30 mt-4 flex h-8 w-auto min-w-fit max-w-none -translate-x-1/2 items-center gap-1.5 rounded-full border px-3 text-[11px] whitespace-nowrap shadow-xl shadow-black/30 ${tone}`} style={{ left: `calc(50% + ${offsetX}px)` }}>{content}</div>;
-}
-
-function WorkspaceStatusBar() {
-  return (
-    <footer data-workspace-status className="no-print fixed bottom-0 left-0 right-0 py-1 px-4 bg-neutral-950/90 border-t border-white/[0.05] backdrop-blur-md text-[10px] text-neutral-400 font-mono flex justify-center items-center gap-4 select-none pointer-events-none z-50 overflow-hidden whitespace-nowrap shadow-[0_-8px_24px_rgba(0,0,0,0.35)]">
-      <span><kbd className="rounded border border-neutral-700 bg-neutral-800 px-1.5 py-0.5 font-sans text-[9px] text-neutral-200 shadow-sm">Ctrl / ⌘</kbd> + Click to select multiple cards</span>
-      <span aria-hidden="true" className="text-neutral-700">|</span>
-      <span><kbd className="rounded border border-neutral-700 bg-neutral-800 px-1.5 py-0.5 font-sans text-[9px] text-neutral-200 shadow-sm">Shift</kbd> + Click for page ranges</span>
-      <span aria-hidden="true" className="text-neutral-700">|</span>
-      <span>Drag and drop assets directly onto active binder slots</span>
-    </footer>
-  );
 }
 
 function BinderSpine({ view }) {
@@ -1341,7 +1334,7 @@ export default function CardBinder() {
   const [currentPage, setCurrentPage] = useState(boot.currentPage);
   const [pool, setPool] = useState(boot.pool);
   const [activeTab, setActiveTab] = useState('tcgdex');
-  const [showBottomPreview, setShowBottomPreview] = useState(true);
+  const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [fetchedCards, setFetchedCards] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -1413,6 +1406,7 @@ export default function CardBinder() {
   const fitInfo = { gridW, gridH, printFit, fitsTrueSize };
   const suggestedPaper = Object.entries(PAPER_SIZES).find(([, value]) => fitFor(value) >= 0.9999)?.[0] || null;
   const current = pages[currentPage] || pages[0];
+  const currentFilledCount = useMemo(() => current ? getSlots(current, dims).filter((slot) => current.slots[slot.key]).length : 0, [current, dims]);
   const spreadGroups = useMemo(() => binderViewGroups(pages.length), [pages.length]);
   const activeSpread = useMemo(() => binderViewForPage(currentPage, pages.length), [currentPage, pages.length]);
   const activeSpreadIndex = spreadGroups.findIndex((group) => group.includes(currentPage));
@@ -2724,7 +2718,7 @@ export default function CardBinder() {
   const frameHIn = settings.view === 'paper' ? paper.hIn : gridH + SHEET_PAD.top + SHEET_PAD.bottom;
   const spineGap = 24;
   const pageAreaWidth = Math.max(160, (stageSize.w - 80 - spineGap) / 2);
-  const ppi = Math.max(12, Math.min(pageAreaWidth / frameWIn, (stageSize.h - 136) / frameHIn));
+  const ppi = Math.max(12, Math.min(pageAreaWidth / frameWIn, (stageSize.h - 96) / frameHIn));
   const gridPpi = settings.view === 'paper' ? ppi * printFit : ppi;
   const frameWidth = frameWIn * ppi;
   const frameHeight = frameHIn * ppi;
@@ -2892,74 +2886,6 @@ export default function CardBinder() {
     </SheetGrid>
   );
 
-  const renderThumbnailLeaf = (page, pageIndex) => {
-    const unit = Math.min((THUMB_BOX.w - THUMB_BOX.pad * 2) / gridW, (THUMB_BOX.h - THUMB_BOX.pad * 2) / gridH);
-    const active = activeSpread.includes(pageIndex);
-    const currentLeaf = pageIndex === currentPage;
-    return (
-      <button
-        key={page.id}
-        type="button"
-        aria-label={`Page ${pageIndex + 1}`}
-        aria-current={currentLeaf ? 'page' : undefined}
-        onClick={() => switchPage(pageIndex)}
-        onDragOver={(event) => { if (dragRef.current || hasFiles(event.dataTransfer)) { event.preventDefault(); event.dataTransfer.dropEffect = dragRef.current?.kind === 'slot' ? 'move' : 'copy'; } }}
-        onDrop={(event) => handleThumbDrop(event, pageIndex)}
-        className="group shrink-0 bg-transparent p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
-      >
-        <div className={`grid aspect-[1/1.414] w-14 place-items-center overflow-hidden rounded-sm border bg-neutral-950 transition-colors ${currentLeaf ? 'border-white/25' : active ? 'border-neutral-700' : 'border-neutral-800 group-hover:border-neutral-600'}`}>
-          <SheetGrid page={page} card={card} gap={settings.gap} unit={`${unit}px`} dims={dims} renderSlot={(slot) => {
-            const id = page.slots[slot.key];
-            const src = images[id] || pool.find((item) => item.id === id)?.src;
-            const crop = id ? getCrop(page, slot.key, id) : { x: 50, y: 50 };
-            return <div className="size-full overflow-hidden border border-zinc-800 bg-zinc-900">{src && <img src={src} alt="" className="size-full" style={{ objectFit: settings.fit, objectPosition: `${crop.x}% ${crop.y}%` }} />}</div>;
-          }} />
-        </div>
-      </button>
-    );
-  };
-
-  const renderThumbnailGroup = (group) => {
-    const active = group.some((pageIndex) => activeSpread.includes(pageIndex));
-    const pageNumbers = group.map((pageIndex) => pageIndex + 1);
-    const label = group.length === 1 ? `Page ${pageNumbers[0]}` : `Pages ${pageNumbers[0]}–${pageNumbers[1]}`;
-    return (
-      <div key={group.join('-')} data-page-group={pageNumbers.join('-')} className={`relative flex shrink-0 flex-col items-center gap-2 pb-1 text-[10px] font-medium whitespace-nowrap ${active ? 'text-red-400' : 'text-neutral-500'}`}>
-        <div className={`flex items-center gap-0.5 p-2 ${active ? 'ring-2 ring-red-500 ring-offset-4 ring-offset-neutral-950 rounded-md scale-105 duration-200 transition-transform' : 'rounded-md duration-200 transition-transform'}`}>{group.map((pageIndex) => renderThumbnailLeaf(pages[pageIndex], pageIndex))}</div>
-        <span>{label}</span>
-      </div>
-    );
-  };
-
-  const renderWorkspaceToolbar = () => {
-    const pageIndex = clamp(currentPage, 0, pages.length - 1);
-    const page = pages[pageIndex];
-    if (!page) return null;
-    const pageSelBox = selectionPageId === page.id ? selBox : null;
-    const pageMerges = activeMerges(page, dims);
-    const pageSelectedMerges = pageSelBox ? pageMerges.filter((merge) => boxesIntersect(merge, pageSelBox)) : [];
-    const pageExactMerge = pageMerges.some((merge) => sameBox(merge, pageSelBox));
-    const pageCanMerge = Boolean(combineMode && pageSelBox && pageSelBox.rs * pageSelBox.cs > 1 && !pageExactMerge);
-    const pageFilled = getSlots(page, dims).filter((slot) => page.slots[slot.key]).length;
-    return <CanvasToolbar
-      combineMode={combineMode}
-      setCombineMode={setCombineMode}
-      selBox={pageSelBox}
-      canMerge={pageCanMerge}
-      mergeLabel={`Merge ${pageSelBox ? boxDims(pageSelBox) : ''}`}
-      onMerge={() => performMerge(pageSelBox, pageIndex)}
-      selectedMergeCount={pageSelectedMerges.length}
-      onUnmerge={() => unmergeBox(pageSelBox, pageIndex)}
-      onResetLayout={() => resetLayout(pageIndex)}
-      onClearPage={() => clearPage(pageIndex)}
-      filled={pageFilled}
-      total={layout.pockets}
-      mergedCount={pageMerges.length}
-      layout={layout}
-      pageNumber={pageIndex + 1}
-    />;
-  };
-
   const renderCanvasLeaf = (pageIndex, options = {}) => {
     const page = pages[pageIndex];
     if (!page) return null;
@@ -2995,7 +2921,7 @@ export default function CardBinder() {
             {renderEditorGrid(page, pageIndex)}
           </div>
         )}
-        {showHelper && pageIndex === currentPage && <CanvasHelper editing={editing} multiDrag={dragInfo?.kind === 'pool' ? dragInfo.ids.length : 0} flowCount={multiFlow} combineMode={combineMode} offsetX={side === 'left' ? -helperOffsetX : helperOffsetX} onCenter={() => { const value = editingRef.current; if (value) { const next = { ...value, x: 50, y: 50 }; editingRef.current = next; setEditing(next); } }} onCancel={cancelEditing} onDone={commitEditing} />}
+        {showHelper && pageIndex === currentPage && <CanvasHelper editing={editing} multiDrag={dragInfo?.kind === 'pool' ? dragInfo.ids.length : 0} flowCount={multiFlow} offsetX={side === 'left' ? -helperOffsetX : helperOffsetX} onCenter={() => { const value = editingRef.current; if (value) { const next = { ...value, x: 50, y: 50 }; editingRef.current = next; setEditing(next); } }} onCancel={cancelEditing} onDone={commitEditing} />}
       </div>
     );
   };
@@ -3161,6 +3087,16 @@ export default function CardBinder() {
           <AppBar
             settings={settings}
             setSettings={setSettings}
+            isLeftSidebarOpen={isLeftSidebarOpen}
+            setIsLeftSidebarOpen={setIsLeftSidebarOpen}
+            workspaceControls={<SetupToolbar
+              settings={settings}
+              setSettings={setSettings}
+              fitInfo={fitInfo}
+              suggestedPaper={suggestedPaper}
+              onChooseLayout={chooseLayout}
+              onViewChange={(view) => { commitEditing(); setSettings((value) => ({ ...value, view })); }}
+            />}
             onDuplicate={duplicatePage}
             saveStatus={saveStatus}
             installPrompt={installPrompt}
@@ -3174,16 +3110,9 @@ export default function CardBinder() {
             shortcuts={<ShortcutsPopover />}
           />
         </div>
-        <SetupToolbar
-          settings={settings}
-          setSettings={setSettings}
-          fitInfo={fitInfo}
-          suggestedPaper={suggestedPaper}
-          onChooseLayout={chooseLayout}
-          onViewChange={(view) => { commitEditing(); setSettings((value) => ({ ...value, view })); }}
-        />
-        <div className="flex min-h-0 flex-1 pb-7">
+        <div className="relative flex min-h-0 flex-1 overflow-hidden">
           <CardPool
+            isOpen={isLeftSidebarOpen}
             customUploadedCards={customUploadedCards}
             selected={selected}
             placedIds={placedIds}
@@ -3217,17 +3146,17 @@ export default function CardBinder() {
             onFetchedCardDragStart={startFetchedCardDrag}
             onFetchedCardAdd={addFetchedCardToPage}
           />
-          <main className="relative flex min-w-0 flex-1 flex-col">
+          <main className="flex-1 h-[calc(100vh-48px)] bg-neutral-950 overflow-hidden relative flex min-w-0 flex-col">
             <div
               ref={stageRef}
-              className={`relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-neutral-950 bg-[radial-gradient(ellipse_at_center,rgba(82,82,91,0.18),transparent_65%)] transition-[height] duration-200 ${showBottomPreview ? 'h-[calc(100vh-180px)]' : 'h-[calc(100vh-60px)]'}`}
+              className="relative flex size-full min-h-0 flex-1 items-center justify-center overflow-hidden bg-neutral-950 bg-[radial-gradient(ellipse_at_center,rgba(82,82,91,0.18),transparent_65%)] pb-16"
               onPointerMove={moveMarquee}
               onPointerDown={(event) => { if (event.target === event.currentTarget && combineMode) { setSelBox(null); setSelectionPageId(null); } }}
               onDragEnter={(event) => { if (!combineMode && (['pool', 'remote'].includes(dragRef.current?.kind) || hasFiles(event.dataTransfer))) event.preventDefault(); }}
               onDragOver={(event) => { if (!combineMode && (['pool', 'remote'].includes(dragRef.current?.kind) || hasFiles(event.dataTransfer))) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; } }}
               onDrop={handleStageDrop}
             >
-              <div data-workspace-metrics className="absolute bottom-4 left-4 z-25 flex items-center gap-2 select-none pointer-events-none">
+              <div data-workspace-metrics className={`absolute bottom-20 z-25 flex items-center gap-2 select-none pointer-events-none transition-[left] duration-300 ${isLeftSidebarOpen ? 'left-[21rem]' : 'left-4'}`}>
                 <div className="flex items-center gap-1.5 px-2 py-1 bg-neutral-900/80 backdrop-blur-sm border border-white/[0.06] rounded-md shadow-sm">
                   <span className="text-[9px] font-bold tracking-widest text-neutral-500 uppercase">Database</span>
                   <span className="text-[10px] font-mono font-medium text-neutral-200">{fetchedCards.length} items</span>
@@ -3235,6 +3164,10 @@ export default function CardBinder() {
                 <div className="flex items-center gap-1.5 px-2 py-1 bg-neutral-950/80 backdrop-blur-sm border border-white/[0.06] rounded-md shadow-sm">
                   <span className="text-[9px] font-bold tracking-widest text-neutral-500 uppercase">Custom</span>
                   <span className="text-[10px] font-mono font-medium text-red-400">{customUploadedCards.length} uploaded</span>
+                </div>
+                <div className="flex items-center gap-1.5 px-2 py-1 bg-neutral-900/80 backdrop-blur-sm border border-white/[0.06] rounded-md shadow-sm">
+                  <span className="text-[9px] font-bold tracking-widest text-neutral-500 uppercase">Density</span>
+                  <span className="text-[10px] font-mono font-medium text-neutral-200">{currentFilledCount}/{layout.pockets} filled</span>
                 </div>
               </div>
               {settings.view === 'binder' && (
@@ -3245,8 +3178,7 @@ export default function CardBinder() {
                   style={{ width: spreadWidth + 48, height: frameHeight + 48 }}
                 />
               )}
-              <div data-workspace-frame className={`relative [perspective:1200px] ${pageFlip.animating ? '[&_[data-workspace-toolbar]]:pointer-events-none [&_[data-workspace-toolbar]]:opacity-60' : ''}`} style={{ width: spreadWidth, height: frameHeight }}>
-                {renderWorkspaceToolbar()}
+              <div data-workspace-frame className="relative [perspective:1200px]" style={{ width: spreadWidth, height: frameHeight }}>
                 <div
                   data-spread
                   data-flip-active={pageFlip.animating ? '' : undefined}
@@ -3281,6 +3213,16 @@ export default function CardBinder() {
                 canRedo={futureRef.current.length > 0}
                 onUndo={undoAction}
                 onRedo={redoAction}
+                combineMode={combineMode}
+                onToggleCombine={() => setCombineMode((value) => !value)}
+                canMerge={canMerge}
+                onMerge={() => performMerge(selBox, selectionPageIndex)}
+                selectedMergeCount={selectedMerges.length}
+                onUnmerge={() => unmergeBox()}
+                canResetLayout={activeMerges(current, dims).length > 0}
+                onResetLayout={() => resetLayout(currentPage)}
+                canClearPage={currentFilledCount > 0}
+                onClearPage={() => clearPage(currentPage)}
                 currentSpread={activeSpreadIndex + 1}
                 totalSpreads={spreadGroups.length}
                 canPrevious={activeSpreadIndex > 0 && !pageFlip.animating}
@@ -3292,33 +3234,8 @@ export default function CardBinder() {
                 canDelete={pages.length > 2}
               />
             </div>
-            {showBottomPreview && (
-              <footer data-page-tray className="no-print scroll-area w-full border-t border-white/[0.04] bg-neutral-900/30 backdrop-blur-sm py-4 px-6 relative flex justify-center items-center shrink-0 overflow-x-auto">
-                <div data-page-tray-inner className="mx-auto flex w-max items-end justify-center gap-4 h-full pb-2">
-                  {spreadGroups.map(renderThumbnailGroup)}
-                  <div className="flex shrink-0 flex-col items-center gap-2 pb-1 text-[10px] font-medium whitespace-nowrap text-neutral-500">
-                    <div className="flex items-center rounded-md p-2 duration-200 transition-transform">
-                      <button type="button" onClick={addPage} aria-label="Add page" className="group shrink-0 bg-transparent p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500">
-                        <span className="flex aspect-[1/1.414] w-14 items-center justify-center overflow-hidden rounded-sm border border-dashed border-neutral-700 text-neutral-500 transition-colors group-hover:border-neutral-500 group-hover:bg-neutral-900 group-hover:text-neutral-200"><Icon name="plus" size="lg" /></span>
-                      </button>
-                    </div>
-                    <span>Add page</span>
-                  </div>
-                </div>
-              </footer>
-            )}
-            <button
-              type="button"
-              aria-pressed={!showBottomPreview}
-              onClick={() => setShowBottomPreview((prev) => !prev)}
-              className="no-print absolute bottom-4 right-4 z-50 p-2 bg-neutral-900/90 hover:bg-neutral-800 border border-white/[0.06] rounded-md shadow-lg text-neutral-400 hover:text-neutral-200 backdrop-blur-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
-              title={showBottomPreview ? 'Collapse Page Navigator' : 'Expand Page Navigator'}
-            >
-              <Icon name={showBottomPreview ? 'chevronDown' : 'chevronUp'} size="md" className="w-4 h-4" />
-            </button>
           </main>
         </div>
-        <WorkspaceStatusBar />
         <div className="no-print pointer-events-none fixed bottom-10 right-5 z-[100] flex w-[360px] flex-col items-end gap-2">
           {toasts.map((toast) => <div key={toast.id} role="status" className={`animate-toast pointer-events-auto flex max-w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-[12px] shadow-2xl shadow-black/40 ${toastTones[toast.tone] || toastTones.info}`}><span className="leading-relaxed">{toast.message}</span>{toast.action && <button type="button" onClick={() => { setToasts((value) => value.filter((item) => item.id !== toast.id)); toast.action.onClick(); }} className="shrink-0 rounded-md bg-white/10 px-2 py-1 font-semibold text-white hover:bg-white/20">{toast.action.label}</button>}<button type="button" title="Dismiss" aria-label="Dismiss notification" onClick={() => setToasts((value) => value.filter((item) => item.id !== toast.id))} className="grid size-6 shrink-0 place-items-center rounded-md text-current hover:bg-white/10"><Icon name="x" size="sm" /></button></div>)}
         </div>
