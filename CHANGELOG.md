@@ -2,20 +2,20 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.2.3
+## Current state — v4.4.0
 
 - **Ledger date:** 2026-10-20
-- **Application state entering this documentation pass:** commit `69ad992` / retrospective v4.2.2
+- **Application state entering this feature pass:** commit `8a7c7fc` / v4.3.4
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
 - **Primary source:** `src/CardBinder.jsx`, approximately 3,450 lines containing the data model, persistence, catalogue integration, interactions, print tree, and most UI components
 - **Supporting source:** `src/index.css` for Tailwind import, print media, page-turn depth, sleeve materials, portrait guard, and animations
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
-- **Network boundary:** TCGdex REST/API assets only; no MichiBinder backend, account, telemetry, required secret, or environment variable
+- **Network boundary:** TCGdex REST/API assets plus the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, required secret, or environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** Add Page and Duplicate Physical Sheet deterministically reveal the newly created two-page group in long timelines
-- **Last verified behavior:** production build, logo/menu controls, print scope, Binder/Paper switching, uploads, remote/local batch placement, duplication, Merge/Unmerge, Undo/Redo, timeline collapse/reflow, and timeline reveal; Chromium geometry covered 1600×1000, 1366×768, and 1200×700
+- **Last functional change:** live TCGplayer market valuation with canonical TCGdex price identity, USD/SGD switching, portfolio/spread totals, and per-card hover values
+- **Last verified behavior:** production build plus mocked TCGdex detail and exchange responses covering market/low fallback selection, persisted canonical IDs and prices, currency switching, instance totals, active-spread totals, removal updates, hover values, and zero browser errors at 1600×1000, 1366×768, and 1200×700
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## SemVer reconstruction
@@ -532,6 +532,22 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Verified 2×2 marquee interaction, one-pixel frame geometry, four-percent surface opacity, blur/shadow treatment, badge typography and padding, viewport containment, document overflow, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.3.4.
 
+## [v4.4.0] — 2026-10-20
+
+### Added
+
+- Added live TCGplayer market valuation from TCGdex card-detail records, using positive `market`, then `low`, then `mid` as the defensive USD price priority.
+- Added a public USD-to-SGD exchange-rate request with a safe 1.35 fallback and a global SGD/USD capsule toggle beside the portfolio readout.
+- Added an instance-aware Total Value capsule, active-spread value metric, and dual DPI/market-value hover badge with restrained GPU-accelerated counter feedback.
+
+### Improved
+
+- Persisted sanitized raw-USD prices under schema v5 and carried each TCGdex card's canonical ID through localStorage, IndexedDB, data-URL fallback, and CDN-fallback import paths so generated local asset IDs resolve after reload.
+- Derived portfolio totals from all placed slot instances and spread totals from rendered anchors on active pages, keeping values synchronous across placement, movement, removal, page navigation, repricing, and currency changes.
+- Hydrated card-detail pricing for queried catalogue results and saved TCGdex assets while deduplicating in-flight requests per canonical card ID.
+- Verified exchange conversion, positive-market and low-price fallback selection, schema-v5 persistence, canonical metadata, top-bar ordering, responsive containment, hover values, page navigation, removal updates, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
+- Advanced package and lockfile metadata to v4.4.0.
+
 ---
 
 ## Current architecture and engineering rationale
@@ -608,9 +624,10 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 ### Persistence and history
 
 - `localStorage` key: `digital-card-binder:v1`.
-- Persisted schema: version `4`. Data claiming a newer schema falls back to a clean binder rather than being partially interpreted.
+- Persisted schema: version `5`. Data claiming a newer schema falls back to a clean binder rather than being partially interpreted.
+- Schema v5 stores a sanitized canonical-ID-to-raw-USD `cardPrices` map and preserves `tcgdexId` on generated local pool assets.
 - IndexedDB: database `digital-card-binder`, store `images`, version `1`.
-- IndexedDB is preferred for blobs. Fallback records store data URLs in the local metadata payload.
+- IndexedDB is preferred for blobs and now carries canonical TCGdex IDs alongside remote card blobs. Fallback records store data URLs and the same canonical metadata in the local payload.
 - Object URLs are tracked and revoked during reconciliation, deletion, reset, and unmount paths.
 - Undo/Redo is a 30-entry **canvas** history containing pages, active page, and layout. It intentionally excludes pool deletion/import, catalogue state, print scope, and most settings.
 - Save status is brief and asynchronous: `Saving...` appears only during persistence work, then returns to `Saved locally`; failure remains visible as `Save failed`.
@@ -619,10 +636,12 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 
 - API base: `https://api.tcgdex.net/v2/en`; asset host: `https://assets.tcgdex.net`.
 - Card list records provide `id`, `localId`, `name`, and an extensionless image base. The UI appends `/low.jpg`; import appends `/high.jpg`.
+- Queried and persisted TCGdex cards hydrate `/cards/{id}` detail records. Raw USD selection accepts only positive values in `pricing.tcgplayer`, prioritized as `market`, `low`, then `mid`.
 - Set lists are normalized and sorted newest-first where release dates exist. Full set fetches provide the card list used by local infinite pagination.
-- Search is debounced and abortable. Pages append 40 normalized records at a time.
+- Search is debounced and abortable. Pages append 40 normalized records at a time; detail-price requests are deduplicated by canonical card ID.
 - Only the TCGdex asset origin is accepted when normalizing absolute card-image bases.
 - If high-resolution fetch succeeds, the blob becomes a local asset. If browser privacy/CORS policy blocks it, the validated CDN URL remains the persisted fallback.
+- `https://open.er-api.com/v6/latest/USD` supplies the optional live SGD rate. Invalid or unavailable responses retain the local 1.35 fallback; raw persisted card prices remain USD.
 
 ### Print compiler state
 
@@ -646,7 +665,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 2. **No export/import or cloud backup.** Clearing site data, losing a profile, or changing devices loses local work.
 3. **Desktop landscape is the product boundary.** A portrait guard exists; geometry was validated down to 1200×700, not as a small-screen editor.
 4. **Cross-browser confidence is incomplete.** Recent testing used Chromium. Safari/Firefox print scaling, PWA install behavior, vertical range input, and native drag/drop have not received equivalent automated coverage.
-5. **TCGdex is an online dependency.** Search and CDN-only fallback art are unavailable offline until an import is stored locally.
+5. **Market data is an online dependency.** TCGdex search/detail data and CDN-only fallback art are unavailable offline until cached locally; exchange failure is non-blocking because SGD conversion retains the 1.35 fallback.
 6. **Browser printing is partly manual.** The app cannot force paper, margin, scale, duplex, or background settings.
 7. **Service-worker cache growth is unbounded.** `card-binder-v3` has no per-entry eviction, so old hashed assets remain until the cache name changes or site data is cleared.
 8. **`CardBinder.jsx` is highly coupled.** Broad rewrites can cross persistence, printing, drag state, physical ownership, and layout geometry even when the request appears visual.

@@ -59,7 +59,7 @@ const MAX_COLS = 4;
 const getLayout = (id) => GRID_LAYOUTS.find((layout) => layout.id === id) || GRID_LAYOUTS[1];
 const MM = 1 / 25.4;
 const STORAGE_KEY = 'digital-card-binder:v1';
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 const CARD_PRESETS = [{ id: 'pokemon', label: 'Pokémon TCG', hint: '65 × 90 mm', wMm: 65, hMm: 90 }];
 const SCALE_MIN = 0.8;
 const SCALE_MAX = 1.25;
@@ -73,6 +73,7 @@ const TCGDEX_SEARCH_ENDPOINT = `${TCGDEX_API_BASE}/cards?name=`;
 const TCGDEX_SETS_ENDPOINT = `${TCGDEX_API_BASE}/sets`;
 const TCGDEX_ASSET_CDN = 'https://assets.tcgdex.net';
 const TCGDEX_RESULT_LIMIT = 40;
+const SGD_RATE_ENDPOINT = 'https://open.er-api.com/v6/latest/USD';
 const IDB_NAME = 'digital-card-binder';
 const IDB_STORE = 'images';
 const IDB_VERSION = 1;
@@ -124,6 +125,21 @@ const tcgdexImageBase = (image) => {
   }
   return `${TCGDEX_ASSET_CDN}${value.startsWith('/') ? '' : '/'}${value}`;
 };
+const positiveMoney = (value) => {
+  const candidate = value && typeof value === 'object'
+    ? value.usd ?? value.USD ?? value.value ?? value.amount
+    : value;
+  const amount = Number(candidate);
+  return Number.isFinite(amount) && amount > 0 ? amount : 0;
+};
+const tcgplayerMarketPrice = (payload) => {
+  const pricing = payload?.pricing?.tcgplayer || payload?.pricing?.tcgPlayer || payload?.tcgplayer?.prices || payload?.tcgplayer;
+  if (!pricing || typeof pricing !== 'object') return 0;
+  return positiveMoney(pricing.market) || positiveMoney(pricing.low) || positiveMoney(pricing.mid);
+};
+const sanitizePriceMap = (value) => Object.fromEntries(Object.entries(value || {})
+  .map(([id, price]) => [String(id), positiveMoney(price)])
+  .filter(([id, price]) => id && price > 0));
 const normalizeTcgdexCards = (payload) => {
   const items = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [];
   return items
@@ -134,6 +150,7 @@ const normalizeTcgdexCards = (payload) => {
       name: String(item.name || item.id),
       localId: item.localId == null ? '' : String(item.localId),
       image: tcgdexImageBase(item.image),
+      marketPriceUSD: tcgplayerMarketPrice(item),
     }));
 };
 const normalizeTcgdexSets = (payload) => {
@@ -481,7 +498,7 @@ function sanitizePage(value = {}) {
 }
 
 function loadPersisted() {
-  const fallback = { currentPage: 0, settings: sanitizeSettings(), pool: [], pages: emptyPages() };
+  const fallback = { currentPage: 0, settings: sanitizeSettings(), pool: [], pages: emptyPages(), cardPrices: {} };
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return fallback;
@@ -493,12 +510,14 @@ function loadPersisted() {
       name: String(item.name || 'Card image'),
       source: item.source === 'tcgdex' ? 'tcgdex' : 'upload',
       ...(typeof item.src === 'string' ? { src: item.src } : {}),
+      ...(typeof item.tcgdexId === 'string' && item.tcgdexId ? { tcgdexId: item.tcgdexId } : {}),
     })) : [];
     return {
       currentPage: clamp(Math.floor(Number(parsed.currentPage) || 0), 0, pages.length - 1),
       settings: sanitizeSettings(parsed.settings),
       pool,
       pages,
+      cardPrices: sanitizePriceMap(parsed.cardPrices),
     };
   } catch {
     return fallback;
@@ -786,7 +805,7 @@ function SaveStatus({ status }) {
   );
 }
 
-function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, onToggleZenMode, saveStatus }) {
+function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, onToggleZenMode, saveStatus, currencyDisplay, onToggleCurrency, portfolioValueLabel }) {
   const isZenMode = !isLeftSidebarOpen && !showBottomTimeline;
   const zenModeTitle = isZenMode ? 'Exit Focus Mode' : 'Enter Focus Mode';
 
@@ -810,7 +829,12 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <SaveStatus status={saveStatus} />
       </div>
 
-      <div className="flex shrink-0 items-center justify-end">
+      <div className="flex shrink-0 items-center justify-end gap-2">
+        <button type="button" data-currency-toggle onClick={onToggleCurrency} className="h-8 rounded-full border border-white/[0.04] bg-neutral-950/40 px-2.5 font-mono text-[9px] font-bold tracking-widest text-neutral-500 uppercase hover:text-neutral-200 transition-colors shadow-sm focus:outline-none" aria-label={`Display values in ${currencyDisplay === 'SGD' ? 'USD' : 'SGD'}`} title={`Switch to ${currencyDisplay === 'SGD' ? 'USD' : 'SGD'}`}>{currencyDisplay}</button>
+        <div data-portfolio-value className="h-8 flex items-center gap-1.5 rounded-full border border-white/[0.04] bg-neutral-950/40 px-3 py-1.5 shadow-sm text-xs select-none backdrop-blur-md" aria-live="polite" aria-label={`Total portfolio value ${portfolioValueLabel}`}>
+          <span className="text-[9px] font-bold tracking-widest text-neutral-500 uppercase font-sans">Total Value</span>
+          <span key={`${currencyDisplay}-${portfolioValueLabel}`} className="font-sans font-semibold tracking-tight text-emerald-400 font-medium animate-fadeIn">{portfolioValueLabel}</span>
+        </div>
         <button
           type="button"
           className="w-8 h-8 flex items-center justify-center rounded-lg bg-neutral-800/40 hover:bg-neutral-700/60 border border-white/[0.03] text-neutral-400 hover:text-neutral-200 transition-all cursor-pointer shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
@@ -1439,6 +1463,9 @@ export default function CardBinder() {
   }, []);
   const [currentPage, setCurrentPage] = useState(boot.currentPage);
   const [pool, setPool] = useState(boot.pool);
+  const [cardPrices, setCardPrices] = useState(boot.cardPrices || {});
+  const [sgdRate, setSgdRate] = useState(1.35);
+  const [currencyDisplay, setCurrencyDisplay] = useState('SGD');
   const [activeTab, setActiveTab] = useState('cards');
   const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(true);
   const [showBottomTimeline, setShowBottomTimeline] = useState(true);
@@ -1490,6 +1517,9 @@ export default function CardBinder() {
   const searchAbortRef = useRef(null);
   const searchDebounceRef = useRef(null);
   const setCardsCacheRef = useRef(new Map());
+  const cardPricesRef = useRef(cardPrices);
+  const priceRequestsRef = useRef(new Map());
+  const priceHydratedRef = useRef(new Set());
   const marqueeRef = useRef(null);
   const selBoxRef = useRef(selBox);
   const selectionPageIdRef = useRef(selectionPageId);
@@ -1537,6 +1567,19 @@ export default function CardBinder() {
   const customUploadedCards = useMemo(() => pool.filter((item) => item.source !== 'tcgdex'), [pool]);
   const customUploadedIds = useMemo(() => new Set(customUploadedCards.map((item) => item.id)), [customUploadedCards]);
   const allPoolIds = useMemo(() => new Set(pool.map((item) => item.id)), [pool]);
+  const priceKeyByAssetId = useMemo(() => new Map(pool.map((item) => [item.id, item.tcgdexId || item.id])), [pool]);
+  const getCardPriceUSD = useCallback((assetId) => positiveMoney(cardPrices[priceKeyByAssetId.get(assetId) || assetId]), [cardPrices, priceKeyByAssetId]);
+  const portfolioValueUSD = useMemo(() => pages.reduce((total, page) => (
+    total + Object.values(page.slots || {}).reduce((subtotal, assetId) => subtotal + getCardPriceUSD(assetId), 0)
+  ), 0), [pages, getCardPriceUSD]);
+  const activeSpreadValueUSD = useMemo(() => activeSpread.reduce((total, pageIndex) => {
+    const spreadPage = pages[pageIndex];
+    if (!spreadPage) return total;
+    return total + getSlots(spreadPage, dims).reduce((subtotal, slot) => subtotal + getCardPriceUSD(spreadPage.slots[slot.key]), 0);
+  }, 0), [activeSpread, pages, dims, getCardPriceUSD]);
+  const displayRate = currencyDisplay === 'SGD' ? sgdRate : 1;
+  const portfolioValueLabel = currencyDisplay === 'SGD' ? `SGD $${(portfolioValueUSD * displayRate).toFixed(2)}` : `$${portfolioValueUSD.toFixed(2)}`;
+  const spreadValueLabel = currencyDisplay === 'SGD' ? `S$${(activeSpreadValueUSD * displayRate).toFixed(2)}` : `$${activeSpreadValueUSD.toFixed(2)}`;
   const printPages = useMemo(() => {
     if (printScope === 'custom') return compactCustomPrintPages(pages, dims, customUploadedIds);
     return pages
@@ -1553,6 +1596,7 @@ export default function CardBinder() {
   useEffect(() => { editingRef.current = editing; }, [editing]);
   useEffect(() => { selBoxRef.current = selBox; }, [selBox]);
   useEffect(() => { selectionPageIdRef.current = selectionPageId; }, [selectionPageId]);
+  useEffect(() => { cardPricesRef.current = cardPrices; }, [cardPrices]);
 
   useEffect(() => {
     const timeline = timelineContainerRef.current;
@@ -1580,6 +1624,68 @@ export default function CardBinder() {
     setToasts((items) => [...items.slice(-3), { id, message, tone, action }]);
     window.setTimeout(() => setToasts((items) => items.filter((item) => item.id !== id)), action ? 6500 : 3400);
   }, []);
+
+  const hydrateCardPrice = useCallback((cardId, payload = null) => {
+    const id = String(cardId || '').trim();
+    if (!id) return Promise.resolve(0);
+    const inlinePrice = positiveMoney(payload?.marketPriceUSD) || tcgplayerMarketPrice(payload);
+    const commitPrice = (price) => {
+      if (!(price > 0)) return;
+      cardPricesRef.current = { ...cardPricesRef.current, [id]: price };
+      setCardPrices((currentPrices) => currentPrices[id] === price ? currentPrices : { ...currentPrices, [id]: price });
+    };
+    if (inlinePrice) commitPrice(inlinePrice);
+    const cachedPrice = inlinePrice || positiveMoney(cardPricesRef.current[id]);
+    const pendingRequest = priceRequestsRef.current.get(id);
+    if (pendingRequest) return pendingRequest;
+    if (priceHydratedRef.current.has(id)) return Promise.resolve(cachedPrice);
+    priceHydratedRef.current.add(id);
+    const request = fetch(`${TCGDEX_API_BASE}/cards/${encodeURIComponent(id)}`, {
+      headers: { Accept: 'application/json' },
+    })
+      .then((response) => {
+        if (!response.ok) throw new Error(`TCGdex returned ${response.status}`);
+        return response.json();
+      })
+      .then((cardDetail) => {
+        const freshPrice = tcgplayerMarketPrice(cardDetail);
+        if (freshPrice) commitPrice(freshPrice);
+        return freshPrice || cachedPrice;
+      })
+      .catch((error) => {
+        if (error?.name !== 'AbortError') priceHydratedRef.current.delete(id);
+        return cachedPrice;
+      })
+      .finally(() => priceRequestsRef.current.delete(id));
+    priceRequestsRef.current.set(id, request);
+    return request;
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(SGD_RATE_ENDPOINT, { signal: controller.signal, headers: { Accept: 'application/json' } })
+      .then((response) => {
+        if (!response.ok) throw new Error(`Exchange service returned ${response.status}`);
+        return response.json();
+      })
+      .then((payload) => {
+        const rate = positiveMoney(payload?.rates?.SGD ?? payload?.conversion_rates?.SGD ?? payload?.SGD);
+        if (rate) setSgdRate(rate);
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    fetchedCards.forEach((item) => { hydrateCardPrice(item.id, item); });
+  }, [fetchedCards, hydrateCardPrice]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    pool.forEach((item) => {
+      if (item.source === 'tcgdex' && item.tcgdexId) hydrateCardPrice(item.tcgdexId);
+    });
+  }, [hydrated, pool, hydrateCardPrice]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -1741,7 +1847,12 @@ export default function CardBinder() {
         setPool((value) => {
           const present = new Set(value.map((item) => item.id));
           const kept = value.filter((item) => recordMap.has(item.id) || item.src || sessionIdsRef.current.has(item.id));
-          const orphans = records.filter((record) => !present.has(record.id)).sort((a, b) => (a.added || 0) - (b.added || 0)).map((record) => ({ id: record.id, name: record.name || 'Card image', source: record.source === 'tcgdex' ? 'tcgdex' : 'upload' }));
+          const orphans = records.filter((record) => !present.has(record.id)).sort((a, b) => (a.added || 0) - (b.added || 0)).map((record) => ({
+            id: record.id,
+            name: record.name || 'Card image',
+            source: record.source === 'tcgdex' ? 'tcgdex' : 'upload',
+            ...(typeof record.tcgdexId === 'string' && record.tcgdexId ? { tcgdexId: record.tcgdexId } : {}),
+          }));
           const reconciled = [...kept, ...orphans];
           const valid = new Set(reconciled.map((item) => item.id));
           setPages((currentPages) => {
@@ -1779,7 +1890,7 @@ export default function CardBinder() {
     setSaveStatus('saving');
     const timer = window.setTimeout(() => {
       try {
-        const payload = { version: SCHEMA_VERSION, savedAt: Date.now(), currentPage, settings, pool, pages };
+        const payload = { version: SCHEMA_VERSION, savedAt: Date.now(), currentPage, settings, pool, pages, cardPrices: sanitizePriceMap(cardPrices) };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
         setSaveStatus('saved');
       } catch {
@@ -1788,7 +1899,7 @@ export default function CardBinder() {
       }
     }, 200);
     return () => window.clearTimeout(timer);
-  }, [pages, currentPage, pool, settings, hydrated, notify]);
+  }, [pages, currentPage, pool, settings, cardPrices, hydrated, notify]);
 
   useEffect(() => {
     const node = stageRef.current;
@@ -1824,12 +1935,28 @@ export default function CardBinder() {
       return [];
     }
     const source = options.source === 'tcgdex' ? 'tcgdex' : 'upload';
+    const tcgdexId = source === 'tcgdex' && options.tcgdexId ? String(options.tcgdexId) : '';
     const added = Date.now();
-    const entries = files.map((file, index) => ({ id: uid('image'), name: file.name || `Card ${pool.length + index + 1}`, file, source, added: added + index }));
+    const entries = files.map((file, index) => ({
+      id: uid('image'),
+      name: file.name || `Card ${pool.length + index + 1}`,
+      file,
+      source,
+      added: added + index,
+      ...(tcgdexId ? { tcgdexId } : {}),
+    }));
     entries.forEach((entry) => sessionIdsRef.current.add(entry.id));
     if (storageMode === 'indexeddb') {
       try {
-        await idbPutMany(entries.map((entry) => ({ id: entry.id, name: entry.name, type: entry.file.type, blob: entry.file, source: entry.source, added: entry.added })));
+        await idbPutMany(entries.map((entry) => ({
+          id: entry.id,
+          name: entry.name,
+          type: entry.file.type,
+          blob: entry.file,
+          source: entry.source,
+          added: entry.added,
+          ...(entry.tcgdexId ? { tcgdexId: entry.tcgdexId } : {}),
+        })));
         const nextImages = {};
         entries.forEach((entry) => {
           const url = URL.createObjectURL(entry.file);
@@ -1837,7 +1964,12 @@ export default function CardBinder() {
           nextImages[entry.id] = url;
         });
         setImages((value) => ({ ...value, ...nextImages }));
-        setPool((value) => [...value, ...entries.map(({ id, name, source: entrySource }) => ({ id, name, source: entrySource }))]);
+        setPool((value) => [...value, ...entries.map((entry) => ({
+          id: entry.id,
+          name: entry.name,
+          source: entry.source,
+          ...(entry.tcgdexId ? { tcgdexId: entry.tcgdexId } : {}),
+        }))]);
         if (!persistedRef.current) {
           persistedRef.current = true;
           navigator.storage?.persist?.().catch(() => {});
@@ -1847,7 +1979,13 @@ export default function CardBinder() {
         try {
           const urls = await Promise.all(entries.map((entry) => readFileAsDataUrl(entry.file)));
           setImages((value) => ({ ...value, ...Object.fromEntries(entries.map((entry, index) => [entry.id, urls[index]])) }));
-          setPool((value) => [...value, ...entries.map((entry, index) => ({ id: entry.id, name: entry.name, source: entry.source, src: urls[index] }))]);
+          setPool((value) => [...value, ...entries.map((entry, index) => ({
+            id: entry.id,
+            name: entry.name,
+            source: entry.source,
+            src: urls[index],
+            ...(entry.tcgdexId ? { tcgdexId: entry.tcgdexId } : {}),
+          }))]);
           notify('IndexedDB is unavailable. Images will use browser storage instead.', 'warn');
         } catch {
           notify('Could not read one or more images.', 'error');
@@ -1858,7 +1996,13 @@ export default function CardBinder() {
       try {
         const urls = await Promise.all(entries.map((entry) => readFileAsDataUrl(entry.file)));
         setImages((value) => ({ ...value, ...Object.fromEntries(entries.map((entry, index) => [entry.id, urls[index]])) }));
-        setPool((value) => [...value, ...entries.map((entry, index) => ({ id: entry.id, name: entry.name, source: entry.source, src: urls[index] }))]);
+        setPool((value) => [...value, ...entries.map((entry, index) => ({
+          id: entry.id,
+          name: entry.name,
+          source: entry.source,
+          src: urls[index],
+          ...(entry.tcgdexId ? { tcgdexId: entry.tcgdexId } : {}),
+        }))]);
       } catch {
         notify('Could not read one or more images.', 'error');
         return [];
@@ -1869,6 +2013,7 @@ export default function CardBinder() {
   }, [notify, pool.length, storageMode]);
 
   const importFetchedCard = useCallback(async (item, highResImageUrl, options = {}) => {
+    hydrateCardPrice(item.id, item);
     const requestedSource = highResImageUrl || item.url || (item.image ? `${item.image}/high.jpg` : '/placeholder.png');
     const source = requestedSource === '/placeholder.png' || requestedSource.startsWith(`${TCGDEX_ASSET_CDN}/`) ? requestedSource : '/placeholder.png';
     try {
@@ -1877,7 +2022,7 @@ export default function CardBinder() {
       const blob = await response.blob();
       if (!blob.type?.startsWith('image/')) throw new Error('TCGdex returned a non-image asset');
       const file = new File([blob], `${safeFileName(item.name)} · ${safeFileName(item.id)}.jpg`, { type: blob.type || 'image/jpeg' });
-      const ids = await addFiles([file], { source: 'tcgdex', silent: options.silent });
+      const ids = await addFiles([file], { source: 'tcgdex', tcgdexId: item.id, silent: options.silent });
       if (ids.length) return ids;
     } catch {
       // Some privacy extensions block cross-origin blob downloads. The live CDN URL
@@ -1886,10 +2031,10 @@ export default function CardBinder() {
     const id = uid('tcgdex');
     sessionIdsRef.current.add(id);
     setImages((value) => ({ ...value, [id]: source }));
-    setPool((value) => [...value, { id, name: item.name || 'Pokémon card', source: 'tcgdex', src: source }]);
+    setPool((value) => [...value, { id, name: item.name || 'Pokémon card', source: 'tcgdex', src: source, tcgdexId: String(item.id) }]);
     if (!options.silent) notify(`${item.name || 'Pokémon card'} added from TCGdex.`, 'success');
     return [id];
-  }, [addFiles, notify]);
+  }, [addFiles, hydrateCardPrice, notify]);
 
   const importFetchedCards = useCallback(async (cards) => {
     if (!cards?.length) return [];
@@ -2925,7 +3070,8 @@ export default function CardBinder() {
     const dpi = natural ? Math.round(settings.fit === 'cover'
       ? Math.min(natural.w / (frameW * printFit), natural.h / (frameH * printFit))
       : Math.max(natural.w / (frameW * printFit), natural.h / (frameH * printFit))) : null;
-    const dpiTone = dpi >= 300 ? 'bg-emerald-600/90 text-white' : dpi >= 200 ? 'bg-amber-500/90 text-black' : 'bg-red-600/90 text-white';
+    const cardMarketValueUSD = getCardPriceUSD(imgId);
+    const cardMarketValueLabel = currencyDisplay === 'SGD' ? `S$${(cardMarketValueUSD * sgdRate).toFixed(2)}` : `$${cardMarketValueUSD.toFixed(2)}`;
     const labelVisible = (frameW * gridPpi) >= 72;
     const slotActionsAvailable = !combineMode && !dragInfo && !marqueeActive && !editing;
     const stopSlotAction = (event) => event.stopPropagation();
@@ -3039,7 +3185,7 @@ export default function CardBinder() {
           /> : <span className="absolute inset-0 grid place-items-center bg-zinc-800 text-zinc-500"><Icon name="image" /></span>}
         </div>
         {slotActions}
-        {!dragInfo && !combineMode && !editing && dpi && <span title={`${dpi} effective DPI at print size`} className={`absolute bottom-1.5 right-1.5 z-40 hidden rounded-full px-1.5 py-0.5 text-[9px] font-bold shadow group-hover:block ${dpiTone}`}>{dpi} DPI</span>}
+        {!dragInfo && !combineMode && !editing && dpi && <span key={`${currencyDisplay}-${cardMarketValueLabel}`} data-slot-market-value title={`${dpi} effective DPI at print size · ${cardMarketValueLabel} market value`} className="absolute bottom-2 right-2 z-30 rounded-md bg-black/80 px-2 py-1 text-[9px] font-mono tracking-wide text-neutral-200 backdrop-blur-sm border border-white/10 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none animate-scaleIn">{dpi} DPI · {cardMarketValueLabel}</span>}
         {slot.mergeId && <span className="absolute bottom-1.5 left-1.5 z-40 rounded-full bg-red-700/90 px-1.5 py-0.5 text-[9px] font-bold text-white shadow">{boxDims(slot)}</span>}
         {isEditing && <span className="absolute left-1/2 top-2 z-50 -translate-x-1/2 rounded-full bg-amber-500 px-2 py-0.5 text-[9px] font-bold text-amber-950 shadow">Drag to reposition</span>}
       </div>
@@ -3321,6 +3467,9 @@ export default function CardBinder() {
           showBottomTimeline={showBottomTimeline}
           onToggleZenMode={handleToggleZenMode}
           saveStatus={saveStatus}
+          currencyDisplay={currencyDisplay}
+          onToggleCurrency={() => setCurrencyDisplay((value) => value === 'SGD' ? 'USD' : 'SGD')}
+          portfolioValueLabel={portfolioValueLabel}
         />
         <div data-main-layout className="flex h-[calc(100vh-48px)] w-full overflow-hidden bg-neutral-950">
           <CardPool
@@ -3369,12 +3518,14 @@ export default function CardBinder() {
               onDragOver={(event) => { if (!combineMode && (['pool', 'remote', 'remote-batch'].includes(dragRef.current?.kind) || hasFiles(event.dataTransfer))) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; } }}
               onDrop={handleStageDrop}
             >
-              <div data-workspace-metrics aria-label={`Database ${fetchedCards.length} items, Custom ${customUploadedCards.length} uploaded, Density ${currentFilledCount} of ${layout.pockets} filled`} className="pointer-events-none absolute bottom-3 left-6 z-40 flex items-center gap-3 rounded-md border border-white/[0.06] bg-neutral-950/85 px-2.5 py-1.5 font-sans shadow-lg backdrop-blur-sm select-none">
+              <div data-workspace-metrics aria-label={`Database ${fetchedCards.length} items, Custom ${customUploadedCards.length} uploaded, Density ${currentFilledCount} of ${layout.pockets} filled, Spread Value ${spreadValueLabel}`} className="pointer-events-none absolute bottom-3 left-6 z-40 flex items-center gap-3 rounded-md border border-white/[0.06] bg-neutral-950/85 px-2.5 py-1.5 font-sans shadow-lg backdrop-blur-sm select-none">
                 <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="text-neutral-500 font-semibold tracking-wider text-[9px] uppercase">Database</span><strong className="font-sans text-[10px] font-medium tracking-tight bg-gradient-to-r from-neutral-400 via-neutral-300 to-neutral-200 bg-clip-text text-transparent">{fetchedCards.length} items</strong></span>
                 <span aria-hidden="true" className="h-3 w-px bg-white/[0.08]" />
                 <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="text-neutral-500 font-semibold tracking-wider text-[9px] uppercase">Custom</span><strong className="font-sans text-[10px] font-medium tracking-tight bg-gradient-to-r from-neutral-400 via-neutral-300 to-neutral-200 bg-clip-text text-transparent">{customUploadedCards.length} uploaded</strong></span>
                 <span aria-hidden="true" className="h-3 w-px bg-white/[0.08]" />
                 <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="text-neutral-500 font-semibold tracking-wider text-[9px] uppercase">Density</span><strong className="font-sans text-[10px] font-medium tracking-tight bg-gradient-to-r from-neutral-400 via-neutral-300 to-neutral-200 bg-clip-text text-transparent">{currentFilledCount}/{layout.pockets} filled</strong></span>
+                <span aria-hidden="true" className="h-3 w-px bg-white/[0.08]" />
+                <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="text-[9px] font-semibold text-neutral-500 uppercase tracking-widest">Spread Value</span><strong key={`${currencyDisplay}-${spreadValueLabel}`} data-spread-value className="text-xs font-semibold text-neutral-100 bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent animate-fadeIn">{spreadValueLabel}</strong></span>
               </div>
               {settings.view === 'binder' && (
                 <span
