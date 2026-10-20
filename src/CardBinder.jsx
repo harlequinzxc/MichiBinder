@@ -16,6 +16,7 @@ import {
   Grid3X3,
   Image as ImageIcon,
   Keyboard,
+  Layers,
   LayoutGrid,
   Maximize2,
   Minimize2,
@@ -567,6 +568,7 @@ const ICONS = {
   image: ImageIcon,
   install: MonitorDown,
   keyboard: Keyboard,
+  layers: Layers,
   maximize: Maximize2,
   merge: TableCellsMerge,
   menu: Menu,
@@ -588,7 +590,7 @@ const ICONS = {
   wand: WandSparkles,
   x: X,
 };
-function Icon({ name, className = '', strokeWidth }) {
+function Icon({ name, className = '', strokeWidth, size = 16 }) {
   const Component = ICONS[name];
   if (!Component) {
     if (import.meta.env.DEV) console.warn(`Unknown icon: ${name}`);
@@ -598,7 +600,8 @@ function Icon({ name, className = '', strokeWidth }) {
     .split(/\s+/)
     .filter((token) => token && !/^(?:size|w|h)-/.test(token))
     .join(' ');
-  return <Component size={16} className={`h-4 w-4 shrink-0 ${appearanceClasses}`} strokeWidth={strokeWidth ?? 2} aria-hidden="true" />;
+  const geometryClasses = size === 20 ? 'h-5 w-5' : 'h-4 w-4';
+  return <Component size={size} className={`${geometryClasses} shrink-0 ${appearanceClasses}`} strokeWidth={strokeWidth ?? 2} aria-hidden="true" />;
 }
 
 function ToolButton({ icon, label, onClick, disabled = false, disabledReason, active, variant = 'ghost', title, kbd, className = '', dense = false, type = 'button' }) {
@@ -1205,7 +1208,7 @@ function CardPool({
               type="button"
               aria-pressed={activeTab === tab.id}
               onClick={() => chooseTab(tab.id)}
-              className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${activeTab === tab.id ? 'border border-red-500/25 bg-red-950/60 text-red-300 shadow-sm' : 'border border-transparent text-neutral-500 hover:bg-neutral-900 hover:text-neutral-200'}`}
+              className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${activeTab === tab.id ? 'border border-white/[0.08] bg-neutral-800 text-neutral-100 shadow-sm' : 'border border-transparent text-neutral-500 hover:bg-neutral-900 hover:text-neutral-200'}`}
             >
               <Icon name={tab.icon} />
               <span>{tab.label}</span>
@@ -1216,7 +1219,7 @@ function CardPool({
 
       {activeTab === 'michi' ? (
         <section aria-label="Michi custom assets" className="flex min-h-0 flex-1 flex-col px-4 pb-4">
-          <div data-local-upload className={`w-full p-4 border border-dashed border-neutral-800 hover:border-neutral-600 bg-neutral-900/30 hover:bg-neutral-900/50 transition-all rounded-lg text-center cursor-pointer select-none group relative ${sidebarDropActive && !slotDropActive ? '!border-red-600 !bg-red-950/30' : ''}`}>
+          <div data-local-upload className={`relative w-full cursor-pointer select-none rounded-lg border border-dashed border-neutral-800 bg-neutral-950/40 px-4 py-6 text-center transition-all hover:border-neutral-700 hover:bg-neutral-950/80 group ${sidebarDropActive && !slotDropActive ? '!border-red-600 !bg-red-950/30' : ''}`}>
             <input
               ref={inputRef}
               type="file"
@@ -1224,16 +1227,18 @@ function CardPool({
               accept="image/*"
               aria-label="Upload custom card art"
               onChange={handleLocalUploadEvent}
-              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
             />
-            <Icon name="upload" className="mx-auto text-neutral-500 group-hover:text-neutral-400 mb-1.5 transition-colors" />
-            <span className="block text-xs font-semibold text-neutral-200">Upload custom card art</span>
-            <span className="block text-[10px] font-mono text-neutral-500 tracking-normal mt-0.5">PNG, JPG, or WEBP files</span>
+            <Icon name="upload" size={20} className="mx-auto mb-2 text-neutral-500 transition-colors group-hover:text-neutral-400" />
+            <span className="mx-auto flex max-w-[220px] flex-col items-center">
+              <span className="block text-xs font-medium text-neutral-200">Upload custom card art</span>
+              <span className="mt-1 block text-[11px] leading-relaxed text-neutral-400">PNG, JPG, or WEBP files</span>
+            </span>
           </div>
 
-          <div className="flex items-center justify-between px-1 py-1.5 border-b border-white/[0.04] mt-3 mb-2 select-none">
-            <span className="text-[10px] font-bold tracking-widest uppercase text-neutral-500">Your Uploads</span>
-            <span className="text-[10px] font-mono text-neutral-400 bg-neutral-800 px-1.5 py-0.5 rounded-md border border-white/[0.04]">{customUploadedCards.length} assets</span>
+          <div className="mt-3 mb-2 flex items-center justify-between border-b border-white/[0.04] px-1 py-1.5 select-none">
+            <span className="text-[9px] uppercase tracking-widest font-semibold text-neutral-500">Your Uploads</span>
+            <span className="text-[10px] font-sans font-medium text-neutral-400">{customUploadedCards.length} assets</span>
           </div>
 
           <div role="listbox" aria-label="Custom uploaded cards" aria-multiselectable="true" className="scroll-area grid grid-cols-3 gap-2 overflow-y-auto max-h-[calc(100vh-320px)] scrollbar-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden p-0.5" onClick={(event) => { if (event.target === event.currentTarget) onClearSelection(); }}>
@@ -1259,13 +1264,18 @@ function CardPool({
                   className={`relative group/local aspect-[2.5/3.5] cursor-grab active:cursor-grabbing rounded-md overflow-hidden bg-neutral-900 outline-none transition-all duration-150 focus-visible:ring-2 focus-visible:ring-red-500 ${selectionIndex >= 0 ? 'ring-2 ring-red-500 scale-[0.98] brightness-110 shadow-lg' : 'border border-white/[0.03] opacity-80 hover:opacity-100 shadow-sm hover:shadow-lg hover:border-white/[0.15]'}`}
                 >
                   {localCard.localUrlDataString ? <img src={localCard.localUrlDataString} className={`w-full h-full object-cover bg-neutral-950 pointer-events-none ${placed ? 'opacity-45 grayscale group-hover/local:opacity-75' : ''}`} alt="Uploaded Card" /> : <span className="absolute inset-0 grid place-items-center text-neutral-600"><Icon name="image" /></span>}
-                  <span className="absolute top-1 right-1 bg-neutral-950/80 backdrop-blur-sm text-[8px] font-mono text-neutral-400 border border-white/[0.08] px-1 py-0.5 rounded shadow-sm">LOCAL</span>
-                  <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent px-1.5 pb-1 pt-5 text-[9px] font-medium text-neutral-200 opacity-0 transition-opacity group-hover/local:opacity-100 group-focus-visible/local:opacity-100"><span className="block truncate">{localCard.name || 'Custom Art'}</span></span>
+                  <span className="absolute top-1 right-1 rounded border border-white/[0.08] bg-neutral-950/80 px-1 py-0.5 text-[9px] uppercase tracking-widest font-semibold text-neutral-500 shadow-sm backdrop-blur-sm">LOCAL</span>
+                  <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent px-1.5 pb-1 pt-5 text-xs font-medium text-neutral-200 opacity-0 transition-opacity group-hover/local:opacity-100 group-focus-visible/local:opacity-100"><span className="block truncate">{localCard.name || 'Custom Art'}</span></span>
                   {selectionIndex >= 0 && <span className="animate-scaleIn absolute top-1 left-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-mono font-bold text-white shadow-md">{selectionIndex + 1}</span>}
                 </div>
               );
             })}
-            {!customUploadedCards.length && <div className="col-span-3 py-10 text-center text-[11px] leading-relaxed text-neutral-500">Upload custom card art to build your private Michi collection.</div>}
+            {!customUploadedCards.length && (
+              <div className="col-span-3 py-14 px-4 text-center select-none">
+                <span className="text-xs font-semibold text-neutral-300 block mb-1">No custom assets found</span>
+                <p className="text-[11px] leading-relaxed text-neutral-500 max-w-[210px] mx-auto font-sans font-medium">Drop files here or click above to upload your custom trading card artwork, alternates, or token sheets.</p>
+              </div>
+            )}
           </div>
         </section>
       ) : (
@@ -1283,18 +1293,18 @@ function CardPool({
                 aria-label="Search Pokémon cards"
                 placeholder="Search Pokémon cards…"
                 autoComplete="off"
-                className="w-full px-3 py-1.5 bg-neutral-950 border border-white/[0.06] rounded-md text-xs font-medium text-neutral-200 placeholder-neutral-500 focus:outline-none focus:ring-1 focus:ring-red-500/50 transition-all"
+                className="h-9 w-full bg-neutral-950 border border-white/[0.06] rounded-md px-3 py-1.5 text-xs font-medium text-neutral-200 placeholder-neutral-500 transition-all focus:outline-none focus:ring-1 focus:ring-red-500/50"
               />
               {isLoading && <span aria-hidden="true" className="absolute right-8 top-1/2 size-3.5 -translate-y-1/2 animate-spin rounded-full border border-neutral-600 border-t-red-500" />}
             </form>
-            <div className="mt-2">
+            <div className="mt-3.5">
               <label className="block">
-                <span className="mb-1 block text-[10px] font-bold tracking-widest text-neutral-500 uppercase">Card set</span>
+                <span className="mb-1 block text-[9px] uppercase tracking-widest font-semibold text-neutral-500">Card set</span>
                 <select
                   value={selectedSet}
                   aria-label="Filter by Pokémon set"
                   onChange={(event) => setSelectedSet(event.target.value)}
-                  className="w-full px-3 py-1.5 bg-neutral-950 border border-white/[0.06] rounded-md text-xs font-medium text-neutral-300 focus:outline-none cursor-pointer focus:ring-1 focus:ring-red-500/50"
+                  className="h-9 w-full bg-neutral-950 border border-white/[0.06] rounded-md px-3 py-1.5 text-xs font-medium text-neutral-200 cursor-pointer focus:outline-none focus:ring-1 focus:ring-red-500/50"
                 >
                   <option value="">All sets</option>
                   {setsList.map((set) => <option key={set.id} value={set.id}>{set.name}{set.cardCount ? ` · ${set.cardCount}` : ''}</option>)}
@@ -1306,11 +1316,11 @@ function CardPool({
           {searchActive ? (
             <section aria-label="TCGdex search results" className="flex min-h-0 flex-1 flex-col px-3 pb-4">
               <div className="flex items-center justify-between w-full px-1 py-1 border-b border-white/[0.04] mb-2">
-                <span aria-live="polite" className="text-[10px] font-mono text-neutral-400 bg-neutral-800 px-1.5 py-0.5 rounded border border-white/[0.04]">{isLoading && !fetchedCards.length ? 'Loading…' : plural(fetchedCards.length, 'item')}</span>
+                <span aria-live="polite" className="text-[10px] font-sans font-medium text-neutral-400 tracking-normal border-0 bg-transparent p-0">{isLoading && !fetchedCards.length ? 'Loading…' : plural(fetchedCards.length, 'item')}</span>
                 <button
                   type="button"
                   onClick={onClearFilters}
-                  className="flex items-center gap-1 text-[10px] font-medium tracking-wide text-neutral-400 hover:text-neutral-200 transition-colors cursor-pointer select-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-red-500/50 rounded-sm"
+                  className="flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-neutral-400 transition-colors hover:text-neutral-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-red-500/50 select-none"
                 >
                   <Icon name="x" />
                   <span>Clear Filters</span>
@@ -1350,23 +1360,23 @@ function CardPool({
                         className={`relative group/card aspect-[245/337] cursor-grab active:cursor-grabbing rounded-md overflow-hidden bg-neutral-900 outline-none transition-all duration-150 focus-visible:ring-2 focus-visible:ring-red-500 ${selectionIndex >= 0 ? 'ring-2 ring-red-500 scale-[0.98] brightness-110 shadow-lg' : 'border border-white/[0.03] opacity-80 hover:opacity-100 shadow-sm hover:shadow-xl hover:border-white/[0.1]'}`}
                       >
                         <img data-img-id={item.id} src={fullImageUrl} alt={item.name} draggable={false} loading="lazy" className="w-full h-auto object-contain bg-neutral-950 transition-opacity duration-200" onError={(event) => { if (!event.currentTarget.src.endsWith('/placeholder.png')) event.currentTarget.src = '/placeholder.png'; }} />
-                        <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover/card:opacity-100 group-focus-visible/card:opacity-100 transition-opacity p-2 flex items-end"><span className="text-[9px] font-mono font-medium tracking-wide text-neutral-200 truncate w-full">{item.name}</span></span>
+                        <span className="pointer-events-none absolute inset-0 flex items-end bg-gradient-to-t from-black/80 via-transparent to-transparent p-2 opacity-0 transition-opacity group-hover/card:opacity-100 group-focus-visible/card:opacity-100"><span className="w-full truncate text-xs font-medium text-neutral-200">{item.name}</span></span>
                         {selectionIndex >= 0 && <span className="animate-scaleIn absolute top-1 left-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-mono font-bold text-white shadow-md">{selectionIndex + 1}</span>}
                       </div>
                     );
                   })}
-                  {isLoading && fetchedCards.length > 0 && <div data-catalog-loading className="col-span-2 flex items-center justify-center gap-2 py-3 text-[10px] font-medium text-neutral-500"><span aria-hidden="true" className="size-3 animate-spin rounded-full border border-neutral-700 border-t-red-500" />Loading more cards…</div>}
-                  {!isLoading && !searchError && !fetchedCards.length && <div className="col-span-2 text-center py-12 text-xs text-neutral-500 font-mono tracking-wide">No matching Pokémon cards found.</div>}
-                  {!isLoading && !searchError && !hasMoreCards && fetchedCards.length > 0 && <div data-catalog-end className="col-span-2 border-t border-white/[0.04] py-3 text-center text-[9px] font-mono tracking-widest text-neutral-600 uppercase">End of catalog</div>}
+                  {isLoading && fetchedCards.length > 0 && <div data-catalog-loading className="col-span-2 flex items-center justify-center gap-2 py-3 text-[9px] uppercase tracking-widest font-semibold text-neutral-500"><span aria-hidden="true" className="size-3 animate-spin rounded-full border border-neutral-700 border-t-red-500" />Loading more cards…</div>}
+                  {!isLoading && !searchError && !fetchedCards.length && <div className="col-span-2 py-12 text-center text-xs font-medium text-neutral-500">No matching Pokémon cards found.</div>}
+                  {!isLoading && !searchError && !hasMoreCards && fetchedCards.length > 0 && <div data-catalog-end className="col-span-2 border-t border-white/[0.04] py-3 text-center text-[9px] uppercase tracking-widest font-semibold text-neutral-500">End of catalog</div>}
                 </div>
               </div>
-              <p className="mt-2 px-1 text-center text-[9px] leading-relaxed text-neutral-600">Drag to a slot or double-click to add · Powered by TCGdex</p>
+              <p className="mt-2 px-1 text-center text-[9px] uppercase tracking-widest font-semibold text-neutral-500">Drag to a slot or double-click to add · Powered by TCGdex</p>
             </section>
           ) : (
             <div className="mx-4 mt-1 rounded-lg border border-dashed border-white/[0.05] bg-neutral-900/20 px-5 py-10 text-center">
               <Icon name="sparkles" className="mx-auto mb-2 text-neutral-600" />
               <p className="text-xs font-medium text-neutral-400">Search the public card catalog</p>
-              <p className="mt-1 text-[10px] leading-relaxed text-neutral-600">Enter a Pokémon name or select a set to browse TCGdex.</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-neutral-400">Enter a Pokémon name or select a set to browse TCGdex.</p>
             </div>
           )}
         </>

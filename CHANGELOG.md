@@ -501,6 +501,23 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Verified glyph identity and size, Card size labeling/content, exact rail ordering, bounded Print setup geometry, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.3.2.
 
+## [v4.3.3] — 2026-10-20
+
+### Improved
+
+- Enforced a three-tier sidebar hierarchy: 12px medium actions and options, 11px secondary descriptions, and 9px uppercase semibold system context, while retaining the explicitly requested 10px text-only counters.
+- Standardized the Pokémon search and Card set controls at 36px tall with identical neutral surface, border, radius, padding, font size, weight, and foreground geometry; the Card set block now begins exactly 14px below search.
+- Replaced red active source tabs with a restrained neutral slate surface while preserving the prior inactive treatment.
+- Expanded the Michi upload capsule to 24px vertical padding, added a 20px upload glyph through the shared `Icon` abstraction, and aligned its typography and slate hairline treatment with the catalog controls.
+- Rebuilt the empty Michi collection state as a centered title/subtitle feature callout and normalized visible card option names, catalog context, and descriptive copy to the tiered type scale.
+
+### Fixed
+
+- Removed pill chrome from TCGdex result and Your Uploads counters, leaving clean 10px Inter text-only readouts.
+- Restored the `Layers` registration used by the Cards source tab after the prior Card size icon refactor removed its shared mapping.
+- Verified exact input geometry, 14px form spacing, count reset styles, tab states, 20px upload geometry, empty-state content, responsive sidebar layout, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
+- Advanced package and lockfile metadata to v4.3.3.
+
 ---
 
 ## Current architecture and engineering rationale
@@ -552,6 +569,13 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Drop handlers snapshot `FileList`/payload data and reset visual drag state before awaiting IndexedDB, file reads, or remote downloads. This prevents a later native `dragend` from clearing state belonging to a newer drag.
 - Slot-action timing guards prevent Remove/Unmerge controls from also starting a marquee, card drag, or double-click reposition.
 - Native drag targets are DOM-highlighted rather than kept as a high-frequency React array; this avoids render-cycle lag during pointer movement.
+
+### Sidebar source and typography system
+
+- Cards and Michi share `selectedCardIds` but keep independent source semantics. Their active tabs use a neutral slate surface; inactive tabs remain muted until hover.
+- Sidebar typography follows three semantic tiers: 12px medium actions/options, 11px secondary descriptions, and 9px uppercase semibold system context. TCGdex and upload counters are deliberate 10px text-only readout exceptions.
+- Search and Card set controls share a 36px height, neutral-950 surface, six-percent white border, six-pixel radius, 12px horizontal padding, six-pixel vertical padding, and 12px medium foreground. The set block sits 14px below search.
+- Michi's upload capsule uses a 20px Lucide upload glyph, 24px vertical padding, and neutral hairline hover treatment. Its zero-asset state is a three-column centered feature callout rather than an unstructured sentence.
 
 ### Timeline, rail, and viewport boundaries
 
