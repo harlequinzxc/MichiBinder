@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.9.0
+## Current state — v4.9.1
 
 - **Ledger date:** 2026-10-21
-- **Application state entering this feature pass:** commit `cc640f9` / v4.8.3
+- **Application state entering this feature pass:** commit `d767ebf` / v4.9.0
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,8 +14,8 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets plus the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, required secret, or environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** immediate Michi list remounting and permanent per-upload dual cleanup
-- **Last verified behavior:** production build plus three-viewport insertion/remount order, hover trash control, cancel/confirm deletion, all-page slot/crop cleanup, persistence, telemetry, and zero-browser-error checks
+- **Last functional change:** standard Lucide Trash glyph for the Michi per-upload delete control
+- **Last verified behavior:** production build plus three-viewport Trash module identity/geometry, hover visibility, custom telemetry, cancel/confirm cleanup, persistence, and zero-browser-error checks
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## SemVer reconstruction
@@ -785,6 +785,19 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 
 - Verified immediate natural ordering after upload, structural remounting of existing cards, exact trash-control class, 12×12 icon geometry, 0-to-1 hover opacity, exact confirmation text, cancel preservation, click-propagation isolation, confirmed pool deletion, two-page slot/crop cleanup, retained unrelated assets, updated Binder/Custom/Density telemetry, persistence, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.9.0.
+
+## [v4.9.1] — 2026-10-21
+
+### Fixed
+
+- Switched the Michi per-upload delete control from Lucide `Trash2` to the standard `Trash` module while retaining its exact 12px footprint, hover styling, stacking, and permanent cleanup behavior.
+- Confirmed the existing all-page custom-placement reducer and Custom metric remain positioned between Binder and Density with the requested divider, label typography, transparent gradient digits, and accessibility text.
+
+### Verified
+
+- Verified the rendered glyph identifies as `lucide-trash` rather than `lucide-trash-2`, remains 12×12px, transitions from zero to full opacity on card hover, and completes cancel/confirm deletion without browser errors at 1600×1000, 1366×768, and 1200×700.
+- Reverified natural insertion ordering, dual-page assignment/crop cleanup, retained unrelated assets, persisted results, and `CUSTOM 1 CARDS` telemetry after deletion.
+- Advanced package and lockfile metadata to v4.9.1.
 
 ---
 
