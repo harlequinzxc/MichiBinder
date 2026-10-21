@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.13.1
+## Current state — v4.14.0
 
 - **Ledger date:** 2026-10-21
-- **Application state entering this feature pass:** commit `7e5c65e` / v4.13.0
+- **Application state entering this feature pass:** commit `cf7a339` / v4.13.1
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,8 +14,8 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets plus the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, required secret, or environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** visibility-guarded first-unplaced scrolling that safely ignores hidden mounted catalogues during rapid Cards/Michi transitions
-- **Last verified behavior:** production build, three-viewport rapid-switch cancellation for the hidden tab, retained active-tab targeting, zero-size hidden container confirmation, synchronized v4.13.1 title pill, and zero browser errors
+- **Last functional change:** exact-filename custom upload replacement that preserves asset IDs and live binder placements, plus DOM-settled deletion targeting
+- **Last verified behavior:** production build, three-viewport IndexedDB binary overwrite and binder refresh, localStorage fallback replacement, duplicate suppression, dynamic row remounting, delayed `custom-11` deletion targeting, synchronized v4.14.0 title pill, and zero browser errors
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## Strict SemVer policy and audit
@@ -1096,6 +1096,28 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Verified a settled Michi activation still targets `custom-1`, both inactive containers report 0×0 geometry, the synchronized `v4.13.1` title pill remains unchanged in style, and browser errors remain empty at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.13.1.
 
+## [v4.14.0] — 2026-10-21
+
+### Added
+
+- Added exact, case-sensitive filename replacement for local uploads: a matching custom asset reuses its historical ID instead of creating a duplicate pool row.
+- Added batch-aware filename coalescing so repeated same-name files in one picker result resolve to one asset ID and the final binary payload.
+
+### Changed
+
+- Deep replacement now overwrites the existing IndexedDB blob record or localStorage data URL, swaps the live `images` dictionary source, revokes superseded blob URLs, preserves binder slot/page assignments, and refreshes every mounted binder image using that asset ID.
+- Custom inventory keys now include the requested dynamic image-source length so overwrite-driven source changes can remount their panel row immediately.
+- Permanent custom deletion now waits 60ms for the sorted React grid to remove its old frame before scheduling the shared 150ms first-unplaced coordinate pass.
+- Upload completion feedback distinguishes newly added images from refreshed same-name assets.
+
+### Verified
+
+- Verified three-viewport `Replace.png` overwrite retains `custom-1`, keeps exactly 30 pool rows, replaces the 77-byte IndexedDB PNG payload, changes the placed binder image source, preserves the `0-0` slot assignment, and remounts the custom row.
+- Verified the IndexedDB-unavailable path updates the same historical ID and binder slot with a persisted PNG data URL without creating a duplicate.
+- Verified permanent deletion removes the overwritten row, binder assignment, and IndexedDB record, then targets the first remaining unplaced asset `custom-11` at its 764px grid coordinate after the requested macro delay.
+- Reverified fresh upload behavior, synchronized `v4.14.0` title styling, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
+- Advanced package and lockfile metadata to v4.14.0.
+
 ---
 
 ## Current architecture and engineering rationale
@@ -1155,6 +1177,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Cards and Michi share `selectedCardIds` but keep independent source semantics. Their active tabs use a neutral slate surface; inactive tabs remain muted until hover.
 - Cards and Michi panel trees remain mounted under display-toggled wrappers, retaining their search/upload controls and native scroll nodes. Each tab restores a positive remembered offset; a zero-memory first activation targets the first unplaced item, while hydration, uploads, and binder/catalogue data changes retain their own targeting triggers. Delayed target callbacks abort when the mounted container resolves to 0×0 under the inactive panel's `hidden` class.
 - Cards and Michi use the same high-contrast selected ring, scale, brightness, tinted shadow, and translucent frame mask. Their numbered badges occupy the top-right layer; Michi's destructive upload control remains isolated at top-left and its source label shifts beneath a selected badge.
+- Local uploads are keyed by exact filename for replacement: a collision retains the custom asset ID, updates its binary/source URL, preserves every slot assignment, and remounts the corresponding inventory row through its dynamic image-source-length key.
 - Sidebar typography follows three semantic tiers: 12px medium actions/options, 11px secondary descriptions, and 9px uppercase semibold system context. TCGdex and upload counters are deliberate 10px text-only readout exceptions.
 - Search and Card set controls share a 36px height, neutral-950 surface, six-percent white border, six-pixel radius, 12px horizontal padding, six-pixel vertical padding, and 12px medium foreground. The set block sits 14px below search.
 - Michi's upload capsule uses a 20px Lucide upload glyph, 24px vertical padding, and neutral hairline hover treatment. Its zero-asset state is a three-column centered feature callout rather than an unstructured sentence.
@@ -1179,8 +1202,8 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Persisted schema: version `5`. Data claiming a newer schema falls back to a clean binder rather than being partially interpreted.
 - Schema v5 stores a sanitized canonical-ID-to-raw-USD `cardPrices` map and preserves `tcgdexId` on generated local pool assets.
 - IndexedDB: database `digital-card-binder`, store `images`, version `1`.
-- IndexedDB is preferred for blobs and now carries canonical TCGdex IDs alongside remote card blobs. Fallback records store data URLs and the same canonical metadata in the local payload.
-- Object URLs are tracked and revoked during reconciliation, deletion, reset, and unmount paths.
+- IndexedDB is preferred for blobs and carries canonical TCGdex IDs alongside remote card blobs. Exact-filename custom replacement overwrites the existing keyed record; fallback records replace the same pool entry with a new data URL and canonical metadata.
+- Object URLs are tracked and revoked during reconciliation, replacement, deletion, reset, and unmount paths.
 - Undo/Redo is a 30-entry **canvas** history containing pages, active page, and layout. It intentionally excludes pool deletion/import, catalogue state, print scope, and most settings.
 - Save status is brief and asynchronous: `Saving...` appears only during persistence work, then returns to `Saved locally`; failure remains visible as `Save failed`.
 
@@ -1248,7 +1271,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - README's workspace/control description has not yet been brought in line with the latest rail menus.
 - Historical SemVer labels are not Git tags or GitHub Releases. Commit links remain the release evidence.
 - There is no account, cloud sync, collaboration, telemetry, backend, or environment-secret layer. Those are deliberate scope boundaries, not half-built modules.
-- No active functional workspace task was open when v4.13.1 was recorded.
+- No active functional workspace task was open when v4.14.0 was recorded.
 
 ## Incoming engineer hand-off brief
 

@@ -940,7 +940,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.13.1</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.14.0</span>
         </div>
         <SaveStatus status={saveStatus} />
       </div>
@@ -1467,7 +1467,7 @@ function CardPool({
               const placed = placedIds.has(localCard.id);
               return (
                 <div
-                  key={`${localCard.id}-${customUploadedCards.length}-${localCard.name}`}
+                  key={`${localCard.id}-${localCard.localUrlDataString ? localCard.localUrlDataString.length : 0}-${localCard.name}`}
                   data-local-card={localCard.id}
                   data-placed={placed ? '' : undefined}
                   role="option"
@@ -2257,16 +2257,76 @@ export default function CardBinder() {
     const source = options.source === 'tcgdex' ? 'tcgdex' : 'upload';
     const tcgdexId = source === 'tcgdex' && options.tcgdexId ? String(options.tcgdexId) : '';
     const added = Date.now();
-    const entries = files.map((file, index) => ({
-      id: uid('image'),
-      name: file.name || `Card ${pool.length + index + 1}`,
-      file,
-      source,
-      added: added + index,
-      createdAt: new Date(added + index).toISOString(),
-      ...(tcgdexId ? { tcgdexId } : {}),
-    }));
+    const existingUploadsByName = new Map();
+    customUploadedCards.forEach((item) => {
+      if (item.name && !existingUploadsByName.has(item.name)) existingUploadsByName.set(item.name, item);
+    });
+    const pendingIdsByName = new Map();
+    const entriesById = new Map();
+    files.forEach((file, index) => {
+      const exactName = file.name || '';
+      const existing = source === 'upload' && exactName ? existingUploadsByName.get(exactName) : null;
+      const pendingId = source === 'upload' && exactName ? pendingIdsByName.get(exactName) : null;
+      const id = existing?.id || pendingId || uid('image');
+      if (source === 'upload' && exactName && !pendingIdsByName.has(exactName)) pendingIdsByName.set(exactName, id);
+      const previousEntry = entriesById.get(id);
+      entriesById.set(id, {
+        id,
+        name: exactName || `Card ${pool.length + index + 1}`,
+        file,
+        source: existing?.source || source,
+        added: added + index,
+        createdAt: existing?.createdAt || previousEntry?.createdAt || new Date(added + index).toISOString(),
+        replacing: Boolean(existing),
+        ...(tcgdexId ? { tcgdexId } : {}),
+      });
+    });
+    const entries = [...entriesById.values()];
+    const entriesByAssetId = new Map(entries.map((entry) => [entry.id, entry]));
+    const replacementCount = entries.filter((entry) => entry.replacing).length;
     entries.forEach((entry) => sessionIdsRef.current.add(entry.id));
+
+    const commitImages = (nextImages) => {
+      setImages((previousImages) => {
+        const next = { ...previousImages };
+        Object.entries(nextImages).forEach(([id, url]) => {
+          const previousUrl = next[id];
+          if (previousUrl?.startsWith('blob:') && previousUrl !== url) {
+            URL.revokeObjectURL(previousUrl);
+            objectUrlsRef.current.delete(previousUrl);
+          }
+          next[id] = url;
+        });
+        return next;
+      });
+    };
+    const mergePoolEntries = (currentPool, fallbackSources = null) => {
+      const presentIds = new Set(currentPool.map((item) => item.id));
+      const updatedPool = currentPool.map((item) => {
+        const entry = entriesByAssetId.get(item.id);
+        if (!entry) return item;
+        const updated = {
+          ...item,
+          name: entry.name,
+          source: entry.source,
+          createdAt: item.createdAt || entry.createdAt,
+          ...(entry.tcgdexId ? { tcgdexId: entry.tcgdexId } : {}),
+        };
+        if (fallbackSources) updated.src = fallbackSources[entry.id];
+        else delete updated.src;
+        return updated;
+      });
+      const additions = entries.filter((entry) => !presentIds.has(entry.id)).map((entry) => ({
+        id: entry.id,
+        name: entry.name,
+        source: entry.source,
+        createdAt: entry.createdAt,
+        ...(fallbackSources ? { src: fallbackSources[entry.id] } : {}),
+        ...(entry.tcgdexId ? { tcgdexId: entry.tcgdexId } : {}),
+      }));
+      return [...updatedPool, ...additions];
+    };
+
     if (storageMode === 'indexeddb') {
       try {
         await idbPutMany(entries.map((entry) => ({
@@ -2284,14 +2344,8 @@ export default function CardBinder() {
           objectUrlsRef.current.add(url);
           nextImages[entry.id] = url;
         });
-        setImages((value) => ({ ...value, ...nextImages }));
-        setPool((value) => [...value, ...entries.map((entry) => ({
-          id: entry.id,
-          name: entry.name,
-          source: entry.source,
-          createdAt: entry.createdAt,
-          ...(entry.tcgdexId ? { tcgdexId: entry.tcgdexId } : {}),
-        }))]);
+        commitImages(nextImages);
+        setPool((value) => mergePoolEntries(value));
         if (!persistedRef.current) {
           persistedRef.current = true;
           navigator.storage?.persist?.().catch(() => {});
@@ -2300,15 +2354,9 @@ export default function CardBinder() {
         setStorageMode('localstorage');
         try {
           const urls = await Promise.all(entries.map((entry) => readFileAsDataUrl(entry.file)));
-          setImages((value) => ({ ...value, ...Object.fromEntries(entries.map((entry, index) => [entry.id, urls[index]])) }));
-          setPool((value) => [...value, ...entries.map((entry, index) => ({
-            id: entry.id,
-            name: entry.name,
-            source: entry.source,
-            src: urls[index],
-            createdAt: entry.createdAt,
-            ...(entry.tcgdexId ? { tcgdexId: entry.tcgdexId } : {}),
-          }))]);
+          const fallbackSources = Object.fromEntries(entries.map((entry, index) => [entry.id, urls[index]]));
+          commitImages(fallbackSources);
+          setPool((value) => mergePoolEntries(value, fallbackSources));
           notify('IndexedDB is unavailable. Images will use browser storage instead.', 'warn');
         } catch {
           notify('Could not read one or more images.', 'error');
@@ -2318,24 +2366,25 @@ export default function CardBinder() {
     } else {
       try {
         const urls = await Promise.all(entries.map((entry) => readFileAsDataUrl(entry.file)));
-        setImages((value) => ({ ...value, ...Object.fromEntries(entries.map((entry, index) => [entry.id, urls[index]])) }));
-        setPool((value) => [...value, ...entries.map((entry, index) => ({
-          id: entry.id,
-          name: entry.name,
-          source: entry.source,
-          src: urls[index],
-          createdAt: entry.createdAt,
-          ...(entry.tcgdexId ? { tcgdexId: entry.tcgdexId } : {}),
-        }))]);
+        const fallbackSources = Object.fromEntries(entries.map((entry, index) => [entry.id, urls[index]]));
+        commitImages(fallbackSources);
+        setPool((value) => mergePoolEntries(value, fallbackSources));
       } catch {
         notify('Could not read one or more images.', 'error');
         return [];
       }
     }
     scrollToNextUnplacedCard('[role="listbox"][aria-label*="Custom"]', 'data-local-card');
-    if (!options.silent) notify(`${plural(entries.length, 'image')} added to MichiBinder.`, 'success');
+    if (!options.silent) {
+      const addedCount = entries.length - replacementCount;
+      const result = [
+        addedCount ? `${plural(addedCount, 'image')} added` : '',
+        replacementCount ? `${plural(replacementCount, 'image')} refreshed` : '',
+      ].filter(Boolean).join(' · ');
+      notify(`${result} in MichiBinder.`, 'success');
+    }
     return entries.map((entry) => entry.id);
-  }, [notify, pool.length, scrollToNextUnplacedCard, storageMode]);
+  }, [customUploadedCards, notify, pool.length, scrollToNextUnplacedCard, storageMode]);
 
   const importFetchedCard = useCallback(async (item, highResImageUrl, options = {}) => {
     hydrateCardPrice(item.id, item);
@@ -3174,8 +3223,11 @@ export default function CardBinder() {
       setSaveStatus('error');
       notify('The upload was removed, but the local save could not be updated.', 'error');
     }
+    setTimeout(() => {
+      if (activeTab === 'michi') scrollToNextUnplacedCard('[role="listbox"][aria-label*="Custom"]', 'data-local-card');
+    }, 60);
     notify(`${target.name || 'Uploaded card'} permanently deleted.`, 'info');
-  }, [pool, storageMode, currentPage, settings, cardPrices, clearHistory, notify]);
+  }, [pool, storageMode, currentPage, settings, cardPrices, clearHistory, notify, activeTab, scrollToNextUnplacedCard]);
 
   const handleClearAllUploads = useCallback(() => {
     const ids = customUploadedCards.map((item) => item.id);
