@@ -1002,7 +1002,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.20.2</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.20.3</span>
         </div>
         <SaveStatus status={saveStatus} pool={pool} />
       </div>
@@ -2503,62 +2503,83 @@ export default function CardBinder() {
   }, [addFiles, notify]);
 
   const pullAssetsFromImgBBCloud = useCallback(async (usernameString) => {
+    if (!usernameString || !usernameString.trim()) {
+      notify('Please enter a valid ImgBB username.', 'warn');
+      return [];
+    }
+
     setSaveStatus('saving');
     notify('Connecting to remote cloud vault…', 'info');
+
     try {
-      const username = String(usernameString || '').trim().replace(/^@/, '');
-      if (!/^[a-zA-Z0-9_-]+$/.test(username)) throw new Error('Invalid ImgBB username.');
-      const profileUrl = `https://${username}.imgbb.com/`;
-      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(profileUrl)}`;
+      const cleanUser = usernameString.trim();
+      // Fetch the primary root profile where ImgBB mounts public uploads.
+      const targetProfileUrl = `https://${cleanUser}.imgbb.com/`;
+      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetProfileUrl)}`;
+
       const response = await fetch(proxyUrl);
-      if (!response.ok) throw new Error(`Cloud profile request failed with status ${response.status}.`);
+      if (!response.ok) throw new Error(`Proxy gateway error: status ${response.status}`);
+
       const json = await response.json();
       const htmlString = json.contents;
-      if (!htmlString) throw new Error('Cloud profile returned no public layout data.');
+      if (!htmlString) throw new Error('Cloud response profile data empty.');
 
       const normalizedHtml = htmlString
         .replace(/\\u002F/gi, '/')
         .replace(/\\u0026/gi, '&')
         .replace(/\\\//g, '/')
         .replace(/&amp;/g, '&');
-      const assetRegex = /https:\/\/(?:(?:i\.)?ibb\.co|[a-zA-Z0-9.-]+\.imgbb\.com)\/[a-zA-Z0-9_-]+\/[^"'\\\s<>]+?\.(?:png|jpg|jpeg|webp)(?:\?[^"'\\\s<>]*)?/gi;
-      const remoteUrls = [...new Set(normalizedHtml.match(assetRegex) || [])];
-      if (!remoteUrls.length) throw new Error('No public ImgBB assets were discovered.');
+      const imageRegex = /https:\/\/i\.ibb\.co\/[a-zA-Z0-9]+\/[^"']+\.(?:png|jpg|jpeg|webp)/gi;
+      const directUrls = normalizedHtml.match(imageRegex) || [];
+      const uniqueUrls = [...new Set(directUrls)];
 
-      const downloadedSyntheticFiles = (await Promise.all(remoteUrls.map(async (assetUrl, index) => {
+      if (uniqueUrls.length === 0) {
+        const thumbRegex = /https:\/\/thumb\.ibb\.co\/[a-zA-Z0-9]+\/[^"']+\.(?:png|jpg|jpeg|webp)/gi;
+        const thumbUrls = normalizedHtml.match(thumbRegex) || [];
+        thumbUrls.forEach((url) => {
+          const fullUrl = url.replace('thumb.ibb.co', 'i.ibb.co');
+          if (!uniqueUrls.includes(fullUrl)) uniqueUrls.push(fullUrl);
+        });
+      }
+
+      if (uniqueUrls.length === 0) {
+        setSaveStatus('saved');
+        notify('Cloud rehydration failed. Verify the ImgBB username and public asset visibility.', 'error');
+        return [];
+      }
+
+      notify(`Streaming ${uniqueUrls.length} remote cloud assets…`, 'info');
+
+      const downloadedSyntheticFiles = await Promise.all(uniqueUrls.map(async (url, index) => {
         try {
-          const assetResponse = await fetch(assetUrl);
-          if (!assetResponse.ok) throw new Error(`Cloud asset request failed with status ${assetResponse.status}.`);
-          const blob = await assetResponse.blob();
+          const fileResponse = await fetch(url);
+          if (!fileResponse.ok) return null;
+
+          const blob = await fileResponse.blob();
           if (!blob.type?.startsWith('image/')) return null;
-          const terminalSegment = new URL(assetUrl).pathname.split('/').filter(Boolean).pop() || `cloud-asset-${index + 1}`;
-          let filename;
-          try {
-            filename = safeFileName(decodeURIComponent(terminalSegment));
-          } catch {
-            filename = safeFileName(terminalSegment);
-          }
-          if (!/\.(?:png|jpe?g|webp)$/i.test(filename)) {
-            const extension = blob.type === 'image/jpeg' ? '.jpg' : blob.type === 'image/webp' ? '.webp' : '.png';
-            filename += extension;
-          }
-          const file = new File([blob], filename, { type: blob.type });
-          return Object.assign(file, { src: assetUrl, id: uid('cloud') });
-        } catch (error) {
-          console.error(`ImgBB cloud asset download failed for ${assetUrl}:`, error);
+          const urlPathName = new URL(url).pathname.split('/').pop() || `cloud-card-${index}`;
+          const fileName = urlPathName.includes('.') ? urlPathName : `${urlPathName}.png`;
+          const file = new File([blob], safeFileName(fileName), { type: blob.type });
+          return Object.assign(file, { src: url, id: uid('cloud') });
+        } catch {
           return null;
         }
-      }))).filter(Boolean);
-      if (!downloadedSyntheticFiles.length) throw new Error('No valid cloud image downloads completed.');
+      }));
 
-      const addedIds = await addFiles(downloadedSyntheticFiles);
-      if (!addedIds.length) throw new Error('Cloud assets could not be registered locally.');
-      notify(`Successfully rehydrated ${downloadedSyntheticFiles.length} custom cloud assets.`, 'success');
-      return addedIds;
+      const validFiles = downloadedSyntheticFiles.filter(Boolean);
+
+      if (validFiles.length > 0) {
+        const addedIds = await addFiles(validFiles);
+        if (!addedIds.length) throw new Error('Cloud assets could not be registered locally.');
+        notify(`Successfully rehydrated ${validFiles.length} custom cloud assets.`, 'success');
+        return addedIds;
+      }
+
+      throw new Error('All file content download streams failed.');
     } catch (error) {
-      console.error('ImgBB downstream synchronization failed:', error);
-      setSaveStatus('error');
-      notify('Cloud rehydration failed. Verify the ImgBB username and public asset visibility.', 'error');
+      console.error('Downstream Cloud Rehydration Fault:', error);
+      setSaveStatus('saved');
+      notify('Cloud rehydration failed. Verify network connectivity.', 'error');
       return [];
     }
   }, [addFiles, notify]);
