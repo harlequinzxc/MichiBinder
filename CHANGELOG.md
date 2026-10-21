@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.7.1
+## Current state — v4.8.0
 
 - **Ledger date:** 2026-10-20
-- **Application state entering this feature pass:** commit `29eaf8a` / v4.7.0
+- **Application state entering this feature pass:** commit `4f33dfa` / v4.7.1
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,8 +14,8 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets plus the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, required secret, or environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** TCGdex catalogue results now mirror Michi placed-card grayscale and hover treatment
-- **Last verified behavior:** production build plus three-viewport placed/unplaced TCGdex catalogue styling, isolated hover, and zero-browser-error checks
+- **Last functional change:** unified sidebar typography, database-only binder clearing, and wheel/overlay timeline navigation
+- **Last verified behavior:** production build plus three-viewport typography, destructive-scope, persistence, wheel translation, fixed-step smooth-scroll, overlay, and zero-browser-error checks
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## SemVer reconstruction
@@ -703,6 +703,27 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Used the existing named `group/card` hover channel for 0.75 placed-card hover opacity, preventing the catalogue container's outer `group` from brightening every placed result when a different card is hovered.
 - Verified placed and unplaced image classes, 0.45 placed opacity, grayscale filtering, full-frame cover behavior, isolated hover state, 0.75 hover opacity, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.7.1.
+
+## [v4.8.0] — 2026-10-20
+
+### Added
+
+- Added a confirmed Clear Binder action to the Cards search header that removes every placed TCGdex-backed asset and its crop from all sheets while preserving custom uploads, pool records, physical sheets, and undo history.
+- Added a dedicated `timelineScrollRef` plus smooth 400px left/right navigation functions for the horizontal page tray.
+- Added translucent, hover-revealed Lucide chevron overlays at both timeline edges using the required 16px icons and fixed gradient treatments.
+- Added vertical-wheel-to-horizontal-scroll translation on the timeline; a native non-passive guard prevents browser page scrolling without triggering React's passive wheel-listener console error.
+
+### Changed
+
+- Unified Card Set and Your Uploads section labels on the same 9px bold, tracked neutral-400 uppercase Inter treatment with 6px bottom spacing.
+- Unified Cards item counts and Michi asset counts on clean 10px medium neutral-500 metadata typography.
+- Wrapped the existing timeline scroller in a relative `group/timeline` frame while retaining its 300ms elastic drawer geometry, hidden scrollbar chrome, native horizontal overflow, and active-page reveal behavior.
+
+### Verified
+
+- Verified cancel and confirm Clear Binder paths, removal of only database slots/crops, preservation of custom slots/crops and both pool records, and persisted results.
+- Verified overflow across a 40-page timeline, 180px wheel translation, smooth +400px/-400px overlay movement, exact overlay classes, 16px icons, typography classes, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
+- Advanced package and lockfile metadata to v4.8.0.
 
 ---
 

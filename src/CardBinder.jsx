@@ -1231,6 +1231,7 @@ function CardPool({
   inputRef,
   onFiles,
   onClearAllUploads,
+  onClearAllBinderCards,
   onPoolClick,
   onPoolDoubleClick,
   onPoolDragStart,
@@ -1330,9 +1331,9 @@ function CardPool({
           </div>
 
           <div className="mt-3 mb-2 flex items-center justify-between border-b border-white/[0.04] px-1 py-1.5 select-none">
-            <span className="text-[9px] uppercase tracking-widest font-semibold text-neutral-500">Your Uploads</span>
+            <span className="text-[9px] font-bold tracking-widest text-neutral-400 uppercase font-sans block mb-1.5">Your Uploads</span>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-sans font-medium text-neutral-400">{customUploadedCards.length} assets</span>
+              <span className="text-[10px] font-sans font-medium text-neutral-500 tracking-normal">{customUploadedCards.length} assets</span>
               <button type="button" onClick={onClearAllUploads} className="text-[10px] font-medium text-neutral-500 hover:text-red-400 transition-colors uppercase tracking-wider focus:outline-none">Clear All</button>
             </div>
           </div>
@@ -1395,7 +1396,7 @@ function CardPool({
             </form>
             <div className="mt-3.5">
               <label className="block">
-                <span className="mb-1 block text-[9px] font-bold tracking-widest text-neutral-400 uppercase font-sans">Card set</span>
+                <span className="text-[9px] font-bold tracking-widest text-neutral-400 uppercase font-sans block mb-1.5">Card set</span>
                 <select
                   value={selectedSet}
                   aria-label="Filter by Pokémon set"
@@ -1412,15 +1413,18 @@ function CardPool({
           {searchActive ? (
             <section aria-label="TCGdex search results" className="flex min-h-0 flex-1 flex-col px-3 pb-4">
               <div className="mt-4 flex items-center justify-between w-full px-1 py-1 border-b border-white/[0.04] mb-2">
-                <span aria-live="polite" className="text-[10px] font-sans font-medium text-neutral-400 tracking-normal border-0 bg-transparent p-0">{isLoading && !fetchedCards.length ? 'Loading…' : plural(fetchedCards.length, 'item')}</span>
-                <button
-                  type="button"
-                  onClick={onClearFilters}
-                  className="flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-neutral-400 transition-colors hover:text-neutral-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-red-500/50 select-none"
-                >
-                  <Icon name="x" />
-                  <span>Clear Filters</span>
-                </button>
+                <span aria-live="polite" className="text-[10px] font-sans font-medium text-neutral-500 tracking-normal">{isLoading && !fetchedCards.length ? 'Loading…' : plural(fetchedCards.length, 'item')}</span>
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={onClearAllBinderCards} className="text-[10px] font-medium text-neutral-500 hover:text-red-400 transition-colors uppercase tracking-wider focus:outline-none">Clear Binder</button>
+                  <button
+                    type="button"
+                    onClick={onClearFilters}
+                    className="flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-neutral-400 transition-colors hover:text-neutral-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-red-500/50 select-none"
+                  >
+                    <Icon name="x" />
+                    <span>Clear Filters</span>
+                  </button>
+                </div>
               </div>
               {searchError && <div role="alert" className="mx-1 mb-2 rounded-md border border-red-500/20 bg-red-950/30 px-2.5 py-2 text-[10px] leading-relaxed text-red-300">{searchError}</div>}
               <div className="px-2 py-1">
@@ -1594,7 +1598,7 @@ export default function CardBinder() {
   const [stageSize, setStageSize] = useState({ w: 1000, h: 620 });
 
   const stageRef = useRef(null);
-  const timelineContainerRef = useRef(null);
+  const timelineScrollRef = useRef(null);
   const timelineRevealPageIdRef = useRef(null);
   const inputRef = useRef(null);
   const dragRef = useRef(null);
@@ -1626,6 +1630,23 @@ export default function CardBinder() {
   const layoutIdRef = useRef(settings.layout);
   const pastRef = useRef([]);
   const futureRef = useRef([]);
+
+  const scrollTimelineLeft = useCallback(() => {
+    if (timelineScrollRef.current) timelineScrollRef.current.scrollBy({ left: -400, behavior: 'smooth' });
+  }, []);
+  const scrollTimelineRight = useCallback(() => {
+    if (timelineScrollRef.current) timelineScrollRef.current.scrollBy({ left: 400, behavior: 'smooth' });
+  }, []);
+
+  useEffect(() => {
+    const timeline = timelineScrollRef.current;
+    if (!timeline) return undefined;
+    const preventVerticalWheel = (event) => {
+      if (event.deltaY !== 0) event.preventDefault();
+    };
+    timeline.addEventListener('wheel', preventVerticalWheel, { passive: false });
+    return () => timeline.removeEventListener('wheel', preventVerticalWheel);
+  }, []);
 
   const layout = getLayout(settings.layout);
   const dims = useMemo(() => ({ rows: layout.rows, cols: layout.cols }), [layout.rows, layout.cols]);
@@ -1704,7 +1725,7 @@ export default function CardBinder() {
   useEffect(() => { cardPricesRef.current = cardPrices; }, [cardPrices]);
 
   useEffect(() => {
-    const timeline = timelineContainerRef.current;
+    const timeline = timelineScrollRef.current;
     if (!timeline || !showBottomTimeline) return undefined;
     const frame = window.requestAnimationFrame(() => {
       const requestedPageId = timelineRevealPageIdRef.current;
@@ -2906,6 +2927,26 @@ export default function CardBinder() {
     return () => ['dragover', 'drop', 'dragstart', 'dragend', 'pointermove', 'pointerup', 'pointercancel'].forEach((name) => window.removeEventListener(name, safety));
   }, [resetDrag, moveMarquee, finishMarquee]);
 
+  const handleClearAllBinderCards = useCallback(() => {
+    if (!window.confirm('Are you sure you want to clear all standard database cards from your binder sheets? This will not touch your custom uploads.')) return;
+    const databaseIds = new Set(pool.filter((item) => item.source === 'tcgdex').map((item) => item.id));
+    const result = applyCanvasChange((allPages) => allPages.map((page) => {
+      const slots = Object.fromEntries(Object.entries(page.slots || {}).filter(([, assetId]) => !databaseIds.has(assetId)));
+      if (Object.keys(slots).length === Object.keys(page.slots || {}).length) return page;
+      const crops = Object.fromEntries(Object.entries(page.crops || {}).filter(([key, crop]) => slots[key] === crop.img));
+      return { ...page, slots, crops };
+    }));
+    if (!result.changed) {
+      notify('No database cards are currently placed in the binder.', 'info');
+      return;
+    }
+    editingRef.current = null;
+    setEditing(null);
+    setSelBox(null);
+    setSelectionPageId(null);
+    notify('All database cards cleared from binder sheets. Custom uploads were preserved.', 'info');
+  }, [pool, applyCanvasChange, notify]);
+
   const handleClearAllUploads = useCallback(() => {
     const ids = customUploadedCards.map((item) => item.id);
     if (!ids.length) return;
@@ -3707,6 +3748,7 @@ export default function CardBinder() {
             inputRef={inputRef}
             onFiles={addFiles}
             onClearAllUploads={handleClearAllUploads}
+            onClearAllBinderCards={handleClearAllBinderCards}
             onPoolClick={onPoolClick}
             onPoolDoubleClick={(id) => placeCards([id], currentPage, null)}
             onPoolDragStart={startPoolDrag}
@@ -3843,25 +3885,35 @@ export default function CardBinder() {
               onDelete={deletePage}
               canDelete={pages.length > 2}
             />
-            <footer
-              ref={timelineContainerRef}
-              id="bottom-page-timeline"
-              data-page-timeline
-              aria-label="Page timeline"
-              aria-hidden={!showBottomTimeline}
-              inert={showBottomTimeline ? undefined : true}
-              className={`no-print w-full bg-neutral-900/40 backdrop-blur-sm transform-gpu transition-all duration-300 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] will-change-[height,opacity,padding,margin] shrink-0 relative flex justify-start items-center select-none scrollbar-none min-w-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${showBottomTimeline ? 'h-28 border-t border-white/[0.04] overflow-x-auto overscroll-x-contain gap-4 px-4 py-4 opacity-100 translate-y-0' : 'h-0 border-0 overflow-hidden gap-0 px-0 py-0 opacity-0 translate-y-4 pointer-events-none'}`}
-            >
-              <div data-page-timeline-inner className="flex h-full min-w-max w-max items-center justify-start gap-4">
-                {spreadGroups.map(renderThumbnailGroup)}
-                <div className="flex shrink-0 flex-col items-center gap-1 text-[10px] font-medium whitespace-nowrap text-neutral-500">
-                  <button type="button" onClick={addPage} aria-label="Add page" className="group shrink-0 rounded-md bg-transparent p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500">
-                    <span className="flex aspect-[1/1.414] w-10 items-center justify-center overflow-hidden rounded-sm border border-dashed border-neutral-700 text-neutral-500 transition-colors group-hover:border-neutral-500 group-hover:bg-neutral-900 group-hover:text-neutral-200"><Icon name="plus" /></span>
-                  </button>
-                  <span>Add page</span>
+            <div className="relative group/timeline shrink-0">
+              <button type="button" onClick={scrollTimelineLeft} className="absolute left-0 top-1/2 -translate-y-1/2 z-50 h-full w-10 flex items-center justify-center bg-gradient-to-r from-neutral-950/80 via-neutral-950/40 to-transparent text-neutral-400 hover:text-neutral-100 opacity-0 group-hover/timeline:opacity-100 transition-opacity duration-200 focus:outline-none" title="Scroll Left" aria-label="Scroll timeline left"><ChevronLeft size={16} /></button>
+              <footer
+                ref={timelineScrollRef}
+                id="bottom-page-timeline"
+                data-page-timeline
+                aria-label="Page timeline"
+                aria-hidden={!showBottomTimeline}
+                inert={showBottomTimeline ? undefined : true}
+                onWheel={(event) => {
+                  if (event.deltaY !== 0) {
+                    if (!event.defaultPrevented) event.preventDefault();
+                    event.currentTarget.scrollLeft += event.deltaY;
+                  }
+                }}
+                className={`no-print w-full bg-neutral-900/40 backdrop-blur-sm transform-gpu transition-all duration-300 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] will-change-[height,opacity,padding,margin] shrink-0 relative flex justify-start items-center select-none scrollbar-none min-w-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${showBottomTimeline ? 'h-28 border-t border-white/[0.04] overflow-x-auto overscroll-x-contain gap-4 px-4 py-4 opacity-100 translate-y-0' : 'h-0 border-0 overflow-hidden gap-0 px-0 py-0 opacity-0 translate-y-4 pointer-events-none'}`}
+              >
+                <div data-page-timeline-inner className="flex h-full min-w-max w-max items-center justify-start gap-4">
+                  {spreadGroups.map(renderThumbnailGroup)}
+                  <div className="flex shrink-0 flex-col items-center gap-1 text-[10px] font-medium whitespace-nowrap text-neutral-500">
+                    <button type="button" onClick={addPage} aria-label="Add page" className="group shrink-0 rounded-md bg-transparent p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500">
+                      <span className="flex aspect-[1/1.414] w-10 items-center justify-center overflow-hidden rounded-sm border border-dashed border-neutral-700 text-neutral-500 transition-colors group-hover:border-neutral-500 group-hover:bg-neutral-900 group-hover:text-neutral-200"><Icon name="plus" /></span>
+                    </button>
+                    <span>Add page</span>
+                  </div>
                 </div>
-              </div>
-            </footer>
+              </footer>
+              <button type="button" onClick={scrollTimelineRight} className="absolute right-0 top-1/2 -translate-y-1/2 z-50 h-full w-10 flex items-center justify-center bg-gradient-to-l from-neutral-950/80 via-neutral-950/40 to-transparent text-neutral-400 hover:text-neutral-100 opacity-0 group-hover/timeline:opacity-100 transition-opacity duration-200 focus:outline-none" title="Scroll Right" aria-label="Scroll timeline right"><ChevronRight size={16} /></button>
+            </div>
           </main>
         </div>
         <div className="no-print pointer-events-none fixed bottom-10 right-20 z-[100] flex w-[360px] flex-col items-end gap-2">
