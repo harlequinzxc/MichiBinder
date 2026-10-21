@@ -158,23 +158,6 @@ const uid = (prefix = 'id') => `${prefix}-${Date.now().toString(36)}-${Math.rand
 const keyOf = (row, col) => `${row}-${col}`;
 const isEditableTarget = (element) => Boolean(element?.matches?.('input, textarea, select, [contenteditable="true"]'));
 const hasFiles = (dataTransfer) => Array.from(dataTransfer?.types || []).includes('Files');
-const IMGBB_API_KEY = "93093067ffc886a48e1cd4eb98070ab1";
-const uploadImageToImgBB = async (fileObject) => {
-  try {
-    const formData = new FormData();
-    formData.append('key', IMGBB_API_KEY);
-    formData.append('image', fileObject);
-    const response = await fetch('https://api.imgbb.com/1/upload', {
-      method: 'POST',
-      body: formData,
-    });
-    if (!response.ok) return null;
-    const json = await response.json();
-    return json?.data?.display_url || json?.data?.url || null;
-  } catch {
-    return null;
-  }
-};
 const tcgdexImageBase = (image) => {
   const value = typeof image === 'string' ? image.trim().replace(/\/$/, '') : '';
   if (!value) return '';
@@ -961,28 +944,25 @@ function SheetGrid({ page, card, gap, unit, dims, animate = false, renderSlot, g
   );
 }
 
-function SaveStatus({ status, pool = [] }) {
+function SaveStatus({ status }) {
   const saving = status === 'saving';
   const failed = status === 'error';
-  const hasCloudSync = pool.some(item => item.source === 'upload' && item.src && item.src.includes('imgbb.com'))
-    || pool.some((item) => item.source === 'upload' && item.src && item.src.includes('i.ibb.co'));
-  const savedToCloud = status === 'saved' && hasCloudSync;
-  const label = failed ? 'Save failed' : saving ? 'Saving...' : savedToCloud ? 'Saved to Cloud' : 'Saved locally';
+  const label = failed ? 'Save failed' : saving ? 'Saving...' : 'Local Hub Sync Active';
   return (
     <div
       data-engine-badge
-      className={`shrink-0 text-xs flex items-center gap-1.5 ${failed ? 'font-medium text-red-300' : saving ? 'text-neutral-200 font-medium animate-pulse' : savedToCloud ? 'text-emerald-400/90 font-medium' : 'text-neutral-400 font-medium'}`}
+      className={`shrink-0 text-xs flex items-center gap-1.5 ${failed ? 'font-medium text-red-300' : saving ? 'text-neutral-200 font-medium animate-pulse' : 'text-zinc-400 font-medium'}`}
       aria-live="polite"
-      aria-label={`${savedToCloud ? 'Cloud storage' : 'Local storage'}: ${label}`}
-      title={savedToCloud ? 'Cloud persistence status' : 'Local persistence status'}
+      aria-label={`Local storage: ${label}`}
+      title="Local persistence status"
     >
-      <span className={`size-1.5 rounded-full ${failed ? 'bg-red-400' : saving ? 'bg-amber-400' : savedToCloud ? 'bg-emerald-400' : 'bg-neutral-500'} shadow-[0_0_8px_currentColor]`} />
+      <span className={`size-1.5 rounded-full ${failed ? 'bg-red-400' : saving ? 'bg-amber-400' : 'bg-neutral-500'} shadow-[0_0_8px_currentColor]`} />
       <span>{label}</span>
     </div>
   );
 }
 
-function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, onToggleZenMode, saveStatus, pool, currencyDisplay, onToggleCurrency, portfolioValueLabel }) {
+function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, onToggleZenMode, saveStatus, currencyDisplay, onToggleCurrency, portfolioValueLabel }) {
   const isZenMode = !isLeftSidebarOpen && !showBottomTimeline;
   const zenModeTitle = isZenMode ? 'Exit Focus Mode' : 'Enter Focus Mode';
 
@@ -1002,9 +982,9 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.20.7</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.21.0</span>
         </div>
-        <SaveStatus status={saveStatus} pool={pool} />
+        <SaveStatus status={saveStatus} />
       </div>
 
       <div className="flex shrink-0 items-center justify-end gap-2">
@@ -1364,7 +1344,7 @@ function CardPool({
   images,
   inputRef,
   uploadAndRegisterFiles,
-  syncPoolFromRawDocumentText,
+  syncPoolFromLocalDirectory,
   onClearAllUploads,
   onClearAllBinderCards,
   handleRemoveCustomCard,
@@ -1500,8 +1480,9 @@ function CardPool({
           </div>
 
           <div className="mt-3 flex flex-col gap-2 rounded-lg border border-white/[0.04] bg-neutral-950 p-2.5 shadow-inner">
-            <div className="flex items-center justify-between"><div className="flex flex-col"><span className="text-[10px] font-semibold text-neutral-200">Persistent Cloud Backup</span><span className="text-[8px] font-medium text-neutral-500 font-mono tracking-wide uppercase">Real-Time Clipboard Sync</span></div></div>
-            <textarea aria-label="Raw ImgBB account document" placeholder="Click here and press Ctrl+V to paste your raw ImgBB account page dump..." className="h-16 w-full resize-none bg-neutral-900 border border-white/[0.06] rounded-md p-2 text-[11px] font-medium text-neutral-200 placeholder-neutral-600 focus:outline-none focus:ring-1 focus:ring-red-500/50" onChange={(e) => { if(e.target.value.trim()) { syncPoolFromRawDocumentText(e.target.value); e.target.value = ''; } }} />
+            <div className="flex items-center justify-between"><div className="flex flex-col"><span className="text-[10px] font-semibold text-neutral-200">Asset Folder Connection</span><span className="text-[8px] font-medium text-neutral-500 font-mono tracking-wide uppercase">Native Disk Directory</span></div></div>
+            <input type="file" webkitdirectory="" directory="" multiple className="hidden" id="hub-directory-picker" onChange={(e) => { const files = Array.from(e.target.files || []); if(files.length) { syncPoolFromLocalDirectory(files); } e.target.value = ''; }} />
+            <button type="button" onClick={() => document.getElementById('hub-directory-picker')?.click()} className="w-full h-8 flex items-center justify-center rounded-md bg-neutral-800 text-zinc-200 border border-white/[0.04] font-semibold text-xs transition-all hover:bg-neutral-700 active:scale-[0.98]">Mount Local Hub Folder</button>
           </div>
 
           <div className="mt-3 mb-2 flex items-center justify-between border-b border-white/[0.04] px-1 py-1.5 select-none">
@@ -1519,7 +1500,6 @@ function CardPool({
             }).map((localCard, _index, orderedCards) => {
               const selectionIndex = selectedCardIds.indexOf(localCard.id);
               const placed = placedIds.has(localCard.id);
-              const cloudHosted = typeof localCard.src === 'string' && (localCard.src.includes('imgbb.com') || localCard.src.includes('i.ibb.co'));
               return (
                 <div
                   key={`${localCard.id}-${localCard.localUrlDataString ? localCard.localUrlDataString.length : 0}-${localCard.name}`}
@@ -1543,7 +1523,7 @@ function CardPool({
                     <Trash size={12} />
                   </button>
                   {localCard.localUrlDataString ? <img src={localCard.localUrlDataString} className={`w-full h-full object-cover bg-neutral-950 pointer-events-none transition-all duration-200 ${placed ? 'opacity-45 grayscale group-hover/local:opacity-75' : ''}`} alt="Uploaded Card" /> : <span className="absolute inset-0 grid place-items-center text-neutral-600"><Icon name="image" /></span>}
-                  <span className={`absolute right-1 z-20 rounded border px-1 py-0.5 text-[9px] uppercase tracking-widest shadow-sm backdrop-blur-sm ${cloudHosted ? 'border-emerald-500/30 bg-emerald-950/80 text-emerald-400 font-medium' : 'border-white/[0.08] bg-neutral-950/80 text-neutral-500 font-semibold'} ${selectionIndex >= 0 ? 'top-7' : 'top-1'}`}>{cloudHosted ? 'CLOUD' : 'LOCAL'}</span>
+                  <span className={`absolute right-1 z-20 rounded border border-white/[0.08] bg-neutral-950/80 px-1 py-0.5 text-[9px] font-semibold uppercase tracking-widest text-neutral-500 shadow-sm backdrop-blur-sm ${selectionIndex >= 0 ? 'top-7' : 'top-1'}`}>LOCAL</span>
                   <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent px-1.5 pb-1 pt-5 text-xs font-medium text-neutral-200 opacity-0 transition-opacity group-hover/local:opacity-100 group-focus-visible/local:opacity-100"><span className="block truncate">{localCard.name || 'Custom Art'}</span></span>
                   {selectionIndex >= 0 && <span className="animate-scaleIn absolute top-1.5 right-1.5 z-20 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-mono font-bold text-white shadow-md">{selectionIndex + 1}</span>}
                 </div>
@@ -2337,9 +2317,7 @@ export default function CardBinder() {
       const exactName = file.name || '';
       const existing = source === 'upload' && exactName ? existingUploadsByName.get(exactName) : null;
       const pendingId = source === 'upload' && exactName ? pendingIdsByName.get(exactName) : null;
-      const cloudAssetId = typeof file.id === 'string' ? file.id.trim() : '';
-      const cloudSrc = typeof file.src === 'string' ? file.src.trim() : '';
-      const id = existing?.id || pendingId || cloudAssetId || uid('image');
+      const id = existing?.id || pendingId || uid('image');
       if (source === 'upload' && exactName && !pendingIdsByName.has(exactName)) pendingIdsByName.set(exactName, id);
       const previousEntry = entriesById.get(id);
       entriesById.set(id, {
@@ -2350,7 +2328,6 @@ export default function CardBinder() {
         added: added + index,
         createdAt: existing?.createdAt || previousEntry?.createdAt || new Date(added + index).toISOString(),
         replacing: Boolean(existing),
-        ...(cloudSrc ? { cloudSrc } : {}),
         ...(tcgdexId ? { tcgdexId } : {}),
       });
     });
@@ -2385,7 +2362,7 @@ export default function CardBinder() {
           createdAt: item.createdAt || entry.createdAt,
           ...(entry.tcgdexId ? { tcgdexId: entry.tcgdexId } : {}),
         };
-        const persistedSource = entry.cloudSrc || fallbackSources?.[entry.id];
+        const persistedSource = fallbackSources?.[entry.id];
         if (persistedSource) updated.src = persistedSource;
         else delete updated.src;
         return updated;
@@ -2395,7 +2372,7 @@ export default function CardBinder() {
         name: entry.name,
         source: entry.source,
         createdAt: entry.createdAt,
-        ...(entry.cloudSrc || fallbackSources?.[entry.id] ? { src: entry.cloudSrc || fallbackSources[entry.id] } : {}),
+        ...(fallbackSources?.[entry.id] ? { src: fallbackSources[entry.id] } : {}),
         ...(entry.tcgdexId ? { tcgdexId: entry.tcgdexId } : {}),
       }));
       return [...updatedPool, ...additions];
@@ -2461,75 +2438,43 @@ export default function CardBinder() {
   }, [customUploadedCards, notify, pool.length, scrollToNextUnplacedCard, storageMode]);
 
   const uploadAndRegisterFiles = useCallback(async (fileList) => {
-    const files = Array.from(fileList || []);
+    const files = Array.from(fileList || []).filter((file) => file?.type?.startsWith('image/'));
+    if (!files.length) {
+      notify('Choose PNG, JPG, WEBP, GIF, or AVIF image files.', 'warn');
+      return [];
+    }
     setSaveStatus('saving');
-    notify('Uploading assets to cloud vault…', 'info');
     try {
-      const processedCloudAssetFiles = (await Promise.all(files.map(async (file, index) => {
-        if (!file?.type?.startsWith('image/')) return null;
-        const cloudUrl = await uploadImageToImgBB(file);
-        if (!cloudUrl) return null;
-        const syntheticFile = new File(
-          [file],
-          file.name || `cloud-asset-${index + 1}.png`,
-          { type: file.type, lastModified: file.lastModified || Date.now() },
-        );
-        return Object.assign(syntheticFile, { src: cloudUrl, id: uid('cloud') });
-      }))).filter(Boolean);
-
-      if (!processedCloudAssetFiles.length) {
-        setSaveStatus('error');
-        notify('Cloud synchronization failed. Verify the selected images and try again.', 'error');
-        return [];
-      }
-      const addedIds = await addFiles(processedCloudAssetFiles);
-      if (!addedIds.length) {
-        setSaveStatus('error');
-        return [];
-      }
-      notify('Cloud synchronization complete.', 'success');
-      return addedIds;
+      return await addFiles(files);
     } catch (error) {
-      console.error('ImgBB cloud synchronization failed:', error);
+      console.error('Local asset import failed:', error);
       setSaveStatus('error');
-      notify('Cloud synchronization failed. Verify the selected images and try again.', 'error');
+      notify('Local asset import failed. Verify the selected image files.', 'error');
       return [];
     }
   }, [addFiles, notify]);
 
-  const syncPoolFromRawDocumentText = useCallback(async (rawTextPayload) => {
+  const syncPoolFromLocalDirectory = useCallback(async (fileListObjects) => {
     setSaveStatus('saving');
-    notify('Parsing cloud document matrix…', 'info');
+    notify('Traversing local asset directory folder…', 'info');
 
     try {
-      const directImageRegex = /https:\/\/i\.ibb\.co\/[a-zA-Z0-9]+\/[^"']+\.(?:png|jpg|jpeg|webp)/g;
-      const boundedImageRegex = /https:\/\/i\.ibb\.co\/[a-zA-Z0-9]+\/[^\s"'<>\\]+?\.(?:png|jpg|jpeg|webp)/gi;
-      const parsedFragments = String(rawTextPayload || '').match(directImageRegex) || [];
-      const parsedUrls = parsedFragments.flatMap((fragment) => fragment.match(boundedImageRegex) || []).filter(Boolean);
-      const uniqueUrls = [...new Set(parsedUrls)];
-
-      if (uniqueUrls.length === 0) {
-        setSaveStatus('saved');
-        notify('No active image links detected in the pasted text.', 'error');
-        return [];
-      }
-
-      const authoritativeUrls = new Set(uniqueUrls);
-      const isCloudBackedUpload = (item) => (
-        item.source === 'upload'
-        && typeof item.src === 'string'
-        && (item.src.includes('imgbb.com') || item.src.includes('i.ibb.co'))
-      );
-      const staleCloudIds = pool
-        .filter((item) => isCloudBackedUpload(item) && !authoritativeUrls.has(item.src))
+      const directoryFiles = Array.from(fileListObjects || []).filter(Boolean);
+      const validDirectoryFiles = directoryFiles.filter((file) => {
+        const normalizedName = String(file.name || '').trim().toLowerCase();
+        const systemArtifact = normalizedName === '.ds_store'
+          || normalizedName === 'thumbs.db'
+          || normalizedName === 'desktop.ini'
+          || normalizedName.startsWith('._');
+        return !systemArtifact && file.type?.startsWith('image/');
+      });
+      const directoryFileNames = new Set(validDirectoryFiles.map((file) => file.name));
+      const staleDirectoryIds = pool
+        .filter((item) => item.source === 'upload' && !directoryFileNames.has(item.name))
         .map((item) => item.id);
-      const localOnlyNames = new Set(pool
-        .filter((item) => item.source === 'upload' && !isCloudBackedUpload(item))
-        .map((item) => item.name)
-        .filter(Boolean));
 
-      if (staleCloudIds.length) {
-        const staleIdSet = new Set(staleCloudIds);
+      if (staleDirectoryIds.length) {
+        const staleIdSet = new Set(staleDirectoryIds);
         const nextPool = pool.filter((item) => !staleIdSet.has(item.id));
         const validIds = new Set(nextPool.map((item) => item.id));
         const nextPages = pruneMissingImages(pagesRef.current, validIds);
@@ -2549,10 +2494,10 @@ export default function CardBinder() {
           editingRef.current = null;
           setEditing(null);
         }
-        staleCloudIds.forEach((id) => sessionIdsRef.current.delete(id));
+        staleDirectoryIds.forEach((id) => sessionIdsRef.current.delete(id));
         setImages((value) => {
           const next = { ...value };
-          staleCloudIds.forEach((id) => {
+          staleDirectoryIds.forEach((id) => {
             const imageUrl = next[id];
             if (imageUrl?.startsWith('blob:')) {
               URL.revokeObjectURL(imageUrl);
@@ -2563,50 +2508,26 @@ export default function CardBinder() {
           return next;
         });
         try {
-          await idbDeleteMany(staleCloudIds);
+          await idbDeleteMany(staleDirectoryIds);
         } catch {
           // Orphaned binary records are ignored when their pool entries are absent.
         }
       }
 
-      const downloadedSyntheticFiles = (await Promise.all(uniqueUrls.map(async (url, index) => {
-        try {
-          const fileResponse = await fetch(url);
-          if (!fileResponse.ok) return null;
-          const blob = await fileResponse.blob();
-          if (!blob.type?.startsWith('image/')) return null;
-          const urlPathName = new URL(url).pathname.split('/').filter(Boolean).pop() || `cloud-card-${index}`;
-          let deducedFileName;
-          try {
-            deducedFileName = decodeURIComponent(urlPathName);
-          } catch {
-            deducedFileName = urlPathName;
-          }
-          if (!deducedFileName.includes('.')) deducedFileName += '.png';
-          const currentCloudCard = pool.find((item) => isCloudBackedUpload(item) && item.src === url);
-          if (!currentCloudCard && localOnlyNames.has(deducedFileName)) {
-            const hash = new URL(url).pathname.split('/').filter(Boolean).at(-2) || `cloud-${index + 1}`;
-            const extensionIndex = deducedFileName.lastIndexOf('.');
-            deducedFileName = extensionIndex > 0
-              ? `${deducedFileName.slice(0, extensionIndex)} · ${hash}${deducedFileName.slice(extensionIndex)}`
-              : `${deducedFileName} · ${hash}`;
-          }
-          const file = new File([blob], safeFileName(deducedFileName), { type: blob.type });
-          return Object.assign(file, { src: url, id: currentCloudCard?.id || uid('cloud') });
-        } catch {
-          return null;
-        }
-      }))).filter(Boolean);
+      if (!validDirectoryFiles.length) {
+        setSaveStatus('saved');
+        notify('Workspace folder synchronization complete.', 'success');
+        return [];
+      }
 
-      if (!downloadedSyntheticFiles.length) throw new Error('All cloud image downloads failed.');
-      const addedIds = await addFiles(downloadedSyntheticFiles);
-      if (!addedIds.length) throw new Error('Cloud assets could not be registered locally.');
-      notify('Successfully synchronized with your cloud ledger.', 'success');
+      const addedIds = await addFiles(validDirectoryFiles);
+      if (!addedIds.length) throw new Error('Directory images could not be registered locally.');
+      notify('Workspace folder synchronization complete.', 'success');
       return addedIds;
     } catch (error) {
-      console.error('Clipboard cloud reconciliation failed:', error);
-      setSaveStatus('saved');
-      notify('Cloud synchronization failed. Verify the pasted image links and network connectivity.', 'error');
+      console.error('Local directory synchronization failed:', error);
+      setSaveStatus('error');
+      notify('Workspace folder synchronization failed. Verify local file access.', 'error');
       return [];
     }
   }, [pool, addFiles, notify]);
@@ -4283,7 +4204,6 @@ export default function CardBinder() {
           showBottomTimeline={showBottomTimeline}
           onToggleZenMode={handleToggleZenMode}
           saveStatus={saveStatus}
-          pool={pool}
           currencyDisplay={currencyDisplay}
           onToggleCurrency={() => setCurrencyDisplay((value) => value === 'SGD' ? 'USD' : 'SGD')}
           portfolioValueLabel={portfolioValueLabel}
@@ -4298,7 +4218,7 @@ export default function CardBinder() {
             images={images}
             inputRef={inputRef}
             uploadAndRegisterFiles={uploadAndRegisterFiles}
-            syncPoolFromRawDocumentText={syncPoolFromRawDocumentText}
+            syncPoolFromLocalDirectory={syncPoolFromLocalDirectory}
             onClearAllUploads={handleClearAllUploads}
             onClearAllBinderCards={handleClearAllBinderCards}
             handleRemoveCustomCard={handleRemoveCustomCard}

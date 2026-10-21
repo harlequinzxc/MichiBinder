@@ -2,20 +2,20 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.20.7
+## Current state — v4.21.0
 
 - **Ledger date:** 2026-10-22
-- **Application state entering this feature pass:** commit `1ab0e1f` / v4.20.6
+- **Application state entering this feature pass:** commit `8b3bb8d` / v4.20.7
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
 - **Primary source:** `src/CardBinder.jsx`, approximately 3,450 lines containing the data model, persistence, catalogue integration, interactions, print tree, and most UI components
 - **Supporting source:** `src/index.css` for Tailwind import, print media, page-turn depth, sleeve materials, portrait guard, and animations
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
-- **Network boundary:** TCGdex REST/API assets, ImgBB multipart uploads/CDN assets through a client-embedded API credential, ImgBB public-profile retrieval through AllOrigins, and the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, or required environment variable
+- **Network boundary:** TCGdex REST/API assets and the public open ExchangeRate-API USD feed; custom assets remain entirely local with no upload, proxy, scraper, manifest, or remote-sync request path; no MichiBinder backend, account, telemetry, or required environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** downstream ImgBB rehydration now parses pasted account-document text, authoritatively removes missing cloud-backed uploads and placements, preserves local-only assets, and streams the deduplicated live CDN set concurrently
-- **Last verified behavior:** production build, blank-cache four-asset clipboard ingestion, stale cloud pool/slot deletion, local-only preservation, invalid-paste recovery, zero-layout-shift textarea geometry, reload persistence, synchronized v4.20.7 title pill, and zero browser errors
+- **Last functional change:** Michi now mounts browser-native directory selections, filters system artifacts, bulk-ingests local images, and authoritatively removes custom assets and placements whose filenames disappeared from the selected folder
+- **Last verified behavior:** production build, blank-cache 24-image directory ingestion, stale custom pool/slot deletion, retained matching uploads and TCGdex placements, metadata-only empty-folder reconciliation, local manual upload storage, zero online cloud requests, synchronized v4.21.0 title pill, and zero browser errors
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## Strict SemVer policy and audit
@@ -34,7 +34,7 @@ The 2026-10-21 full-ledger audit confirmed the three post-inception major bounda
 2. **v3.0.0:** the toolbar/tray composition was dismantled and rebuilt as the four-area workspace with contextual bottom navigation.
 3. **v4.0.0:** top-heavy configuration controls were removed and replaced by the standalone right utility rail plus cohesive bottom structural controller.
 
-The audit also confirmed that presentation-only releases remain patches; capability releases such as TCGdex integration, source workspaces, valuation, upload deletion, print slicing, and first-unplaced tracking remain minors; and later fixes that complete those existing contracts remain patches. Specifically, v4.8.2 restored the Custom metric removed during v4.8.1 consolidation, while v4.11.1–v4.11.7 corrected lifecycle and print-slicing gaps in capabilities introduced by v4.11.0 and earlier print releases. Persistent per-tab scroll memory is a new stateful interaction and therefore begins v4.12.0 rather than v4.11.8; continuously measurable inactive-panel background scrolling is likewise a new cross-tab capability and begins v4.15.0; premium layout-aware prompt compilation and copy workflows begin v4.16.0, while their preview-format and prompt-copy corrections remain the v4.16.1 patch; remote public-asset ingestion begins v4.17.0, its replacement with bulk Imgur album deconstruction and concurrent streaming begins v4.18.0, the CORS-safe public-page scraper correction remains the v4.18.1 patch, cloud-first ImgBB upload interception begins v4.19.0, cross-device downstream ImgBB profile rehydration begins v4.20.0, the GridRip boundary-instruction correction remains the v4.20.1 patch, the cloud-control/header presentation correction remains the v4.20.2 patch, the downstream root-profile parser correction remains the v4.20.3 patch, the JSONP profile-loader correction remains the v4.20.4 patch, the device-ledger rehydration correction remains the v4.20.5 patch, the public-manifest registry correction remains the v4.20.6 patch, and the authoritative clipboard-reconciliation correction remains the v4.20.7 patch.
+The audit also confirmed that presentation-only releases remain patches; capability releases such as TCGdex integration, source workspaces, valuation, upload deletion, print slicing, and first-unplaced tracking remain minors; and later fixes that complete those existing contracts remain patches. Specifically, v4.8.2 restored the Custom metric removed during v4.8.1 consolidation, while v4.11.1–v4.11.7 corrected lifecycle and print-slicing gaps in capabilities introduced by v4.11.0 and earlier print releases. Persistent per-tab scroll memory is a new stateful interaction and therefore begins v4.12.0 rather than v4.11.8; continuously measurable inactive-panel background scrolling is likewise a new cross-tab capability and begins v4.15.0; premium layout-aware prompt compilation and copy workflows begin v4.16.0, while their preview-format and prompt-copy corrections remain the v4.16.1 patch; remote public-asset ingestion begins v4.17.0, its replacement with bulk Imgur album deconstruction and concurrent streaming begins v4.18.0, the CORS-safe public-page scraper correction remains the v4.18.1 patch, cloud-first ImgBB upload interception begins v4.19.0, cross-device downstream ImgBB profile rehydration begins v4.20.0, the GridRip boundary-instruction correction remains the v4.20.1 patch, the cloud-control/header presentation correction remains the v4.20.2 patch, the downstream root-profile parser correction remains the v4.20.3 patch, the JSONP profile-loader correction remains the v4.20.4 patch, the device-ledger rehydration correction remains the v4.20.5 patch, the public-manifest registry correction remains the v4.20.6 patch, and the authoritative clipboard-reconciliation correction remains the v4.20.7 patch. Browser-native authoritative directory mounting replaces the retired online custom-asset architecture as a new ingestion capability and therefore begins v4.21.0.
 
 Historical entries are ordered from oldest to newest. Commit links, rather than nonexistent retrospective Git tags, are the immutable references.
 
@@ -1410,6 +1410,26 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Verified immediate textarea clearing, unchanged panel dimensions during synchronization, removal of the manifest URL and Pull from Cloud controls, zero proxy/manifest requests, zero unexpected browser errors, unchanged runtime dependencies, and retained GridRip boundary instructions.
 - Rebuilt the production bundle and advanced package, lockfile, and title-pill metadata to v4.20.7.
 
+## [v4.21.0] — 2026-10-22
+
+### Added
+
+- Added `syncPoolFromLocalDirectory(fileListObjects)`, a strict pool-aware directory reconciler that flattens native file selections, filters `.DS_Store`, `Thumbs.db`, `desktop.ini`, AppleDouble artifacts, and non-image nodes, then forwards valid image batches through the existing IndexedDB/local-storage pipeline.
+- Added authoritative filename reconciliation for mounted directories: custom uploads absent from the selected folder are removed from the pool, binder placements, crops, selection/editing state, object-URL cache, history, and IndexedDB while matching custom IDs and every TCGdex asset remain intact.
+- Added a hidden multi-file `webkitdirectory`/`directory` picker, a self-resetting **Mount Local Hub Folder** trigger, and the compact **Asset Folder Connection / Native Disk Directory** panel beneath manual upload.
+- Added the settled global status **Local Hub Sync Active** with the requested zinc text and steady neutral indicator while preserving saving and failure precedence.
+
+### Removed
+
+- Removed the embedded ImgBB credential, multipart upload helper, remote-first manual picker/drop routing, profile/proxy scrapers, JSONP callbacks, manifest fetching, clipboard URL parsing, direct CDN downloads, cloud source IDs, CLOUD badges, and pool-aware cloud header overrides.
+- Removed every online custom-asset request path; manual picker/drop ingestion now writes native image files directly through `addFiles` without a network prerequisite.
+
+### Verified
+
+- Verified blank-cache mounting of 24 images in one directory selection, system-artifact rejection, exact-filename refresh, stale custom pool/slot deletion, matching custom-ID retention, TCGdex pool/placement retention, metadata-only empty-directory clearing, picker reset, and reload restoration at 1600×1000, 1366×768, and 1200×700.
+- Verified fixed panel dimensions during synchronization, exact directory attributes and CTA classes, all custom-card badges rendered LOCAL, local-hub header styling, zero ImgBB/AllOrigins/manifest requests, zero unexpected browser errors, unchanged runtime dependencies, and retained GridRip boundary instructions.
+- Advanced package, lockfile, and title-pill metadata to v4.21.0.
+
 ---
 
 ## Current architecture and engineering rationale
@@ -1472,7 +1492,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Local uploads are keyed by exact filename for replacement: a collision retains the custom asset ID, updates its binary/source URL, preserves every slot assignment, and remounts the corresponding inventory row through its dynamic image-source-length key.
 - Sidebar typography follows three semantic tiers: 12px medium actions/options, 11px secondary descriptions, and 9px uppercase semibold system context. TCGdex and upload counters are deliberate 10px text-only readout exceptions.
 - Search and Card set controls share a 36px height, neutral-950 surface, six-percent white border, six-pixel radius, 12px horizontal padding, six-pixel vertical padding, and 12px medium foreground. The set block sits 14px below search.
-- Michi's upload capsule uses a 20px Lucide upload glyph, 24px vertical padding, and neutral hairline hover treatment. A compact clipboard-sync panel sits directly beneath it; picker and native drop inputs upload concurrently before durable local ingestion, while a fixed 64px textarea immediately deconstructs pasted ImgBB account text and clears itself without shifting the panel. Each valid paste is authoritative for cloud-backed uploads: missing CDN entries and their placements are purged, local-only assets remain untouched, and the deduplicated direct `i.ibb.co` set streams concurrently without profile HTML, proxy gateways, manifests, or device-session state. Persisted source pointers drive fixed-footprint emerald CLOUD versus muted LOCAL badges without changing the grid geometry. Its zero-asset state is a three-column centered feature callout rather than an unstructured sentence.
+- Michi's upload capsule uses a 20px Lucide upload glyph, 24px vertical padding, and neutral hairline hover treatment. Manual picker and native drop inputs write image files directly to local persistence. A compact directory-hub panel sits beneath the capsule with a hidden self-resetting multi-file directory picker and fixed 32px mount action. Each selection is authoritative by exact custom-card filename: missing uploads and their placements are purged, matching IDs are refreshed, system metadata/non-images are ignored, and TCGdex assets remain untouched. Every custom card uses the fixed-footprint muted LOCAL badge. Its zero-asset state is a three-column centered feature callout rather than an unstructured sentence.
 
 ### Timeline, rail, and viewport boundaries
 
@@ -1497,7 +1517,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - IndexedDB is preferred for blobs and carries canonical TCGdex IDs alongside remote card blobs. Exact-filename custom replacement overwrites the existing keyed record; fallback records replace the same pool entry with a new data URL and canonical metadata.
 - Object URLs are tracked and revoked during reconciliation, replacement, deletion, reset, and unmount paths.
 - Undo/Redo is a 30-entry **canvas** history containing pages, active page, and layout. It intentionally excludes pool deletion/import, catalogue state, print scope, and most settings.
-- Save status is brief and asynchronous: `Saving...` appears only during persistence work, failure remains visible as `Save failed`, and settled state is pool-aware—neutral `Saved locally` for local-only data or emerald `Saved to Cloud` when an uploaded asset retains an ImgBB source.
+- Save status is brief and asynchronous: `Saving...` appears only during persistence work, failure remains visible as `Save failed`, and every settled state uses zinc `Local Hub Sync Active` with a steady neutral indicator.
 
 ### TCGdex contract
 
@@ -1562,8 +1582,8 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Cross-browser print calibration and installed-PWA lifecycle testing remain manual.
 - README's workspace/control description has not yet been brought in line with the latest rail menus.
 - Historical SemVer labels are not Git tags or GitHub Releases. Commit links remain the release evidence.
-- There is no MichiBinder account, collaboration, telemetry, backend, or environment-secret layer. ImgBB synchronization remains a client-side integration using the configured public credential and public-profile gateway.
-- The v4.20.7 authoritative ImgBB clipboard-reconciliation hotfix is complete; no active functional workspace task remains open.
+- There is no MichiBinder account, collaboration, telemetry, backend, environment-secret layer, or online custom-asset synchronization. Browser security requires the user to choose the local directory again for each authoritative refresh; no folder handle is retained.
+- The v4.21.0 browser-native local directory hub release is complete; no active functional workspace task remains open.
 
 ## Incoming engineer hand-off brief
 
