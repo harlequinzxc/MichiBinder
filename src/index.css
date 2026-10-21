@@ -113,6 +113,11 @@ img {
   height: 0;
 }
 
+.scroll-area[aria-label="Custom uploaded cards"] {
+  grid-auto-rows: max-content;
+  align-content: start;
+}
+
 /* 4. Physical-unit grid geometry. */
 .slot-area {
   grid-column: var(--col-start) / span var(--col-span);
