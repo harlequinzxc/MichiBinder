@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.20.1
+## Current state — v4.20.2
 
 - **Ledger date:** 2026-10-22
-- **Application state entering this feature pass:** commit `57b4091` / v4.20.0
+- **Application state entering this feature pass:** commit `4bda9e5` / v4.20.1
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,8 +14,8 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets, ImgBB multipart uploads/CDN assets through a client-embedded API credential, ImgBB public-profile retrieval through AllOrigins, and the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, or required environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** GridRip's 2×2 and shared 3×3/4×3 prompts now require dynamic outer-canvas expansion instead of enforcing fixed global aspect ratios
-- **Last verified behavior:** production build, exact replacement sentence in both generated GridRip branches, removal of both superseded global-canvas aspect-ratio instructions, synchronized v4.20.1 title pill, and unchanged prompt copy behavior
+- **Last functional change:** unclipped vertical ImgBB synchronization controls plus a pool-aware global persistence badge that distinguishes local and cloud-synced saved states
+- **Last verified behavior:** production build, exact stacked panel/control classes, six-pixel input/button separation, local-neutral to cloud-emerald header transition, persisted cloud status after reload, synchronized v4.20.2 title pill, and zero browser errors
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## Strict SemVer policy and audit
@@ -34,7 +34,7 @@ The 2026-10-21 full-ledger audit confirmed the three post-inception major bounda
 2. **v3.0.0:** the toolbar/tray composition was dismantled and rebuilt as the four-area workspace with contextual bottom navigation.
 3. **v4.0.0:** top-heavy configuration controls were removed and replaced by the standalone right utility rail plus cohesive bottom structural controller.
 
-The audit also confirmed that presentation-only releases remain patches; capability releases such as TCGdex integration, source workspaces, valuation, upload deletion, print slicing, and first-unplaced tracking remain minors; and later fixes that complete those existing contracts remain patches. Specifically, v4.8.2 restored the Custom metric removed during v4.8.1 consolidation, while v4.11.1–v4.11.7 corrected lifecycle and print-slicing gaps in capabilities introduced by v4.11.0 and earlier print releases. Persistent per-tab scroll memory is a new stateful interaction and therefore begins v4.12.0 rather than v4.11.8; continuously measurable inactive-panel background scrolling is likewise a new cross-tab capability and begins v4.15.0; premium layout-aware prompt compilation and copy workflows begin v4.16.0, while their preview-format and prompt-copy corrections remain the v4.16.1 patch; remote public-asset ingestion begins v4.17.0, its replacement with bulk Imgur album deconstruction and concurrent streaming begins v4.18.0, the CORS-safe public-page scraper correction remains the v4.18.1 patch, cloud-first ImgBB upload interception begins v4.19.0, cross-device downstream ImgBB profile rehydration begins v4.20.0, and the GridRip boundary-instruction correction remains the v4.20.1 patch.
+The audit also confirmed that presentation-only releases remain patches; capability releases such as TCGdex integration, source workspaces, valuation, upload deletion, print slicing, and first-unplaced tracking remain minors; and later fixes that complete those existing contracts remain patches. Specifically, v4.8.2 restored the Custom metric removed during v4.8.1 consolidation, while v4.11.1–v4.11.7 corrected lifecycle and print-slicing gaps in capabilities introduced by v4.11.0 and earlier print releases. Persistent per-tab scroll memory is a new stateful interaction and therefore begins v4.12.0 rather than v4.11.8; continuously measurable inactive-panel background scrolling is likewise a new cross-tab capability and begins v4.15.0; premium layout-aware prompt compilation and copy workflows begin v4.16.0, while their preview-format and prompt-copy corrections remain the v4.16.1 patch; remote public-asset ingestion begins v4.17.0, its replacement with bulk Imgur album deconstruction and concurrent streaming begins v4.18.0, the CORS-safe public-page scraper correction remains the v4.18.1 patch, cloud-first ImgBB upload interception begins v4.19.0, cross-device downstream ImgBB profile rehydration begins v4.20.0, the GridRip boundary-instruction correction remains the v4.20.1 patch, and the cloud-control/header presentation correction remains the v4.20.2 patch.
 
 Historical entries are ordered from oldest to newest. Commit links, rather than nonexistent retrospective Git tags, are the immutable references.
 
@@ -1311,6 +1311,21 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Verified the new boundary-expansion sentence occurs exactly twice and both obsolete final global-canvas aspect-ratio instructions are absent.
 - Reverified the generated and copied GridRip text for 2×2, 3×3, and 4×3 layouts, synchronized the title pill, and advanced package and lockfile metadata to v4.20.1.
 
+## [v4.20.2] — 2026-10-22
+
+### Fixed
+
+- Replaced the absolutely overlaid Sync Down action with a vertically stacked, full-width input and Pull from Cloud button separated by a deterministic six-pixel gap.
+- Shortened the username placeholder and increased the field/button heights to 32px, eliminating text overlap and clipping across supported desktop viewport heights.
+- Made the global save badge inspect the live pool: settled local-only state now remains neutral as “Saved locally,” while persisted ImgBB/ibb assets switch it to emerald “Saved to Cloud” with the matching indicator dot.
+- Routed the pool through `AppBar` and `SaveStatus` without changing any persistence writes, save timing, upload behavior, or cloud rehydration data structures.
+
+### Verified
+
+- Verified the exact requested panel, input, and full-width CTA classes, no legacy absolute action, and a measured six-pixel vertical control gap at 1600×1000, 1366×768, and 1200×700.
+- Verified local-only neutral header state, saving state, cloud-emerald settled state, persisted “Saved to Cloud” recovery after reload, synchronized v4.20.2 title pill, and zero browser errors.
+- Advanced package and lockfile metadata to v4.20.2.
+
 ---
 
 ## Current architecture and engineering rationale
@@ -1373,7 +1388,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Local uploads are keyed by exact filename for replacement: a collision retains the custom asset ID, updates its binary/source URL, preserves every slot assignment, and remounts the corresponding inventory row through its dynamic image-source-length key.
 - Sidebar typography follows three semantic tiers: 12px medium actions/options, 11px secondary descriptions, and 9px uppercase semibold system context. TCGdex and upload counters are deliberate 10px text-only readout exceptions.
 - Search and Card set controls share a 36px height, neutral-950 surface, six-percent white border, six-pixel radius, 12px horizontal padding, six-pixel vertical padding, and 12px medium foreground. The set block sits 14px below search.
-- Michi's upload capsule uses a 20px Lucide upload glyph, 24px vertical padding, and neutral hairline hover treatment. A compact ImgBB live-status panel sits directly beneath it; picker and native drop inputs upload concurrently before durable local ingestion, while the embedded username form can rehydrate a public profile through AllOrigins. Persisted source pointers drive fixed-footprint emerald CLOUD versus muted LOCAL badges without changing the grid geometry. Its zero-asset state is a three-column centered feature callout rather than an unstructured sentence.
+- Michi's upload capsule uses a 20px Lucide upload glyph, 24px vertical padding, and neutral hairline hover treatment. A compact ImgBB live-status panel sits directly beneath it; picker and native drop inputs upload concurrently before durable local ingestion, while the embedded username form vertically stacks full-width controls and can rehydrate a public profile through AllOrigins without overlap. Persisted source pointers drive fixed-footprint emerald CLOUD versus muted LOCAL badges without changing the grid geometry. Its zero-asset state is a three-column centered feature callout rather than an unstructured sentence.
 
 ### Timeline, rail, and viewport boundaries
 
@@ -1398,7 +1413,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - IndexedDB is preferred for blobs and carries canonical TCGdex IDs alongside remote card blobs. Exact-filename custom replacement overwrites the existing keyed record; fallback records replace the same pool entry with a new data URL and canonical metadata.
 - Object URLs are tracked and revoked during reconciliation, replacement, deletion, reset, and unmount paths.
 - Undo/Redo is a 30-entry **canvas** history containing pages, active page, and layout. It intentionally excludes pool deletion/import, catalogue state, print scope, and most settings.
-- Save status is brief and asynchronous: `Saving...` appears only during persistence work, then returns to `Saved locally`; failure remains visible as `Save failed`.
+- Save status is brief and asynchronous: `Saving...` appears only during persistence work, failure remains visible as `Save failed`, and settled state is pool-aware—neutral `Saved locally` for local-only data or emerald `Saved to Cloud` when an uploaded asset retains an ImgBB source.
 
 ### TCGdex contract
 
@@ -1464,7 +1479,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - README's workspace/control description has not yet been brought in line with the latest rail menus.
 - Historical SemVer labels are not Git tags or GitHub Releases. Commit links remain the release evidence.
 - There is no MichiBinder account, collaboration, telemetry, backend, or environment-secret layer. ImgBB synchronization remains a client-side integration using the configured public credential and public-profile gateway.
-- The v4.20.1 GridRip boundary-instruction release is complete; no active functional workspace task remains open.
+- The v4.20.2 cloud-control and global persistence-badge hotfix is complete; no active functional workspace task remains open.
 
 ## Incoming engineer hand-off brief
 

@@ -961,25 +961,28 @@ function SheetGrid({ page, card, gap, unit, dims, animate = false, renderSlot, g
   );
 }
 
-function SaveStatus({ status }) {
+function SaveStatus({ status, pool = [] }) {
   const saving = status === 'saving';
   const failed = status === 'error';
-  const label = failed ? 'Save failed' : saving ? 'Saving...' : 'Saved locally';
+  const hasCloudSync = pool.some(item => item.source === 'upload' && item.src && item.src.includes('imgbb.com'))
+    || pool.some((item) => item.source === 'upload' && item.src && item.src.includes('i.ibb.co'));
+  const savedToCloud = status === 'saved' && hasCloudSync;
+  const label = failed ? 'Save failed' : saving ? 'Saving...' : savedToCloud ? 'Saved to Cloud' : 'Saved locally';
   return (
     <div
       data-engine-badge
-      className={`shrink-0 text-xs flex items-center gap-1.5 ${failed ? 'font-medium text-red-300' : saving ? 'text-neutral-200 font-medium animate-pulse' : 'text-neutral-400 font-medium'}`}
+      className={`shrink-0 text-xs flex items-center gap-1.5 ${failed ? 'font-medium text-red-300' : saving ? 'text-neutral-200 font-medium animate-pulse' : savedToCloud ? 'text-emerald-400/90 font-medium' : 'text-neutral-400 font-medium'}`}
       aria-live="polite"
-      aria-label={`Local storage: ${label}`}
-      title="Local persistence status"
+      aria-label={`${savedToCloud ? 'Cloud storage' : 'Local storage'}: ${label}`}
+      title={savedToCloud ? 'Cloud persistence status' : 'Local persistence status'}
     >
-      <span className={`size-1.5 rounded-full ${failed ? 'bg-red-400' : saving ? 'bg-amber-400' : 'bg-emerald-400'} shadow-[0_0_8px_currentColor]`} />
+      <span className={`size-1.5 rounded-full ${failed ? 'bg-red-400' : saving ? 'bg-amber-400' : savedToCloud ? 'bg-emerald-400' : 'bg-neutral-500'} shadow-[0_0_8px_currentColor]`} />
       <span>{label}</span>
     </div>
   );
 }
 
-function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, onToggleZenMode, saveStatus, currencyDisplay, onToggleCurrency, portfolioValueLabel }) {
+function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, onToggleZenMode, saveStatus, pool, currencyDisplay, onToggleCurrency, portfolioValueLabel }) {
   const isZenMode = !isLeftSidebarOpen && !showBottomTimeline;
   const zenModeTitle = isZenMode ? 'Exit Focus Mode' : 'Enter Focus Mode';
 
@@ -999,9 +1002,9 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.20.1</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.20.2</span>
         </div>
-        <SaveStatus status={saveStatus} />
+        <SaveStatus status={saveStatus} pool={pool} />
       </div>
 
       <div className="flex shrink-0 items-center justify-end gap-2">
@@ -1496,14 +1499,13 @@ function CardPool({
             </span>
           </div>
 
-          <div className="mt-3 flex flex-col rounded-lg border border-white/[0.04] bg-neutral-950 p-2.5 shadow-inner">
-            <div className="flex items-center justify-between">
-              <div className="flex flex-col"><span className="text-[10px] font-semibold text-neutral-200">Persistent Cloud Backup</span><span className="text-[8px] font-medium text-neutral-500 font-mono tracking-wide uppercase">Active via ImgBB CDN</span></div>
-              <div className="flex items-center gap-1.5 text-[9px] font-bold text-emerald-400 font-sans tracking-wide uppercase"><span className="size-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_currentColor] animate-pulse" />Live</div>
-            </div>
-            <form className="relative" onSubmit={(e) => { e.preventDefault(); const val = e.currentTarget.elements.cloudUser.value; if(val.trim()){ pullAssetsFromImgBBCloud(val); e.currentTarget.reset(); } }}>
-              <input type="text" name="cloudUser" aria-label="ImgBB username" placeholder="Enter ImgBB username to sync custom assets down…" className="mt-2 h-7 w-full bg-neutral-900 border border-white/[0.06] rounded-md px-2 text-[11px] font-medium text-neutral-200 placeholder-neutral-600 focus:outline-none focus:ring-1 focus:ring-red-500/50" />
-              <button type="submit" className="absolute right-2 top-[22px] -translate-y-1/2 text-[9px] font-semibold uppercase tracking-wide text-neutral-500 transition-colors hover:text-emerald-400 focus:outline-none">Sync Down</button>
+          <div className="mt-3 flex flex-col gap-2 rounded-lg border border-white/[0.04] bg-neutral-950 p-2.5 shadow-inner">
+            <div className="flex items-center justify-between"><div className="flex flex-col"><span className="text-[10px] font-semibold text-neutral-200">Persistent Cloud Backup</span><span className="text-[8px] font-medium text-neutral-500 font-mono tracking-wide uppercase">Active via ImgBB CDN</span></div><div className="flex items-center gap-1.5 text-[9px] font-bold text-emerald-400 font-sans tracking-wide uppercase"><span className="size-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_currentColor] animate-pulse" />Live</div></div>
+            <form onSubmit={(e) => { e.preventDefault(); const val = e.currentTarget.elements.cloudUser.value; if(val.trim()){ pullAssetsFromImgBBCloud(val); e.currentTarget.reset(); } }}>
+              <div className="flex flex-col gap-1.5 w-full">
+                <input name="cloudUser" type="text" aria-label="ImgBB username" placeholder="Enter ImgBB username..." className="h-8 w-full bg-neutral-900 border border-white/[0.06] rounded-md px-2.5 text-xs font-medium text-neutral-200 placeholder-neutral-600 focus:outline-none focus:ring-1 focus:ring-red-500/50" />
+                <button type="submit" className="w-full h-8 flex items-center justify-center rounded-md bg-neutral-800 text-zinc-200 border border-white/[0.04] font-semibold text-xs transition-all hover:bg-neutral-700 active:scale-[0.98]">Pull from Cloud</button>
+              </div>
             </form>
           </div>
 
@@ -4233,6 +4235,7 @@ export default function CardBinder() {
           showBottomTimeline={showBottomTimeline}
           onToggleZenMode={handleToggleZenMode}
           saveStatus={saveStatus}
+          pool={pool}
           currencyDisplay={currencyDisplay}
           onToggleCurrency={() => setCurrencyDisplay((value) => value === 'SGD' ? 'USD' : 'SGD')}
           portfolioValueLabel={portfolioValueLabel}
