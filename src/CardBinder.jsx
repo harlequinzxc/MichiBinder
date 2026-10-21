@@ -124,8 +124,10 @@ const EUR_PER_USD_FALLBACK = 0.92;
 const IDB_NAME = 'digital-card-binder';
 const IDB_STORE = 'images';
 const IDB_HANDLE_STORE = 'directory-handles';
-const IDB_DIRECTORY_HANDLE_KEY = 'active-directory';
-const IDB_VERSION = 3;
+const LEGACY_DIRECTORY_HANDLE_KEY = 'active-directory';
+const BINDER_DIRECTORY_HANDLE_PREFIX = 'binder-directory:';
+const binderDirectoryHandleKey = (binderId) => `${BINDER_DIRECTORY_HANDLE_PREFIX}${binderId}`;
+const IDB_VERSION = 4;
 const HISTORY_LIMIT = 30;
 const SHEET_PAD = { top: 0.3, right: 0.3, bottom: 0.3, left: 0.62 };
 const THUMB_BOX = { w: 40, h: 40 * 1.414, pad: 3 };
@@ -677,10 +679,14 @@ const sanitizeBinderRecord = (value = {}, index = 0) => {
     };
   }) : [];
   const createdAt = typeof value.createdAt === 'string' ? value.createdAt : new Date().toISOString();
+  const id = typeof value.id === 'string' && value.id ? value.id : uid('binder');
+  const hasDirectoryHandle = typeof value.directoryHandleKey === 'string' && value.directoryHandleKey.length > 0;
   return {
-    id: typeof value.id === 'string' && value.id ? value.id : uid('binder'),
+    id,
     name: String(value.name || `Collection Binder ${index + 1}`).trim().slice(0, 80) || `Collection Binder ${index + 1}`,
     cardSet: typeof value.cardSet === 'string' ? value.cardSet : '',
+    directoryHandleKey: hasDirectoryHandle ? binderDirectoryHandleKey(id) : '',
+    directoryName: hasDirectoryHandle ? String(value.directoryName || '').slice(0, 180) : '',
     createdAt,
     updatedAt: typeof value.updatedAt === 'string' ? value.updatedAt : createdAt,
     currentPage: clamp(Math.floor(Number(value.currentPage) || 0), 0, pages.length - 1),
@@ -833,33 +839,49 @@ const idbDeleteBinderAssets = (binderId, assetIds) => idbDeleteMany([
   ...assetIds,
   ...assetIds.map((assetId) => binderImageRecordId(binderId, assetId)),
 ]);
-const idbGetDirectoryHandle = async () => {
+const idbGetDirectoryHandleRecords = async () => {
   const db = await getDB();
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(IDB_HANDLE_STORE, 'readonly');
-    const request = transaction.objectStore(IDB_HANDLE_STORE).get(IDB_DIRECTORY_HANDLE_KEY);
-    request.onsuccess = () => resolve(request.result?.handle || null);
-    request.onerror = () => reject(request.error || new Error('Could not read directory handle'));
+    const request = transaction.objectStore(IDB_HANDLE_STORE).getAll();
+    request.onsuccess = () => resolve(request.result || []);
+    request.onerror = () => reject(request.error || new Error('Could not read directory handles'));
   });
 };
-const idbPutDirectoryHandle = async (handle) => {
+const idbPutDirectoryHandle = async (binderId, handle) => {
   const db = await getDB();
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(IDB_HANDLE_STORE, 'readwrite');
-    transaction.objectStore(IDB_HANDLE_STORE).put({ id: IDB_DIRECTORY_HANDLE_KEY, handle });
+    transaction.objectStore(IDB_HANDLE_STORE).put({
+      id: binderDirectoryHandleKey(binderId),
+      binderId,
+      directoryName: String(handle?.name || ''),
+      handle,
+      updatedAt: Date.now(),
+    });
     transaction.oncomplete = () => resolve();
     transaction.onerror = () => reject(transaction.error || new Error('Could not store directory handle'));
     transaction.onabort = () => reject(transaction.error || new Error('Directory handle storage was aborted'));
   });
 };
-const idbDeleteDirectoryHandle = async () => {
+const idbDeleteDirectoryHandle = async (binderId) => {
   const db = await getDB();
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(IDB_HANDLE_STORE, 'readwrite');
-    transaction.objectStore(IDB_HANDLE_STORE).delete(IDB_DIRECTORY_HANDLE_KEY);
+    transaction.objectStore(IDB_HANDLE_STORE).delete(binderDirectoryHandleKey(binderId));
     transaction.oncomplete = () => resolve();
     transaction.onerror = () => reject(transaction.error || new Error('Could not delete directory handle'));
     transaction.onabort = () => reject(transaction.error || new Error('Directory handle deletion was aborted'));
+  });
+};
+const idbDeleteLegacyDirectoryHandle = async () => {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(IDB_HANDLE_STORE, 'readwrite');
+    transaction.objectStore(IDB_HANDLE_STORE).delete(LEGACY_DIRECTORY_HANDLE_KEY);
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error || new Error('Could not delete legacy directory handle'));
+    transaction.onabort = () => reject(transaction.error || new Error('Legacy directory handle deletion was aborted'));
   });
 };
 
@@ -1129,7 +1151,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.22.1</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.22.2</span>
         </div>
         <SaveStatus isFolderLinked={isFolderLinked} />
       </div>
@@ -1630,7 +1652,7 @@ function CardPool({
           </div>
 
           <div className="mt-3 flex flex-col gap-2 rounded-lg border border-white/[0.04] bg-neutral-950 p-2.5 shadow-inner">
-            <div className="flex items-center justify-between"><div className="flex flex-col"><span className="text-[10px] font-semibold text-neutral-200">Cloud-Free Storage</span><span className="text-[8px] font-medium text-neutral-500 font-mono tracking-wide uppercase">Custom Card Art Folder</span></div></div>
+            <div className="flex items-center justify-between"><div className="flex flex-col"><span className="text-xs font-semibold text-neutral-200">Cloud-Free Storage</span><span className="text-[9px] font-bold tracking-widest text-neutral-500 uppercase">CUSTOM CARD ART FOLDER</span></div></div>
             <input type="file" webkitdirectory="" directory="" multiple className="hidden" id="hub-directory-picker" onChange={(e) => { const files = Array.from(e.target.files || []); if(files.length) { syncPoolFromLocalDirectory(files); } e.target.value = ''; }} />
             <div className="flex flex-col gap-1.5 w-full" data-folder-link-actions>
               <button type="button" onClick={handleFolderAction} className="w-full h-8 flex items-center justify-center rounded-md bg-neutral-800 text-zinc-200 border border-white/[0.04] font-semibold text-xs transition-all hover:bg-neutral-700 active:scale-[0.98]">{isFolderLinked ? 'Sync' : 'Link Folder'}</button>
@@ -1913,8 +1935,11 @@ export default function CardBinder() {
   const [selectionAnchorId, setSelectionAnchorId] = useState(null);
   const [saveStatus, setSaveStatus] = useState('saved');
   const [storageMode, setStorageMode] = useState('indexeddb');
-  const [directoryHandle, setDirectoryHandle] = useState(null);
-  const isFolderLinked = Boolean(directoryHandle);
+  const [directoryHandles, setDirectoryHandles] = useState({});
+  const currentDirectoryHandle = directoryHandles[activeBinderId] || null;
+  const activeBinderRecord = binders.find((binder) => binder.id === activeBinderId) || null;
+  const activeBinder = activeBinderRecord ? { ...activeBinderRecord, directoryHandle: currentDirectoryHandle } : null;
+  const isFolderLinked = Boolean(activeBinder?.directoryHandle || currentDirectoryHandle);
   const [hydrated, setHydrated] = useState(false);
   const [toasts, setToasts] = useState([]);
   const [openPanel, setOpenPanel] = useState(null);
@@ -1986,23 +2011,65 @@ export default function CardBinder() {
 
   useEffect(() => {
     let live = true;
-    idbGetDirectoryHandle().then(async (handle) => {
-      if (!live || handle?.kind !== 'directory') return;
-      let permission = 'prompt';
+    (async () => {
       try {
-        permission = typeof handle.queryPermission === 'function'
-          ? await handle.queryPermission({ mode: 'read' })
-          : 'granted';
+        const records = await idbGetDirectoryHandleRecords();
+        const knownBinderIds = new Set(bindersRef.current.map((binder) => binder.id));
+        const initialActiveId = activeBinderIdRef.current;
+        const legacyRecord = records.find((record) => record.id === LEGACY_DIRECTORY_HANDLE_KEY && record.handle?.kind === 'directory');
+        const scopedRecords = records
+          .map((record) => ({
+            ...record,
+            binderId: record.binderId || (String(record.id || '').startsWith(BINDER_DIRECTORY_HANDLE_PREFIX)
+              ? String(record.id).slice(BINDER_DIRECTORY_HANDLE_PREFIX.length)
+              : ''),
+          }))
+          .filter((record) => record.handle?.kind === 'directory' && knownBinderIds.has(record.binderId));
+
+        if (legacyRecord && initialActiveId) {
+          if (!scopedRecords.some((record) => record.binderId === initialActiveId)) {
+            await idbPutDirectoryHandle(initialActiveId, legacyRecord.handle);
+            scopedRecords.push({ ...legacyRecord, binderId: initialActiveId, id: binderDirectoryHandleKey(initialActiveId) });
+          }
+          await idbDeleteLegacyDirectoryHandle().catch(() => {});
+        }
+
+        const hydratedHandles = {};
+        const hydratedNames = {};
+        for (const record of scopedRecords) {
+          let permission = 'prompt';
+          try {
+            permission = typeof record.handle.queryPermission === 'function'
+              ? await record.handle.queryPermission({ mode: 'read' })
+              : 'granted';
+          } catch {
+            permission = 'prompt';
+          }
+          if (permission === 'denied') {
+            await idbDeleteDirectoryHandle(record.binderId).catch(() => {});
+            continue;
+          }
+          hydratedHandles[record.binderId] = record.handle;
+          hydratedNames[record.binderId] = String(record.directoryName || record.handle.name || '');
+        }
+        if (!live) return;
+
+        setDirectoryHandles(hydratedHandles);
+        const nextBinders = bindersRef.current.map((binder) => {
+          const handle = hydratedHandles[binder.id];
+          const directoryHandleKey = handle ? binderDirectoryHandleKey(binder.id) : '';
+          const directoryName = handle ? hydratedNames[binder.id] : '';
+          return binder.directoryHandleKey === directoryHandleKey && binder.directoryName === directoryName
+            ? binder
+            : { ...binder, directoryHandleKey, directoryName, updatedAt: new Date().toISOString() };
+        });
+        bindersRef.current = nextBinders;
+        setBinders(nextBinders);
+        if (nextBinders.length) persistBinderRepository(nextBinders, activeBinderIdRef.current);
       } catch {
-        permission = 'prompt';
+        // Native handle hydration is optional; manual file ingestion remains available.
       }
-      if (!live) return;
-      if (permission === 'denied') {
-        await idbDeleteDirectoryHandle().catch(() => {});
-        return;
-      }
-      setDirectoryHandle(handle);
-    }).catch(() => {});
+    })();
     return () => { live = false; };
   }, []);
 
@@ -2134,6 +2201,29 @@ export default function CardBinder() {
     window.setTimeout(() => setToasts((items) => items.filter((item) => item.id !== id)), action ? 6500 : 3400);
   }, []);
 
+  const updateBinderDirectoryMetadata = useCallback((binderId, handle = null) => {
+    const currentActiveId = activeBinderIdRef.current;
+    const liveWorkspace = workspaceStateRef.current;
+    let nextBinders = bindersRef.current.map((binder) => (
+      binder.id === currentActiveId && liveWorkspace
+        ? serializeBinderWorkspace(binder, liveWorkspace)
+        : binder
+    ));
+    nextBinders = nextBinders.map((binder) => binder.id === binderId ? {
+      ...binder,
+      directoryHandleKey: handle ? binderDirectoryHandleKey(binderId) : '',
+      directoryName: handle ? String(handle.name || '').slice(0, 180) : '',
+      updatedAt: new Date().toISOString(),
+    } : binder);
+    bindersRef.current = nextBinders;
+    setBinders(nextBinders);
+    try {
+      persistBinderRepository(nextBinders, currentActiveId);
+    } catch {
+      notify('Folder state changed, but its binder record could not be saved.', 'error');
+    }
+  }, [notify]);
+
   const snapshotActiveBinder = useCallback((baseBinder) => serializeBinderWorkspace(baseBinder, {
     selectedSet,
     currentPage,
@@ -2256,6 +2346,8 @@ export default function CardBinder() {
         ...repositoryCandidate,
         id: uid('binder'),
         name: repositoryCandidate.name || fallbackName,
+        directoryHandleKey: '',
+        directoryName: '',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
@@ -2986,19 +3078,25 @@ export default function CardBinder() {
 
   const handleDirectorySync = useCallback(async () => {
     const targetBinderId = activeBinderIdRef.current;
-    if (!directoryHandle) {
-      notify('Choose a local asset folder before syncing.', 'warn');
+    const targetHandle = currentDirectoryHandle;
+    if (!targetHandle) {
+      notify('Choose a local card art folder before syncing.', 'warn');
       return [];
     }
     try {
-      const permitted = await ensureDirectoryReadPermission(directoryHandle);
+      const permitted = await ensureDirectoryReadPermission(targetHandle);
       if (!permitted) {
-        setDirectoryHandle(null);
-        await idbDeleteDirectoryHandle().catch(() => {});
-        notify('Folder access is required to synchronize local assets.', 'error');
+        setDirectoryHandles((value) => {
+          const next = { ...value };
+          delete next[targetBinderId];
+          return next;
+        });
+        updateBinderDirectoryMetadata(targetBinderId, null);
+        await idbDeleteDirectoryHandle(targetBinderId).catch(() => {});
+        notify('Folder access expired. Link the folder again to continue.', 'error');
         return [];
       }
-      const files = await collectDirectoryHandleFiles(directoryHandle);
+      const files = await collectDirectoryHandleFiles(targetHandle);
       if (activeBinderIdRef.current !== targetBinderId) {
         notify('Folder scan finished after the workspace changed. Sync again on the active binder.', 'info');
         return [];
@@ -3006,10 +3104,10 @@ export default function CardBinder() {
       return await syncPoolFromLocalDirectory(files);
     } catch (error) {
       console.error('Directory handle traversal failed:', error);
-      notify('Workspace folder synchronization failed. Reconnect the folder and try again.', 'error');
+      notify('Folder sync failed. Link the folder again and retry.', 'error');
       return [];
     }
-  }, [directoryHandle, ensureDirectoryReadPermission, collectDirectoryHandleFiles, syncPoolFromLocalDirectory, notify]);
+  }, [currentDirectoryHandle, ensureDirectoryReadPermission, collectDirectoryHandleFiles, syncPoolFromLocalDirectory, updateBinderDirectoryMetadata, notify]);
 
   const handleDirectoryConnect = useCallback(async () => {
     const targetBinderId = activeBinderIdRef.current;
@@ -3021,8 +3119,9 @@ export default function CardBinder() {
       const handle = await window.showDirectoryPicker({ mode: 'read' });
       const permitted = await ensureDirectoryReadPermission(handle);
       if (!permitted) throw new Error('Directory read permission was not granted.');
-      await idbPutDirectoryHandle(handle);
-      setDirectoryHandle(handle);
+      await idbPutDirectoryHandle(targetBinderId, handle);
+      setDirectoryHandles((value) => ({ ...value, [targetBinderId]: handle }));
+      updateBinderDirectoryMetadata(targetBinderId, handle);
       const files = await collectDirectoryHandleFiles(handle);
       if (activeBinderIdRef.current !== targetBinderId) {
         notify('Folder connected. Sync again to import it into the active binder.', 'info');
@@ -3032,28 +3131,34 @@ export default function CardBinder() {
     } catch (error) {
       if (error?.name === 'AbortError') return [];
       console.error('Directory connection failed:', error);
-      notify('Could not connect the selected folder.', 'error');
+      notify('Could not link the selected folder.', 'error');
       return [];
     }
-  }, [ensureDirectoryReadPermission, collectDirectoryHandleFiles, syncPoolFromLocalDirectory, notify]);
+  }, [ensureDirectoryReadPermission, collectDirectoryHandleFiles, syncPoolFromLocalDirectory, updateBinderDirectoryMetadata, notify]);
 
   const handleFolderAction = useCallback(() => (
-    directoryHandle ? handleDirectorySync() : handleDirectoryConnect()
-  ), [directoryHandle, handleDirectorySync, handleDirectoryConnect]);
+    currentDirectoryHandle ? handleDirectorySync() : handleDirectoryConnect()
+  ), [currentDirectoryHandle, handleDirectorySync, handleDirectoryConnect]);
 
   const handleDisconnectFolder = useCallback(async () => {
-    setDirectoryHandle(null);
+    const targetBinderId = activeBinderIdRef.current;
+    setDirectoryHandles((value) => {
+      const next = { ...value };
+      delete next[targetBinderId];
+      return next;
+    });
+    updateBinderDirectoryMetadata(targetBinderId, null);
     setSaveStatus('saved');
     const picker = document.getElementById('hub-directory-picker');
     if (picker) picker.value = '';
     try {
-      await idbDeleteDirectoryHandle();
+      await idbDeleteDirectoryHandle(targetBinderId);
       notify('Folder disconnected. Workspace assets were preserved.', 'info');
     } catch (error) {
       console.error('Directory handle unlink failed:', error);
       notify('Folder disconnected locally, but its cached permission token could not be removed.', 'error');
     }
-  }, [notify]);
+  }, [updateBinderDirectoryMetadata, notify]);
 
   const importFetchedCard = useCallback(async (item, highResImageUrl, options = {}) => {
     const targetBinderId = activeBinderIdRef.current;
@@ -4753,7 +4858,6 @@ export default function CardBinder() {
     </div>
   );
 
-  const activeBinder = binders.find((binder) => binder.id === activeBinderId) || null;
   const toastTones = {
     info: 'border-zinc-700 bg-[#18181B] text-zinc-100',
     success: 'border-emerald-400/25 bg-emerald-950 text-emerald-100',
@@ -5004,7 +5108,7 @@ export default function CardBinder() {
                 <div>
                   <p className="mb-1 font-mono text-[9px] font-bold uppercase tracking-[0.22em] text-red-400">Workspace activation</p>
                   <h2 id="binder-wizard-title" className="text-xl font-semibold tracking-tight text-white">Create your binder</h2>
-                  <p className="mt-1 text-xs leading-relaxed text-neutral-400">Name your collection and configure its private canvas.</p>
+                  <p className="mt-1 text-xs leading-relaxed text-neutral-400">Give your binder a name and choose a pocket size.</p>
                 </div>
                 {binders.length > 0 && (
                   <button type="button" onClick={() => setIsBinderWizardOpen(false)} aria-label="Close binder creator" className="grid size-8 shrink-0 place-items-center rounded-lg text-neutral-500 transition-colors hover:bg-white/[0.05] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><X size={15} /></button>
@@ -5013,12 +5117,12 @@ export default function CardBinder() {
 
               <div className="space-y-4">
                 <label className="block">
-                  <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-neutral-400">Binder title</span>
+                  <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-neutral-400">Binder Title</span>
                   <input name="binderName" type="text" required autoFocus maxLength={80} placeholder="My Collection Binder" className="h-9 w-full rounded-lg border border-white/[0.08] bg-neutral-950 px-3 text-xs text-white outline-none transition-colors placeholder:text-neutral-700 focus:border-red-500/60 focus:ring-2 focus:ring-red-500/15" />
                 </label>
 
                 <fieldset>
-                  <legend className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-neutral-400">Pocket grid</legend>
+                  <legend className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-neutral-400">Pocket Grid</legend>
                   <div className="grid grid-cols-3 gap-2">
                     {GRID_LAYOUTS.map((grid) => (
                       <label key={grid.id} className="cursor-pointer">
@@ -5034,11 +5138,11 @@ export default function CardBinder() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <label className="block">
-                    <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-neutral-400">Page count</span>
+                    <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-neutral-400">Page Count</span>
                     <input name="pages" type="number" min="1" max="100" defaultValue="20" required className="h-9 w-full rounded-lg border border-white/[0.08] bg-neutral-950 px-3 font-mono text-xs text-white outline-none transition-colors focus:border-red-500/60 focus:ring-2 focus:ring-red-500/15" />
                   </label>
                   <label className="block min-w-0">
-                    <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-neutral-400">Card set</span>
+                    <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-neutral-400">Card Set</span>
                     <select name="cardSet" defaultValue="" className="h-9 w-full rounded-lg border border-white/[0.08] bg-neutral-950 px-2.5 text-xs text-white outline-none transition-colors focus:border-red-500/60 focus:ring-2 focus:ring-red-500/15">
                       <option value="">Manual / Custom</option>
                       {setsList.map((set) => <option key={set.id} value={set.id}>{set.name}</option>)}
@@ -5050,7 +5154,7 @@ export default function CardBinder() {
                   <div className="flex items-center justify-between gap-4">
                     <div className="min-w-0">
                       <p className="text-[10px] font-semibold text-neutral-300">Restore a JSON backup</p>
-                      <p className="mt-0.5 text-[9px] leading-relaxed text-neutral-600">Import a saved binder instead of starting blank.</p>
+                      <p className="mt-0.5 text-[9px] leading-relaxed text-neutral-600">Restore from backup file</p>
                     </div>
                     <button type="button" onClick={() => document.getElementById('wizard-backup-picker')?.click()} className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-white/[0.08] bg-neutral-800 px-2.5 text-[10px] font-semibold text-neutral-300 transition-colors hover:bg-neutral-700 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Upload size={12} /> Restore</button>
                     <input id="wizard-backup-picker" type="file" accept="application/json,.json" className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (file) handleWizardJsonImport(file); }} />
