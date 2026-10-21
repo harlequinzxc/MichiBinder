@@ -1002,7 +1002,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.20.6</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.20.7</span>
         </div>
         <SaveStatus status={saveStatus} pool={pool} />
       </div>
@@ -1364,7 +1364,7 @@ function CardPool({
   images,
   inputRef,
   uploadAndRegisterFiles,
-  pullAssetsFromImgBBCloud,
+  syncPoolFromRawDocumentText,
   onClearAllUploads,
   onClearAllBinderCards,
   handleRemoveCustomCard,
@@ -1500,13 +1500,8 @@ function CardPool({
           </div>
 
           <div className="mt-3 flex flex-col gap-2 rounded-lg border border-white/[0.04] bg-neutral-950 p-2.5 shadow-inner">
-            <div className="flex items-center justify-between"><div className="flex flex-col"><span className="text-[10px] font-semibold text-neutral-200">Persistent Cloud Backup</span><span className="text-[8px] font-medium text-neutral-500 font-mono tracking-wide uppercase">Active via ImgBB CDN</span></div><div className="flex items-center gap-1.5 text-[9px] font-bold text-emerald-400 font-sans tracking-wide uppercase"><span className="size-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_currentColor] animate-pulse" />Live</div></div>
-            <form onSubmit={(e) => { e.preventDefault(); const val = e.currentTarget.elements.cloudManifest.value; if(val.trim()){ pullAssetsFromImgBBCloud(val); e.currentTarget.reset(); } }}>
-              <div className="flex flex-col gap-1.5 w-full">
-                <input name="cloudManifest" type="text" aria-label="Public cloud manifest URL" placeholder="Paste your public manifest URL..." className="h-8 w-full bg-neutral-900 border border-white/[0.06] rounded-md px-2.5 text-xs font-medium text-neutral-200 placeholder-neutral-600 focus:outline-none focus:ring-1 focus:ring-red-500/50" />
-                <button type="submit" className="w-full h-8 flex items-center justify-center rounded-md bg-neutral-800 text-zinc-200 border border-white/[0.04] font-semibold text-xs transition-all hover:bg-neutral-700 active:scale-[0.98]">Pull from Cloud</button>
-              </div>
-            </form>
+            <div className="flex items-center justify-between"><div className="flex flex-col"><span className="text-[10px] font-semibold text-neutral-200">Persistent Cloud Backup</span><span className="text-[8px] font-medium text-neutral-500 font-mono tracking-wide uppercase">Real-Time Clipboard Sync</span></div></div>
+            <textarea aria-label="Raw ImgBB account document" placeholder="Click here and press Ctrl+V to paste your raw ImgBB account page dump..." className="h-16 w-full resize-none bg-neutral-900 border border-white/[0.06] rounded-md p-2 text-[11px] font-medium text-neutral-200 placeholder-neutral-600 focus:outline-none focus:ring-1 focus:ring-red-500/50" onChange={(e) => { if(e.target.value.trim()) { syncPoolFromRawDocumentText(e.target.value); e.target.value = ''; } }} />
           </div>
 
           <div className="mt-3 mb-2 flex items-center justify-between border-b border-white/[0.04] px-1 py-1.5 select-none">
@@ -2502,24 +2497,76 @@ export default function CardBinder() {
     }
   }, [addFiles, notify]);
 
-  const pullAssetsFromImgBBCloud = useCallback(async (manifestUrlString) => {
+  const syncPoolFromRawDocumentText = useCallback(async (rawTextPayload) => {
     setSaveStatus('saving');
-    notify('Streaming remote cloud asset matrix…', 'info');
+    notify('Parsing cloud document matrix…', 'info');
 
     try {
-      const manifestUrl = String(manifestUrlString || '').trim();
-      const response = await fetch(manifestUrl);
-      if (!response.ok) throw new Error(`Cloud manifest request failed with status ${response.status}.`);
-
-      const dataText = await response.text();
-      const directImageRegex = /https:\/\/i\.ibb\.co\/[a-zA-Z0-9]+\/[^\s"'<>\\]+?\.(?:png|jpg|jpeg|webp)(?:\?[^\s"'<>\\]*)?/gi;
-      const parsedUrls = (dataText.match(directImageRegex) || []).filter(Boolean);
+      const directImageRegex = /https:\/\/i\.ibb\.co\/[a-zA-Z0-9]+\/[^"']+\.(?:png|jpg|jpeg|webp)/g;
+      const boundedImageRegex = /https:\/\/i\.ibb\.co\/[a-zA-Z0-9]+\/[^\s"'<>\\]+?\.(?:png|jpg|jpeg|webp)/gi;
+      const parsedFragments = String(rawTextPayload || '').match(directImageRegex) || [];
+      const parsedUrls = parsedFragments.flatMap((fragment) => fragment.match(boundedImageRegex) || []).filter(Boolean);
       const uniqueUrls = [...new Set(parsedUrls)];
 
       if (uniqueUrls.length === 0) {
         setSaveStatus('saved');
-        notify('No active cloud cards tracked in this manifest index.', 'warn');
+        notify('No active image links detected in the pasted text.', 'error');
         return [];
+      }
+
+      const authoritativeUrls = new Set(uniqueUrls);
+      const isCloudBackedUpload = (item) => (
+        item.source === 'upload'
+        && typeof item.src === 'string'
+        && (item.src.includes('imgbb.com') || item.src.includes('i.ibb.co'))
+      );
+      const staleCloudIds = pool
+        .filter((item) => isCloudBackedUpload(item) && !authoritativeUrls.has(item.src))
+        .map((item) => item.id);
+      const localOnlyNames = new Set(pool
+        .filter((item) => item.source === 'upload' && !isCloudBackedUpload(item))
+        .map((item) => item.name)
+        .filter(Boolean));
+
+      if (staleCloudIds.length) {
+        const staleIdSet = new Set(staleCloudIds);
+        const nextPool = pool.filter((item) => !staleIdSet.has(item.id));
+        const validIds = new Set(nextPool.map((item) => item.id));
+        const nextPages = pruneMissingImages(pagesRef.current, validIds);
+
+        setPool(nextPool);
+        pagesRef.current = nextPages;
+        setPages(nextPages);
+        historyRestoreTimerRef.current.forEach((timer) => window.clearTimeout(timer));
+        historyRestoreTimerRef.current = [];
+        pastRef.current = [];
+        futureRef.current = [];
+        setSelectedCardIds((value) => value.filter((id) => !staleIdSet.has(id)));
+        setSelectionAnchorId((value) => staleIdSet.has(value) ? null : value);
+        setSelBox(null);
+        setSelectionPageId(null);
+        if (editingRef.current && staleIdSet.has(editingRef.current.imgId)) {
+          editingRef.current = null;
+          setEditing(null);
+        }
+        staleCloudIds.forEach((id) => sessionIdsRef.current.delete(id));
+        setImages((value) => {
+          const next = { ...value };
+          staleCloudIds.forEach((id) => {
+            const imageUrl = next[id];
+            if (imageUrl?.startsWith('blob:')) {
+              URL.revokeObjectURL(imageUrl);
+              objectUrlsRef.current.delete(imageUrl);
+            }
+            delete next[id];
+          });
+          return next;
+        });
+        try {
+          await idbDeleteMany(staleCloudIds);
+        } catch {
+          // Orphaned binary records are ignored when their pool entries are absent.
+        }
       }
 
       const downloadedSyntheticFiles = (await Promise.all(uniqueUrls.map(async (url, index) => {
@@ -2529,26 +2576,40 @@ export default function CardBinder() {
           const blob = await fileResponse.blob();
           if (!blob.type?.startsWith('image/')) return null;
           const urlPathName = new URL(url).pathname.split('/').filter(Boolean).pop() || `cloud-card-${index}`;
-          const deducedFileName = urlPathName.includes('.') ? urlPathName : `${urlPathName}.png`;
+          let deducedFileName;
+          try {
+            deducedFileName = decodeURIComponent(urlPathName);
+          } catch {
+            deducedFileName = urlPathName;
+          }
+          if (!deducedFileName.includes('.')) deducedFileName += '.png';
+          const currentCloudCard = pool.find((item) => isCloudBackedUpload(item) && item.src === url);
+          if (!currentCloudCard && localOnlyNames.has(deducedFileName)) {
+            const hash = new URL(url).pathname.split('/').filter(Boolean).at(-2) || `cloud-${index + 1}`;
+            const extensionIndex = deducedFileName.lastIndexOf('.');
+            deducedFileName = extensionIndex > 0
+              ? `${deducedFileName.slice(0, extensionIndex)} · ${hash}${deducedFileName.slice(extensionIndex)}`
+              : `${deducedFileName} · ${hash}`;
+          }
           const file = new File([blob], safeFileName(deducedFileName), { type: blob.type });
-          return Object.assign(file, { src: url, id: uid('cloud') });
+          return Object.assign(file, { src: url, id: currentCloudCard?.id || uid('cloud') });
         } catch {
           return null;
         }
       }))).filter(Boolean);
 
-      if (!downloadedSyntheticFiles.length) throw new Error('All image streaming paths failed.');
+      if (!downloadedSyntheticFiles.length) throw new Error('All cloud image downloads failed.');
       const addedIds = await addFiles(downloadedSyntheticFiles);
       if (!addedIds.length) throw new Error('Cloud assets could not be registered locally.');
-      notify(`Successfully rehydrated ${downloadedSyntheticFiles.length} custom cloud assets.`, 'success');
+      notify('Successfully synchronized with your cloud ledger.', 'success');
       return addedIds;
     } catch (error) {
-      console.error('Cloud manifest rehydration failed:', error);
+      console.error('Clipboard cloud reconciliation failed:', error);
       setSaveStatus('saved');
-      notify('Cloud rehydration failed. Verify manifest access and network connectivity.', 'error');
+      notify('Cloud synchronization failed. Verify the pasted image links and network connectivity.', 'error');
       return [];
     }
-  }, [addFiles, notify]);
+  }, [pool, addFiles, notify]);
 
   const importFetchedCard = useCallback(async (item, highResImageUrl, options = {}) => {
     hydrateCardPrice(item.id, item);
@@ -4237,7 +4298,7 @@ export default function CardBinder() {
             images={images}
             inputRef={inputRef}
             uploadAndRegisterFiles={uploadAndRegisterFiles}
-            pullAssetsFromImgBBCloud={pullAssetsFromImgBBCloud}
+            syncPoolFromRawDocumentText={syncPoolFromRawDocumentText}
             onClearAllUploads={handleClearAllUploads}
             onClearAllBinderCards={handleClearAllBinderCards}
             handleRemoveCustomCard={handleRemoveCustomCard}
