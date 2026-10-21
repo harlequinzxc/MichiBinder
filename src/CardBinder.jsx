@@ -112,6 +112,14 @@ const round2 = (value) => Math.round(value * 100) / 100;
 const fmtMm = (inches) => (inches * 25.4).toFixed(1);
 const fmtPct = (factor) => (factor >= 0.9999 ? '100%' : `${Math.floor(factor * 1000) / 10}%`);
 const plural = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`;
+const scrollToNextUnplacedCard = (containerSelector, itemAttribute) => {
+  requestAnimationFrame(() => {
+    const container = document.querySelector(containerSelector);
+    if (!container) return;
+    const nextTarget = container.querySelector(`[${itemAttribute}]:not([data-placed])`);
+    if (nextTarget) nextTarget.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+};
 const uid = (prefix = 'id') => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
 const keyOf = (row, col) => `${row}-${col}`;
 const isEditableTarget = (element) => Boolean(element?.matches?.('input, textarea, select, [contenteditable="true"]'));
@@ -1300,6 +1308,8 @@ function CardPool({
     if (tab === activeTab) return;
     onClearSelection();
     setActiveTab(tab);
+    if (tab === 'cards') setTimeout(() => scrollToNextUnplacedCard('[data-tcgdex-results]', 'data-tcgdex-card'), 60);
+    if (tab === 'michi') setTimeout(() => scrollToNextUnplacedCard('[role="listbox"][aria-label*="Custom"]', 'data-local-card'), 60);
   };
   return (
     <aside
@@ -1473,6 +1483,7 @@ function CardPool({
                       <div
                         key={item.id}
                         data-tcgdex-card={item.id}
+                        data-placed={isPlacedInBinder ? '' : undefined}
                         role="option"
                         ref={(node) => {
                           if (!node || node.dataset.catalogEntrance) return;
@@ -2211,7 +2222,11 @@ export default function CardBinder() {
       if (!blob.type?.startsWith('image/')) throw new Error('TCGdex returned a non-image asset');
       const file = new File([blob], `${safeFileName(item.name)} · ${safeFileName(item.id)}.jpg`, { type: blob.type || 'image/jpeg' });
       const ids = await addFiles([file], { source: 'tcgdex', tcgdexId: item.id, silent: options.silent });
-      if (ids.length) return ids;
+      if (ids.length) {
+        if (activeTab === 'cards') scrollToNextUnplacedCard('[data-tcgdex-results]', 'data-tcgdex-card');
+        if (activeTab === 'michi') scrollToNextUnplacedCard('[role="listbox"][aria-label*="Custom"]', 'data-local-card');
+        return ids;
+      }
     } catch {
       // Some privacy extensions block cross-origin blob downloads. The live CDN URL
       // still remains a valid, persistable source for the binder and print views.
@@ -2220,9 +2235,11 @@ export default function CardBinder() {
     sessionIdsRef.current.add(id);
     setImages((value) => ({ ...value, [id]: source }));
     setPool((value) => [...value, { id, name: item.name || 'Pokémon card', source: 'tcgdex', src: source, tcgdexId: String(item.id) }]);
+    if (activeTab === 'cards') scrollToNextUnplacedCard('[data-tcgdex-results]', 'data-tcgdex-card');
+    if (activeTab === 'michi') scrollToNextUnplacedCard('[role="listbox"][aria-label*="Custom"]', 'data-local-card');
     if (!options.silent) notify(`${item.name || 'Pokémon card'} added from TCGdex.`, 'success');
     return [id];
-  }, [addFiles, hydrateCardPrice, notify]);
+  }, [activeTab, addFiles, hydrateCardPrice, notify]);
 
   const importFetchedCards = useCallback(async (cards) => {
     if (!cards?.length) return [];
@@ -2446,12 +2463,14 @@ export default function CardBinder() {
     if (!ids?.length) return;
     commitEditing();
     let result;
-    applyCanvasChange((value) => {
+    const canvasChange = applyCanvasChange((value) => {
       result = applyPlacement(value, ids, pageIndex, startKey, dimsRef.current);
       return result.pages;
     });
     setSelectedCardIds([]);
     setSelectionAnchorId(null);
+    if (canvasChange.changed && activeTab === 'cards') scrollToNextUnplacedCard('[data-tcgdex-results]', 'data-tcgdex-card');
+    if (canvasChange.changed && activeTab === 'michi') scrollToNextUnplacedCard('[role="listbox"][aria-label*="Custom"]', 'data-local-card');
     requestAnimationFrame(() => {
       if (!result) return;
       const flowed = result.targets.filter((target) => target.pageIndex > pageIndex).length;
@@ -2460,7 +2479,7 @@ export default function CardBinder() {
       if (result.created) message += ` (${plural(result.created, 'new page')})`;
       notify(message, 'success');
     });
-  }, [commitEditing, applyCanvasChange, notify]);
+  }, [commitEditing, applyCanvasChange, activeTab, notify]);
 
   const addFetchedCardToPage = useCallback(async (item, highResImageUrl) => {
     const ids = await importFetchedCard(item, highResImageUrl);
@@ -2490,7 +2509,7 @@ export default function CardBinder() {
 
   const moveSlotCard = useCallback((payload, targetPageIndex, targetKey = null) => {
     commitEditing();
-    applyCanvasChange((value) => {
+    const canvasChange = applyCanvasChange((value) => {
       const sourceIndex = value.findIndex((page) => page.id === payload.pageId);
       if (sourceIndex < 0) return value;
       const sourcePage = value[sourceIndex];
@@ -2516,7 +2535,9 @@ export default function CardBinder() {
       else next[targetPageIndex].crops[destinationKey] = { img: payload.imgId, ...sourceCrop };
       return next;
     });
-  }, [commitEditing, applyCanvasChange, notify]);
+    if (canvasChange.changed && activeTab === 'cards') scrollToNextUnplacedCard('[data-tcgdex-results]', 'data-tcgdex-card');
+    if (canvasChange.changed && activeTab === 'michi') scrollToNextUnplacedCard('[role="listbox"][aria-label*="Custom"]', 'data-local-card');
+  }, [commitEditing, applyCanvasChange, activeTab, notify]);
 
   const makeDragGhost = useCallback((event, ids) => {
     try {
