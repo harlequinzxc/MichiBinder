@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.12.2
+## Current state — v4.13.0
 
 - **Ledger date:** 2026-10-21
-- **Application state entering this feature pass:** commit `f9d2d05` / v4.12.1
+- **Application state entering this feature pass:** commit `d7b76bd` / v4.12.2
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,8 +14,8 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets plus the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, required secret, or environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** fresh-upload top alignment plus uniform high-contrast Cards/Michi selection frames and collision-free index badges
-- **Last verified behavior:** production build, three-viewport fresh-upload targeting, alphanumeric top placement, matching selected/unselected frame states, separated custom delete/index controls, synchronized v4.12.2 title pill, and zero browser errors
+- **Last functional change:** immediate print-scope execution, unified 288px rail popovers, embedded horizontal card scaling, centered crop guidance, and a three-template AI prompt copy studio
+- **Last verified behavior:** production build, three-viewport centered reposition badge geometry, direct all/custom print calls, 288px rail panels, scale/change/reset flow, all three clipboard templates and success toasts, synchronized v4.13.0 title pill, and zero browser errors
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## Strict SemVer policy and audit
@@ -1061,6 +1061,27 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Verified the synchronized `v4.12.2` title pill and zero browser errors at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.12.2.
 
+## [v4.13.0] — 2026-10-21
+
+### Added
+
+- Added an **AI Prompt Generator** rail tool with dedicated InPaint, Restyle, and GridRip templates, disabled read-only prompt fields, compact Lucide copy controls, Clipboard API writes, and success/error toast feedback.
+
+### Changed
+
+- Made both Print Scope choices select their scope and launch the main print routine automatically after the requested 50ms state-settling delay; validation reads the latest compiled scope through a shared ref rather than a stale click-time closure.
+- Expanded the shared rail popover footprint from 224px/40vh to 288px/50vh so print, layout, material, shortcut, and prompt content retain readable non-wrapping lines.
+- Removed the standalone scale trigger and vertical scale dialog; Card size now owns a horizontal 80–125% range, inline percentage heading, endpoint parameters, double-click reset, and compact reset control directly below its preset selector.
+- Centered the active crop-reposition announcement on both axes with the supplied amber capsule geometry and visual treatment.
+
+### Verified
+
+- Verified exact crop-badge centering with at most 0.008px rounding drift, direct one-card Uploads Only and two-card Include All print invocations, and 288px Print, Card size, and AI tool popovers.
+- Verified the embedded card scale changes from 100% to 110% and resets to 100%, with no standalone scale trigger or vertical range remaining.
+- Verified all three prompt values, disabled prompt fields, Clipboard API payloads, corresponding success toasts, the synchronized `v4.13.0` title pill, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
+- Reverified four-page dynamic custom output with all 32 slices, merged horizontal/2×2/3×3 print slicing, catalogue scroll memory, lookahead/removal targeting, fresh-upload alignment, and uniform catalogue selection frames.
+- Advanced package and lockfile metadata to v4.13.0.
+
 ---
 
 ## Current architecture and engineering rationale
@@ -1130,8 +1151,9 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - The source sidebar consumes width when open; the right-side main tree receives the remainder.
 - The preview surface is one flex row containing the scrollable stage and detached rail. The stage stops at the rail's left edge, including the rail padding zone; the surface permits overflow so rail dialogs can overlay lower workspace bands while the main workspace remains the outer clip boundary.
 - The rail has no full-height edge divider and no `self-start`; its outer box is vertically centered against the **live preview surface**, not the complete main column. Collapsing the timeline changes preview height, so the rail's vertical center moves.
-- The rail begins with Print / PDF, Print setup, then Grid selection. Print setup uses `FileSliders`; Card size uses `RulerDimensionLine` and exposes its selector without a redundant archetype caption.
-- Every rail dialog is absolutely anchored at `right-full mr-3 top-0` relative to its trigger. Panels cap at 40vh and scroll internally when their content is longer.
+- The rail begins with Print / PDF, Print setup, then Grid selection. Print Scope choices immediately launch their selected compilation; Print setup uses `FileSliders`; Card size uses `RulerDimensionLine` and owns both its preset selector and horizontal 80–125% scale controls.
+- Keyboard shortcuts are followed by AI Prompt Generator, whose InPaint, Restyle, and GridRip cards copy fixed templates through the Clipboard API and report the result through standard toasts.
+- Every rail dialog is absolutely anchored at `right-full mr-3 top-0` relative to its trigger. Panels use a uniform 288px width, cap at 50vh, and scroll internally when their content is longer.
 - Database/Custom/Density is absolutely anchored to the preview bottom edge. It uses the self-hosted Inter sans stack and is not part of the timeline or bottom controller flow.
 - The bottom controller owns Undo/Redo, Merge/Unmerge/reset/clear, spread navigation, Add, Duplicate, Delete, and timeline toggle. One-pixel dividers separate its History, Slot Structure, and Spread Navigation pockets.
 - The timeline is a sibling below the preview/controller inside the right-side main tree. Its 300ms elastic slide/fade transitions height, opacity, and padding; collapsed geometry still resolves to zero height, padding, and border so the preview reclaims the full band.
@@ -1212,7 +1234,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - README's workspace/control description has not yet been brought in line with the latest rail menus.
 - Historical SemVer labels are not Git tags or GitHub Releases. Commit links remain the release evidence.
 - There is no account, cloud sync, collaboration, telemetry, backend, or environment-secret layer. Those are deliberate scope boundaries, not half-built modules.
-- No active functional workspace task was open when v4.12.2 was recorded.
+- No active functional workspace task was open when v4.13.0 was recorded.
 
 ## Incoming engineer hand-off brief
 

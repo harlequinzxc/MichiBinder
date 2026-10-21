@@ -940,7 +940,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.12.2</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.13.0</span>
         </div>
         <SaveStatus status={saveStatus} />
       </div>
@@ -993,7 +993,7 @@ function RailPopover({ title, icon, children }) {
       data-rail-popover
       role="dialog"
       aria-label={title}
-      className="absolute right-full mr-3 top-0 rounded-xl bg-neutral-950/95 border border-white/[0.08] p-3 z-50 flex max-h-[40vh] w-56 flex-col gap-2 overflow-y-auto shadow-[0_16px_40px_rgba(0,0,0,0.8)] backdrop-blur-xl animate-scaleIn origin-right"
+      className="absolute right-full mr-3 top-0 rounded-xl bg-neutral-950/95 border border-white/[0.08] p-3 z-50 flex max-h-[50vh] w-72 flex-col gap-2 overflow-y-auto shadow-[0_16px_40px_rgba(0,0,0,0.8)] backdrop-blur-xl animate-scaleIn origin-right"
       onPointerDown={(event) => event.stopPropagation()}
     >
       <div className="flex items-center gap-2 border-b border-white/[0.06] pb-2 text-[11px] font-semibold text-neutral-100">
@@ -1004,6 +1004,24 @@ function RailPopover({ title, icon, children }) {
     </div>
   );
 }
+
+const AI_PROMPT_TEMPLATES = [
+  {
+    id: 'inpaint',
+    title: 'InPaint Prompt',
+    prompt: 'A seamless, high-resolution Pokémon card background extension, clean anime art style, vibrant shading...',
+  },
+  {
+    id: 'restyle',
+    title: 'Restyle Prompt',
+    prompt: 'Transform this illustration into a premium vintage oil painting style, thick texture strokes, classic holo border layout...',
+  },
+  {
+    id: 'gridrip',
+    title: 'GridRip Prompt',
+    prompt: 'Isolate and splice this canvas spreadsheet grid layout array into individual card rectangles, standard aspect ratios...',
+  },
+];
 
 function RightControlRail({
   settings,
@@ -1021,6 +1039,7 @@ function RightControlRail({
   onReset,
   installPrompt,
   onInstall,
+  notify,
 }) {
   const cleanSize = settings.cardSize;
   const base = baseCardSizeMm(cleanSize);
@@ -1028,9 +1047,16 @@ function RightControlRail({
   const activeLayout = getLayout(settings.layout);
   const setCardSize = (patch) => setSettings((value) => ({ ...value, cardSize: sanitizeCardSize({ ...value.cardSize, ...patch }) }));
   const togglePanel = (panel) => setOpenPanel((value) => value === panel ? null : panel);
-  const choosePrintScope = (scope) => { setPrintScope(scope); };
   const chooseGrid = (layoutId) => { onChooseLayout(layoutId); setOpenPanel(null); };
   const chooseView = (view) => { onViewChange(view); setOpenPanel(null); };
+  const copyPrompt = async (template) => {
+    try {
+      await navigator.clipboard.writeText(template.prompt);
+      notify(`${template.title} copied to clipboard.`, 'success');
+    } catch {
+      notify('Could not copy the prompt to the clipboard.', 'error');
+    }
+  };
 
   return (
     <aside data-control-rail aria-label="Layout and print controls" className="no-print py-3 pr-3 flex items-center justify-center z-40 select-none max-h-[calc(100vh-176px)] shrink-0">
@@ -1051,7 +1077,7 @@ function RightControlRail({
                       { value: 'all', label: 'Include all', detail: 'Every placed card' },
                       { value: 'custom', label: 'Uploads only', detail: 'Private uploads only' },
                     ].map((option) => (
-                      <button key={option.value} type="button" role="radio" aria-checked={printScope === option.value} onClick={() => choosePrintScope(option.value)} className={`flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${printScope === option.value ? 'border-red-500/25 bg-red-950/55 text-red-200' : 'border-white/[0.05] bg-neutral-900/60 text-neutral-300 hover:bg-neutral-800'}`}>
+                      <button key={option.value} type="button" role="radio" aria-checked={printScope === option.value} onClick={option.value === 'all' ? () => { setPrintScope('all'); setTimeout(() => onPrint(), 50); } : () => { setPrintScope('custom'); setTimeout(() => onPrint(), 50); }} className={`flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${printScope === option.value ? 'border-red-500/25 bg-red-950/55 text-red-200' : 'border-white/[0.05] bg-neutral-900/60 text-neutral-300 hover:bg-neutral-800'}`}>
                         <span className={`grid size-4 shrink-0 place-items-center rounded-full border ${printScope === option.value ? 'border-red-400/50 bg-red-500/15' : 'border-white/10 bg-neutral-950'}`}>{printScope === option.value && <span className="size-1.5 rounded-full bg-red-400" />}</span>
                         <span className="min-w-0"><strong className="block text-[11px] font-semibold">{option.label}</strong><span className="block truncate text-[9px] text-neutral-500">{option.detail}</span></span>
                       </button>
@@ -1108,17 +1134,6 @@ function RightControlRail({
               </RailPopover>
             )}
           </div>
-          <div className="relative flex">
-            <button type="button" aria-label={`Card scale: ${Math.round(cleanSize.scale * 100)}%`} aria-expanded={openPanel === 'scale'} aria-haspopup="dialog" onClick={() => togglePanel('scale')} title="Card scale" className={`flex h-7 w-11 items-center justify-center rounded-full border text-[10px] font-mono font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${openPanel === 'scale' ? 'border-red-500/30 bg-red-950/70 text-red-300' : 'border-white/[0.08] bg-neutral-950 text-neutral-300 hover:bg-neutral-800'}`}>{Math.round(cleanSize.scale * 100)}%</button>
-            {openPanel === 'scale' && (
-              <RailPopover title="Card scale" icon="ruler">
-                <div className="flex items-center justify-center gap-5 py-1">
-                  <input type="range" min={80} max={125} step={1} value={Math.round(cleanSize.scale * 100)} aria-label="Card scale" onChange={(event) => setCardSize({ scale: Number(event.target.value) / 100 })} onDoubleClick={() => setCardSize({ scale: 1 })} className="h-40 w-5 cursor-pointer accent-red-600 [direction:rtl] [writing-mode:vertical-lr] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500" />
-                  <div className="flex flex-col items-center gap-3"><output className="text-xl font-semibold tracking-tight text-neutral-100">{Math.round(cleanSize.scale * 100)}%</output><span className="text-[9px] font-mono tracking-widest text-neutral-500 uppercase">80–125%</span><button type="button" onClick={() => setCardSize({ scale: 1 })} className="rounded-md border border-white/[0.08] bg-neutral-900 px-2 py-1 text-[9px] font-semibold text-neutral-400 hover:text-neutral-200">Reset</button></div>
-                </div>
-              </RailPopover>
-            )}
-          </div>
         </div>
 
         <div data-rail-zone="material" className="flex flex-col items-center gap-2 [@media(max-height:720px)]:gap-1">
@@ -1127,6 +1142,15 @@ function RightControlRail({
             {openPanel === 'card-size' && (
               <RailPopover title="Card size" icon="rulerDimension">
                 <label className="block"><select value={custom ? 'custom' : cleanSize.preset} aria-label="Card size" onChange={(event) => { if (event.target.value === 'custom') setCardSize({ preset: 'custom', customWmm: base.w, customHmm: base.h }); else setCardSize({ preset: event.target.value }); }} className="h-9 w-full rounded-lg border border-white/[0.08] bg-neutral-900 px-2 text-[11px] font-medium text-neutral-200 outline-none focus-visible:ring-2 focus-visible:ring-red-500">{CARD_PRESETS.map((preset) => <option key={preset.id} value={preset.id}>{preset.label} · {preset.wMm} × {preset.hMm} mm</option>)}<option value="custom">Custom dimensions…</option></select></label>
+                <div className="border-t border-white/[0.06] pt-2">
+                  <span className="mb-1 block text-[11px] font-medium text-zinc-400">Card scale ({Math.round(cleanSize.scale * 100)}%)</span>
+                  <div className="w-full h-8 flex items-center gap-2">
+                    <span className="font-mono text-[8px] text-neutral-600">80</span>
+                    <input type="range" min={80} max={125} step={1} value={Math.round(cleanSize.scale * 100)} aria-label="Card scale" onChange={(event) => setCardSize({ scale: Number(event.target.value) / 100 })} onDoubleClick={() => setCardSize({ scale: 1 })} className="min-w-0 flex-1 cursor-pointer accent-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500" />
+                    <span className="font-mono text-[8px] text-neutral-600">125</span>
+                    <ToolButton icon="reset" title="Reset card scale" dense onClick={() => setCardSize({ scale: 1 })} className="!h-6 !min-w-6 !px-1" />
+                  </div>
+                </div>
                 {custom && <div className="flex items-center justify-between gap-1 rounded-lg border border-white/[0.06] bg-neutral-900/70 p-2"><MmField label="W" value={cleanSize.customWmm} onCommit={(customWmm) => setCardSize({ customWmm })} /><span className="text-neutral-600">×</span><MmField label="H" value={cleanSize.customHmm} onCommit={(customHmm) => setCardSize({ customHmm })} /></div>}
                 <div className="flex items-center justify-between border-t border-white/[0.06] pt-2 text-[9px] font-mono text-neutral-500"><span>Effective</span><strong className="text-neutral-200">{fmtMm(resolveCardSize(cleanSize).w)} × {fmtMm(resolveCardSize(cleanSize).h)} mm</strong></div>
               </RailPopover>
@@ -1135,6 +1159,22 @@ function RightControlRail({
           <div className="relative flex">
             <RailButton icon="keyboard" label="Keyboard shortcuts" active={openPanel === 'shortcuts'} expanded={openPanel === 'shortcuts'} onClick={() => togglePanel('shortcuts')} />
             {openPanel === 'shortcuts' && <RailPopover title="Keyboard shortcuts" icon="keyboard"><ShortcutsContent /></RailPopover>}
+          </div>
+          <div className="relative flex">
+            <RailButton icon="sparkles" label="AI Prompt Generator" active={openPanel === 'ai-tools'} expanded={openPanel === 'ai-tools'} onClick={() => togglePanel('ai-tools')} />
+            {openPanel === 'ai-tools' && (
+              <RailPopover title="AI Generation Tools" icon="sparkles">
+                {AI_PROMPT_TEMPLATES.map((template) => (
+                  <section key={template.id} className="rounded-lg border border-white/[0.06] bg-neutral-900/65 p-2.5 shadow-sm">
+                    <span className="text-[9px] font-bold tracking-widest text-neutral-500 uppercase font-sans">{template.title}</span>
+                    <div className="mt-1.5 flex items-start gap-2">
+                      <textarea disabled value={template.prompt} aria-label={template.title} rows={3} className="min-h-16 min-w-0 flex-1 resize-none rounded-md border border-white/[0.06] bg-neutral-950/75 px-2 py-1.5 text-[10px] leading-relaxed text-neutral-400 opacity-100 outline-none disabled:cursor-default disabled:opacity-100" />
+                      <ToolButton icon="copy" title={`Copy ${template.title}`} dense onClick={() => copyPrompt(template)} className="border border-white/[0.06] bg-neutral-900" />
+                    </div>
+                  </section>
+                ))}
+              </RailPopover>
+            )}
           </div>
           {installPrompt && <RailButton icon="install" label="Install app" onClick={onInstall} />}
         </div>
@@ -1810,6 +1850,8 @@ export default function CardBinder() {
       })
       .filter((page) => !settings.skipEmptyPages || getSlots(page, dims).some((slot) => page.slots[slot.key]));
   }, [pages, settings.skipEmptyPages, dims, printScope, customUploadedIds, allPoolIds]);
+  const printStateRef = useRef({ printPages, printScope });
+  printStateRef.current = { printPages, printScope };
 
   useEffect(() => { layoutIdRef.current = settings.layout; }, [settings.layout]);
   useEffect(() => { dimsRef.current = dims; }, [dims]);
@@ -3235,13 +3277,14 @@ export default function CardBinder() {
 
   const handlePrint = useCallback(() => {
     commitEditing();
-    if (!printPages.length || !printPages.some((page) => Object.keys(page.slots).length)) {
-      notify(printScope === 'custom' ? 'No uploaded cards are placed in the current print scope.' : 'Add at least one card before printing.', 'warn');
+    const { printPages: currentPrintPages, printScope: currentPrintScope } = printStateRef.current;
+    if (!currentPrintPages.length || !currentPrintPages.some((page) => Object.keys(page.slots).length)) {
+      notify(currentPrintScope === 'custom' ? 'No uploaded cards are placed in the current print scope.' : 'Add at least one card before printing.', 'warn');
       return;
     }
     setOpenPanel(null);
     window.setTimeout(() => window.print(), 50);
-  }, [commitEditing, printPages, printScope, notify]);
+  }, [commitEditing, notify]);
 
   const resetBinder = useCallback(async () => {
     if (!window.confirm('Reset the entire binder? This deletes every page and image from this device.')) return;
@@ -3638,7 +3681,7 @@ export default function CardBinder() {
           </span>
         )}
         {slot.mergeId && <span className="absolute bottom-1.5 left-1.5 z-40 rounded-full bg-red-700/90 px-1.5 py-0.5 text-[9px] font-bold text-white shadow">{boxDims(slot)}</span>}
-        {isEditing && <span className="absolute left-1/2 top-2 z-50 -translate-x-1/2 rounded-full bg-amber-500 px-2 py-0.5 text-[9px] font-bold text-amber-950 shadow">Drag to reposition</span>}
+        {isEditing && <span className="absolute left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-500 px-2.5 py-1 text-[9px] font-bold text-amber-950 shadow-md backdrop-blur-sm select-none">Drag to reposition</span>}
       </div>
     );
   };
@@ -4084,6 +4127,7 @@ export default function CardBinder() {
                 onReset={resetBinder}
                 installPrompt={installPrompt}
                 onInstall={async () => { await installPrompt.prompt(); setInstallPrompt(null); }}
+                notify={notify}
               />
             </div>
             <FloatingNavigation
