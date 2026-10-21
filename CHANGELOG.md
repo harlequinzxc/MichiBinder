@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.9.2
+## Current state — v4.9.3
 
 - **Ledger date:** 2026-10-21
-- **Application state entering this feature pass:** commit `17d78a2` / v4.9.1
+- **Application state entering this feature pass:** commit `1585646` / v4.9.2
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,8 +14,8 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets plus the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, required secret, or environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** dynamic print-grid span placement and non-distorting contained print imagery
-- **Last verified behavior:** production build plus three-viewport print-media/PDF checks for custom 100×50mm tracks, merged spans, contained images, print limits, crop position, and zero browser errors
+- **Last functional change:** top-left Lucide Trash overlay for Michi upload cards
+- **Last verified behavior:** production build plus three-viewport top-left geometry, standard Trash identity/size, hover visibility, cancel/confirm cleanup, persistence, telemetry, and zero-browser-error checks
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## SemVer reconstruction
@@ -812,6 +812,18 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Verified exact inline 2×2 and 1×1 print grid coordinates, computed two-column/two-row merged bounds, custom 100×50mm track ratio, two contained print images, 100% print max-width/max-height, saved 25%/75% object positioning, absence of cover/square print classes, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
 - Generated and validated a non-empty CSS-page-sized PDF beginning with a valid `%PDF` signature.
 - Advanced package and lockfile metadata to v4.9.2.
+
+## [v4.9.3] — 2026-10-21
+
+### Changed
+
+- Moved the Michi per-upload delete overlay from the top-right to the top-left corner with the exact `top-1.5 left-1.5` positioning tokens.
+- Kept the explicitly imported standard Lucide `Trash` component at 12px, the 50-layer overlay, direct card-child placement, named hover group behavior, and existing translucent control treatment.
+
+### Verified
+
+- Verified exact control classes, top-left geometry inside the card border, standard `lucide-trash` identity, 12×12px icon dimensions, zero-to-full hover opacity, immediate natural ordering, cancel/confirm removal, two-page assignment/crop cleanup, persistence, updated telemetry, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
+- Advanced package and lockfile metadata to v4.9.3.
 
 ---
 
