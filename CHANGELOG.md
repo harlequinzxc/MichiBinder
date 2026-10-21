@@ -2,20 +2,20 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.17.0
+## Current state — v4.18.0
 
 - **Ledger date:** 2026-10-21
-- **Application state entering this feature pass:** commit `1d0eb38` / v4.16.1
+- **Application state entering this feature pass:** commit `905704d` / v4.17.0
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
 - **Primary source:** `src/CardBinder.jsx`, approximately 3,450 lines containing the data model, persistence, catalogue integration, interactions, print tree, and most UI components
 - **Supporting source:** `src/index.css` for Tailwind import, print media, page-turn depth, sleeve materials, portrait guard, and animations
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
-- **Network boundary:** TCGdex REST/API assets plus the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, required secret, or environment variable
+- **Network boundary:** TCGdex REST/API assets, Imgur's public album/media endpoints, and the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, required secret, or environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** remote image-stream ingestion for direct public URLs, Google Drive shares, and Dropbox shares through the existing durable custom-asset pipeline
-- **Last verified behavior:** production build, exact remote-ingestion control classes, stable control geometry during fetch, direct/Drive/Dropbox URL transforms, image and failure validation, persisted reload recovery, synchronized v4.17.0 title pill, and zero unexpected browser errors
+- **Last functional change:** token-free bulk Imgur album/gallery deconstruction plus concurrent media streaming through the existing durable custom-asset pipeline
+- **Last verified behavior:** production build, complete removal of the superseded general URL fetcher, exact Imgur collector controls, stable fetch-time geometry, album/gallery/direct routing, partial-failure filtering, persisted reload recovery, synchronized v4.18.0 title pill, and zero unexpected browser errors
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## Strict SemVer policy and audit
@@ -34,7 +34,7 @@ The 2026-10-21 full-ledger audit confirmed the three post-inception major bounda
 2. **v3.0.0:** the toolbar/tray composition was dismantled and rebuilt as the four-area workspace with contextual bottom navigation.
 3. **v4.0.0:** top-heavy configuration controls were removed and replaced by the standalone right utility rail plus cohesive bottom structural controller.
 
-The audit also confirmed that presentation-only releases remain patches; capability releases such as TCGdex integration, source workspaces, valuation, upload deletion, print slicing, and first-unplaced tracking remain minors; and later fixes that complete those existing contracts remain patches. Specifically, v4.8.2 restored the Custom metric removed during v4.8.1 consolidation, while v4.11.1–v4.11.7 corrected lifecycle and print-slicing gaps in capabilities introduced by v4.11.0 and earlier print releases. Persistent per-tab scroll memory is a new stateful interaction and therefore begins v4.12.0 rather than v4.11.8; continuously measurable inactive-panel background scrolling is likewise a new cross-tab capability and begins v4.15.0; premium layout-aware prompt compilation and copy workflows begin v4.16.0, while their preview-format and prompt-copy corrections remain the v4.16.1 patch; remote public-asset ingestion is a new source capability and begins v4.17.0.
+The audit also confirmed that presentation-only releases remain patches; capability releases such as TCGdex integration, source workspaces, valuation, upload deletion, print slicing, and first-unplaced tracking remain minors; and later fixes that complete those existing contracts remain patches. Specifically, v4.8.2 restored the Custom metric removed during v4.8.1 consolidation, while v4.11.1–v4.11.7 corrected lifecycle and print-slicing gaps in capabilities introduced by v4.11.0 and earlier print releases. Persistent per-tab scroll memory is a new stateful interaction and therefore begins v4.12.0 rather than v4.11.8; continuously measurable inactive-panel background scrolling is likewise a new cross-tab capability and begins v4.15.0; premium layout-aware prompt compilation and copy workflows begin v4.16.0, while their preview-format and prompt-copy corrections remain the v4.16.1 patch; remote public-asset ingestion begins v4.17.0, and its replacement with bulk Imgur album deconstruction and concurrent streaming begins v4.18.0.
 
 Historical entries are ordered from oldest to newest. Commit links, rather than nonexistent retrospective Git tags, are the immutable references.
 
@@ -1220,6 +1220,27 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Verified remote-control geometry remains unchanged while a delayed stream is in flight and all three imported blobs survive a persisted reload at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.17.0.
 
+## [v4.18.0] — 2026-10-21
+
+### Added
+
+- Added token-free Imgur album/gallery deconstruction for `/a/{id}` and `/gallery/{id}` links, extracting public media URLs from the returned text-decoded JSON payload.
+- Added direct `.png`, `.jpg`, `.jpeg`, and `.webp` URL support through the same Imgur collector.
+- Added concurrent `Promise.all` streaming across album media, per-asset HTTP/blob/native-`File` conversion, MIME filtering, decoded and sanitized terminal-path filenames, and content-type-aware fallback extensions.
+- Added scanning and media-count progress notifications before routing each surviving batch through the existing durable `addFiles` persistence and first-unplaced-scroll pipeline.
+
+### Changed
+
+- Replaced the general single-file Google Drive/Dropbox/direct URL transformer, handler prop, and sidebar form with the focused bulk Imgur album streamer and `addFilesFromAlbum` contract.
+- Failed individual media streams now drop out of otherwise valid batches, while total album/API/CORS failures report the dedicated public-album recovery message and clean console diagnostics.
+
+### Verified
+
+- Verified exact Imgur form classes/copy, album and gallery ID routing, direct-image routing, a four-item album scan with two valid concurrent imports, JPEG fallback naming, partial HTTP and non-image filtering, and progressive count feedback.
+- Verified invalid links and total stream/API failures preserve the pool and display their exact error messages; all expected operational/network diagnostics were isolated from unexpected browser errors.
+- Verified upload and collector geometry remains unchanged while a delayed album scan is active, and four successfully streamed blobs survive a persisted reload at 1600×1000, 1366×768, and 1200×700.
+- Advanced package and lockfile metadata to v4.18.0.
+
 ---
 
 ## Current architecture and engineering rationale
@@ -1282,7 +1303,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Local uploads are keyed by exact filename for replacement: a collision retains the custom asset ID, updates its binary/source URL, preserves every slot assignment, and remounts the corresponding inventory row through its dynamic image-source-length key.
 - Sidebar typography follows three semantic tiers: 12px medium actions/options, 11px secondary descriptions, and 9px uppercase semibold system context. TCGdex and upload counters are deliberate 10px text-only readout exceptions.
 - Search and Card set controls share a 36px height, neutral-950 surface, six-percent white border, six-pixel radius, 12px horizontal padding, six-pixel vertical padding, and 12px medium foreground. The set block sits 14px below search.
-- Michi's upload capsule uses a 20px Lucide upload glyph, 24px vertical padding, and neutral hairline hover treatment. A compact remote-stream form sits directly beneath it and routes direct, Google Drive, and Dropbox images through the same durable upload pipeline. Its zero-asset state is a three-column centered feature callout rather than an unstructured sentence.
+- Michi's upload capsule uses a 20px Lucide upload glyph, 24px vertical padding, and neutral hairline hover treatment. A compact Imgur collector sits directly beneath it and routes album, gallery, and direct-image batches through the same durable upload pipeline. Its zero-asset state is a three-column centered feature callout rather than an unstructured sentence.
 
 ### Timeline, rail, and viewport boundaries
 
@@ -1373,7 +1394,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - README's workspace/control description has not yet been brought in line with the latest rail menus.
 - Historical SemVer labels are not Git tags or GitHub Releases. Commit links remain the release evidence.
 - There is no account, cloud sync, collaboration, telemetry, backend, or environment-secret layer. Those are deliberate scope boundaries, not half-built modules.
-- The v4.17.0 remote public-asset ingestion release is complete; no active functional workspace task remains open.
+- The v4.18.0 bulk Imgur album-streaming release is complete; no active functional workspace task remains open.
 
 ## Incoming engineer hand-off brief
 

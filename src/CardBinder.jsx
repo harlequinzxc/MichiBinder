@@ -158,22 +158,26 @@ const uid = (prefix = 'id') => `${prefix}-${Date.now().toString(36)}-${Math.rand
 const keyOf = (row, col) => `${row}-${col}`;
 const isEditableTarget = (element) => Boolean(element?.matches?.('input, textarea, select, [contenteditable="true"]'));
 const hasFiles = (dataTransfer) => Array.from(dataTransfer?.types || []).includes('Files');
-const transformToDirectDownloadUrl = (urlString) => {
+const fetchImgurAlbumImages = async (urlString) => {
   const trimmedUrl = typeof urlString === 'string' ? urlString.trim() : '';
+  let url;
   try {
-    const url = new URL(trimmedUrl);
-    if (url.hostname.includes('google.com')) {
-      const fileId = url.pathname.match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1] || url.searchParams.get('id');
-      if (fileId) return `https://drive.google.com/uc?export=download&id=${encodeURIComponent(fileId)}`;
-    }
-    if (url.hostname.includes('dropbox.com')) {
-      url.searchParams.set('dl', '1');
-      return url.href;
-    }
-    return url.href;
+    url = new URL(trimmedUrl);
   } catch {
-    return null;
+    return [];
   }
+
+  const albumMatch = url.pathname.match(/\/(?:a|gallery)\/([a-zA-Z0-9]+)/);
+  if (albumMatch) {
+    const albumId = albumMatch[1];
+    const response = await fetch(`https://api.imgur.com/post/v1/albums/${albumId}?include=media`);
+    if (!response.ok) throw new Error(`Imgur album request failed with status ${response.status}.`);
+    const data = JSON.parse(await response.text());
+    return data?.media?.map((item) => item.url).filter(Boolean) || [];
+  }
+
+  if (/\.(?:png|jpe?g|webp)$/i.test(url.pathname)) return [url.href];
+  return [];
 };
 const tcgdexImageBase = (image) => {
   const value = typeof image === 'string' ? image.trim().replace(/\/$/, '') : '';
@@ -999,7 +1003,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.17.0</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.18.0</span>
         </div>
         <SaveStatus status={saveStatus} />
       </div>
@@ -1361,7 +1365,7 @@ function CardPool({
   images,
   inputRef,
   onFiles,
-  addFilesFromUrl,
+  addFilesFromAlbum,
   onClearAllUploads,
   onClearAllBinderCards,
   handleRemoveCustomCard,
@@ -1497,9 +1501,9 @@ function CardPool({
           </div>
 
           <div className="mt-3 flex flex-col gap-1.5 rounded-lg border border-white/[0.04] bg-neutral-950 p-2">
-            <span className="text-[9px] font-bold tracking-widest text-neutral-500 uppercase font-sans">Stream Remote Asset Link</span>
-            <form className="flex min-w-0 items-center gap-1.5" onSubmit={(e) => { e.preventDefault(); const val = e.currentTarget.elements.assetUrl.value; if(val.trim()){ addFilesFromUrl(val); e.currentTarget.reset(); } }}>
-              <input type="url" name="assetUrl" aria-label="Remote asset URL" placeholder="Paste a public image link" className="h-8 min-w-0 flex-1 bg-neutral-900 border border-white/[0.06] rounded-md px-2.5 text-xs font-medium text-neutral-200 placeholder-neutral-600 focus:outline-none focus:ring-1 focus:ring-red-500/50" />
+            <span className="text-[9px] font-bold tracking-widest text-neutral-500 uppercase font-sans">Stream Imgur Album Link</span>
+            <form className="flex min-w-0 items-center gap-1.5" onSubmit={(e) => { e.preventDefault(); const val = e.currentTarget.elements.albumUrl.value; if(val.trim()){ addFilesFromAlbum(val); e.currentTarget.reset(); } }}>
+              <input type="url" name="albumUrl" aria-label="Imgur album URL" placeholder="Paste Imgur album or direct image URL…" className="h-8 min-w-0 flex-1 bg-neutral-900 border border-white/[0.06] rounded-md px-2.5 text-xs font-medium text-neutral-200 placeholder-neutral-600 focus:outline-none focus:ring-1 focus:ring-red-500/50" />
               <button type="submit" className="h-8 px-3 rounded-md bg-neutral-800 text-zinc-300 font-semibold text-xs border border-white/[0.04] hover:bg-neutral-700 hover:text-white transition-all active:scale-[0.95]">Fetch</button>
             </form>
           </div>
@@ -2455,42 +2459,50 @@ export default function CardBinder() {
     return entries.map((entry) => entry.id);
   }, [customUploadedCards, notify, pool.length, scrollToNextUnplacedCard, storageMode]);
 
-  const addFilesFromUrl = useCallback(async (urlString) => {
-    const transformedUrl = transformToDirectDownloadUrl(urlString);
-    if (!transformedUrl) {
-      notify('Invalid asset URL format.', 'error');
-      return [];
-    }
-
+  const addFilesFromAlbum = useCallback(async (urlString) => {
     setSaveStatus('saving');
-    notify('Fetching remote asset stream…', 'info');
+    notify('Scanning album files…', 'info');
     try {
-      const response = await fetch(transformedUrl);
-      if (!response.ok) throw new Error(`Remote asset request failed with status ${response.status}.`);
-      const blob = await response.blob();
-      if (!blob.type?.startsWith('image/')) {
+      const urls = await fetchImgurAlbumImages(urlString);
+      if (!urls.length) {
         setSaveStatus('error');
-        notify('Target link does not resolve to a valid web image file.', 'error');
+        notify('No public images found in this link.', 'error');
         return [];
       }
 
-      const responseUrl = new URL(response.url || transformedUrl);
-      const terminalSegment = responseUrl.pathname.split('/').filter(Boolean).pop() || 'remote-asset';
-      let fileName;
-      try {
-        fileName = safeFileName(decodeURIComponent(terminalSegment));
-      } catch {
-        fileName = safeFileName(terminalSegment);
-      }
-      if (!/\.[a-z0-9]{2,8}$/i.test(fileName)) fileName += '.png';
-      const syntheticFile = new File([blob], fileName, { type: blob.type });
-      const addedIds = await addFiles([syntheticFile]);
+      notify(`Streaming ${urls.length} remote cloud assets…`, 'info');
+      const syntheticFiles = (await Promise.all(urls.map(async (assetUrl, index) => {
+        try {
+          const response = await fetch(assetUrl);
+          if (!response.ok) throw new Error(`Imgur asset request failed with status ${response.status}.`);
+          const blob = await response.blob();
+          const responseUrl = new URL(response.url || assetUrl);
+          const terminalSegment = responseUrl.pathname.split('/').filter(Boolean).pop() || `imgur-asset-${index + 1}`;
+          let fileName;
+          try {
+            fileName = safeFileName(decodeURIComponent(terminalSegment));
+          } catch {
+            fileName = safeFileName(terminalSegment);
+          }
+          if (!/\.(?:png|jpe?g|webp)$/i.test(fileName)) {
+            const extension = blob.type === 'image/jpeg' ? '.jpg' : blob.type === 'image/webp' ? '.webp' : '.png';
+            fileName += extension;
+          }
+          return new File([blob], fileName, { type: blob.type });
+        } catch (error) {
+          console.error(`Imgur asset stream failed for ${assetUrl}:`, error);
+          return null;
+        }
+      }))).filter((file) => file?.type?.startsWith('image/'));
+
+      if (!syntheticFiles.length) throw new Error('No valid Imgur image streams completed.');
+      const addedIds = await addFiles(syntheticFiles);
       if (!addedIds.length) setSaveStatus('error');
       return addedIds;
     } catch (error) {
-      console.error('Remote asset fetch failed:', error);
+      console.error('Imgur album fetch failed:', error);
       setSaveStatus('error');
-      notify('Asset fetch failed. Verify the file is publicly shared and permits cross-origin lookups.', 'error');
+      notify('Album fetch failed. Verify the album is completely public and permits cross-origin lookups.', 'error');
       return [];
     }
   }, [addFiles, notify]);
@@ -4181,7 +4193,7 @@ export default function CardBinder() {
             images={images}
             inputRef={inputRef}
             onFiles={addFiles}
-            addFilesFromUrl={addFilesFromUrl}
+            addFilesFromAlbum={addFilesFromAlbum}
             onClearAllUploads={handleClearAllUploads}
             onClearAllBinderCards={handleClearAllBinderCards}
             handleRemoveCustomCard={handleRemoveCustomCard}
