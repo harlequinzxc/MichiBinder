@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.8.1
+## Current state — v4.8.2
 
 - **Ledger date:** 2026-10-21
-- **Application state entering this feature pass:** commit `96e8365` / v4.8.0
+- **Application state entering this feature pass:** commit `f8cdecc` / v4.8.1
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,8 +14,8 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets plus the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, required secret, or environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** simplified catalogue/upload copy and consolidated workspace placement telemetry
-- **Last verified behavior:** production build plus three-viewport empty-state copy, upload-count heading, all-page binder-card count, typography, accessibility label, and zero-browser-error checks
+- **Last functional change:** fully contained 0.85-scale timeline sheets and an all-page custom-card workspace metric
+- **Last verified behavior:** production build plus three-viewport timeline overflow, scale, bottom-row containment, miniature image fit, aggregate custom count, typography, accessibility label, and zero-browser-error checks
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## SemVer reconstruction
@@ -738,6 +738,23 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 
 - Verified exact empty-state copy, absence of the removed catalogue headline and standalone asset counter, live `YOUR UPLOADS (1)` heading copy/class, an all-page `BINDER 4 CARDS` test total, exact metadata class, gradient number treatment, consolidated accessibility text, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.8.1.
+
+## [v4.8.2] — 2026-10-21
+
+### Added
+
+- Added a Custom workspace metric between Binder and Density that counts every custom-upload placement across all pages through the assignment-map model and reports the total in the row's accessibility label.
+
+### Fixed
+
+- Changed each timeline page frame to visible overflow with centered flex containment, removing the strict clipping that could hide lower miniature rows.
+- Wrapped each complete timeline sheet grid in one GPU-backed, center-origin 0.85 scale container to create a consistent visual buffer without altering page or slot geometry.
+- Standardized miniature card images on full-size `object-contain` rendering with a 1px corner radius so their aspect ratios remain intact at filmstrip scale.
+
+### Verified
+
+- Verified exact frame and scaler classes, computed visible overflow/flex centering and 0.85 scale, pointer isolation, nine contained miniature images, complete visibility of slots 7–9, exact contain-image classes, an all-page `CUSTOM 6 CARDS` test total, metric dividers/gradient typography, consolidated accessibility text, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
+- Advanced package and lockfile metadata to v4.8.2.
 
 ---
 
