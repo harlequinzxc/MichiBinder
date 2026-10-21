@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.11.3
+## Current state — v4.11.4
 
 - **Ledger date:** 2026-10-21
-- **Application state entering this feature pass:** commit `6346300` / v4.11.2
+- **Application state entering this feature pass:** commit `efcc57a` / v4.11.3
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,8 +14,8 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets plus the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, required secret, or environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** paint-safe 120ms first-unplaced catalogue scrolling across asynchronous Cards and Michi renders
-- **Last verified behavior:** production build plus three-viewport query/set hydration, tab and placement advancement, exact TCGdex placed-state skipping, smooth start alignment, and zero-browser-error checks
+- **Last functional change:** lazy-load first-unplaced lookahead plus snap-back scrolling after slot removal and database-card clearing
+- **Last verified behavior:** production build plus three-viewport automatic page-2 lookahead, removal/clear snap-back, query/set hydration, tab/placement advancement, synchronized v4.11.4 title pill, and zero-browser-error checks
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## SemVer reconstruction
@@ -950,6 +950,26 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Reverified the exact `data-placed` lifecycle and zero browser errors at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.11.3.
 
+## [v4.11.4] — 2026-10-21
+
+### Added
+
+- Extended first-unplaced catalogue tracking with lazy-load lookahead: when every painted TCGdex result is already placed and another result page exists, the shared observer advances pagination automatically.
+- Added a result-hydration effect that reevaluates the first-unplaced target whenever fetched card data or lookahead state changes.
+- Added post-removal snap-back tracking for individual binder-pocket removal and Clear Binder so newly available Cards or Michi assets return to the top boundary.
+
+### Changed
+
+- Increased the shared painted-layout delay from 120ms to 150ms and retained smooth `block: 'start'` alignment.
+- Synchronized the MichiBinder title pill with package and ledger SemVer at `v4.11.4`.
+
+### Verified
+
+- Verified an all-placed 40-card TCGdex result page automatically requests page 2 and scrolls to Card 41, the first newly loaded unplaced result.
+- Verified individual slot removal and Clear Binder both scroll back to Card 1 after its placed marker is removed.
+- Reverified query/set hydration, Cards/Michi tab and placement advancement, exact placed-state skipping, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
+- Advanced package and lockfile metadata to v4.11.4.
+
 ---
 
 ## Current architecture and engineering rationale
@@ -1099,7 +1119,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - README's workspace/control description has not yet been brought in line with the latest rail menus.
 - Historical SemVer labels are not Git tags or GitHub Releases. Commit links remain the release evidence.
 - There is no account, cloud sync, collaboration, telemetry, backend, or environment-secret layer. Those are deliberate scope boundaries, not half-built modules.
-- No active functional workspace task was open when v4.11.3 was recorded.
+- No active functional workspace task was open when v4.11.4 was recorded.
 
 ## Incoming engineer hand-off brief
 

@@ -916,7 +916,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v1.4.1</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.11.4</span>
         </div>
         <SaveStatus status={saveStatus} />
       </div>
@@ -1634,19 +1634,6 @@ export default function CardBinder() {
   const [editing, setEditing] = useState(null);
   const [stageSize, setStageSize] = useState({ w: 1000, h: 620 });
 
-  const scrollToNextUnplacedCard = useCallback((containerSelector, itemAttribute) => {
-    // Allow React to commit dynamic catalogue frames before querying the painted layout.
-    setTimeout(() => {
-      const container = document.querySelector(containerSelector);
-      if (!container) return;
-
-      const nextTarget = container.querySelector(`[${itemAttribute}]:not([data-placed])`);
-      if (nextTarget) {
-        nextTarget.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    }, 120);
-  }, []);
-
   const stageRef = useRef(null);
   const timelineScrollRef = useRef(null);
   const timelineRevealPageIdRef = useRef(null);
@@ -1980,7 +1967,6 @@ export default function CardBinder() {
       }
       if (searchAbortRef.current !== controller) return;
       setFetchedCards((currentCards) => nextPage === 1 ? normalized : [...currentCards, ...normalized]);
-      setTimeout(() => scrollToNextUnplacedCard('[data-tcgdex-results]', 'data-tcgdex-card'), 100);
       setHasMoreCards(hasNext);
     } catch (error) {
       if (error?.name === 'AbortError' || searchAbortRef.current !== controller) return;
@@ -1990,7 +1976,7 @@ export default function CardBinder() {
     } finally {
       if (searchAbortRef.current === controller) setIsLoading(false);
     }
-  }, [scrollToNextUnplacedCard]);
+  }, []);
 
   const submitCardSearch = useCallback(() => {
     window.clearTimeout(searchDebounceRef.current);
@@ -2001,10 +1987,31 @@ export default function CardBinder() {
     fetchCards(searchQuery, selectedSet, 1);
   }, [fetchCards, searchQuery, selectedSet]);
 
-  const loadMoreCards = useCallback(() => {
+  const onLoadMore = useCallback(() => {
     if (isLoading || !hasMoreCards || (!searchQuery.trim() && !selectedSet)) return;
     setCatalogPage((value) => value + 1);
   }, [hasMoreCards, isLoading, searchQuery, selectedSet]);
+
+  const scrollToNextUnplacedCard = useCallback((containerSelector, itemAttribute) => {
+    setTimeout(() => {
+      const container = document.querySelector(containerSelector);
+      if (!container) return;
+
+      const nextTarget = container.querySelector(`[${itemAttribute}]:not([data-placed])`);
+
+      if (nextTarget) {
+        nextTarget.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else if (containerSelector === '[data-tcgdex-results]' && hasMoreCards && !isLoading) {
+        onLoadMore();
+      }
+    }, 150);
+  }, [hasMoreCards, isLoading, onLoadMore]);
+
+  useEffect(() => {
+    if (fetchedCards.length > 0) {
+      scrollToNextUnplacedCard('[data-tcgdex-results]', 'data-tcgdex-card');
+    }
+  }, [fetchedCards, scrollToNextUnplacedCard]);
 
   useEffect(() => {
     window.clearTimeout(searchDebounceRef.current);
@@ -2254,7 +2261,7 @@ export default function CardBinder() {
     if (activeTab === 'michi') scrollToNextUnplacedCard('[role="listbox"][aria-label*="Custom"]', 'data-local-card');
     if (!options.silent) notify(`${item.name || 'Pokémon card'} added from TCGdex.`, 'success');
     return [id];
-  }, [activeTab, addFiles, hydrateCardPrice, notify]);
+  }, [activeTab, addFiles, hydrateCardPrice, notify, scrollToNextUnplacedCard]);
 
   const importFetchedCards = useCallback(async (cards) => {
     if (!cards?.length) return [];
@@ -2494,7 +2501,7 @@ export default function CardBinder() {
       if (result.created) message += ` (${plural(result.created, 'new page')})`;
       notify(message, 'success');
     });
-  }, [commitEditing, applyCanvasChange, activeTab, notify]);
+  }, [commitEditing, applyCanvasChange, activeTab, notify, scrollToNextUnplacedCard]);
 
   const addFetchedCardToPage = useCallback(async (item, highResImageUrl) => {
     const ids = await importFetchedCard(item, highResImageUrl);
@@ -2520,7 +2527,9 @@ export default function CardBinder() {
       delete crops[key];
       return { ...page, slots, crops };
     }));
-  }, [commitEditing, applyCanvasChange]);
+    if (activeTab === 'cards') scrollToNextUnplacedCard('[data-tcgdex-results]', 'data-tcgdex-card');
+    if (activeTab === 'michi') scrollToNextUnplacedCard('[role="listbox"][aria-label*="Custom"]', 'data-local-card');
+  }, [commitEditing, applyCanvasChange, activeTab, scrollToNextUnplacedCard]);
 
   const moveSlotCard = useCallback((payload, targetPageIndex, targetKey = null) => {
     commitEditing();
@@ -2552,7 +2561,7 @@ export default function CardBinder() {
     });
     if (canvasChange.changed && activeTab === 'cards') scrollToNextUnplacedCard('[data-tcgdex-results]', 'data-tcgdex-card');
     if (canvasChange.changed && activeTab === 'michi') scrollToNextUnplacedCard('[role="listbox"][aria-label*="Custom"]', 'data-local-card');
-  }, [commitEditing, applyCanvasChange, activeTab, notify]);
+  }, [commitEditing, applyCanvasChange, activeTab, notify, scrollToNextUnplacedCard]);
 
   const makeDragGhost = useCallback((event, ids) => {
     try {
@@ -3007,12 +3016,14 @@ export default function CardBinder() {
       notify('No database cards are currently placed in the binder.', 'info');
       return;
     }
+    if (activeTab === 'cards') scrollToNextUnplacedCard('[data-tcgdex-results]', 'data-tcgdex-card');
+    if (activeTab === 'michi') scrollToNextUnplacedCard('[role="listbox"][aria-label*="Custom"]', 'data-local-card');
     editingRef.current = null;
     setEditing(null);
     setSelBox(null);
     setSelectionPageId(null);
     notify('All database cards cleared from binder sheets. Custom uploads were preserved.', 'info');
-  }, [pool, applyCanvasChange, notify]);
+  }, [pool, applyCanvasChange, notify, activeTab, scrollToNextUnplacedCard]);
 
   const handleRemoveCustomCard = useCallback((cardId, e) => {
     e.stopPropagation();
@@ -3933,7 +3944,7 @@ export default function CardBinder() {
             searchError={searchError}
             onSearchSubmit={submitCardSearch}
             onClearFilters={clearCatalogFilters}
-            onLoadMore={loadMoreCards}
+            onLoadMore={onLoadMore}
             onFetchedCardDragStart={startFetchedCardDrag}
             onFetchedCardAdd={addFetchedCardToPage}
             scrollToNextUnplacedCard={scrollToNextUnplacedCard}
