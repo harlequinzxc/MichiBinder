@@ -940,7 +940,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.12.1</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.12.2</span>
         </div>
         <SaveStatus status={saveStatus} />
       </div>
@@ -1441,15 +1441,16 @@ function CardPool({
                   onKeyDown={(event) => { if (event.key === 'Enter') onPoolDoubleClick(localCard.id); }}
                   onDragStart={(event) => onPoolDragStart(event, localCard.id)}
                   onDragEnd={onDragEnd}
-                  className="relative group/local aspect-[245/337] cursor-grab active:cursor-grabbing rounded-md overflow-hidden bg-neutral-900 border border-white/[0.03] opacity-80 hover:opacity-100 shadow-sm hover:shadow-lg transition-all duration-150"
+                  className={`relative group/local aspect-[245/337] cursor-grab active:cursor-grabbing rounded-md overflow-hidden bg-neutral-900 border transition-all duration-150 ${selectionIndex >= 0 ? 'ring-2 ring-red-500 border-transparent scale-[0.97] brightness-110 shadow-lg shadow-red-950/20' : 'border-white/[0.03] opacity-80 hover:opacity-100 shadow-sm hover:shadow-lg'}`}
                 >
+                  {selectionIndex >= 0 && <span aria-hidden="true" className="pointer-events-none absolute inset-0 z-10 bg-red-500/[0.06] backdrop-blur-[0.5px]" />}
                   <button type="button" onClick={(e) => handleRemoveCustomCard(localCard.id, e)} className="absolute top-1.5 left-1.5 z-50 flex h-6 w-6 items-center justify-center rounded-md border border-white/10 bg-neutral-950/80 text-neutral-400 hover:text-red-400 opacity-0 group-hover/local:opacity-100 transition-all duration-200 focus:outline-none backdrop-blur-sm" title="Delete Uploaded Card">
                     <Trash size={12} />
                   </button>
                   {localCard.localUrlDataString ? <img src={localCard.localUrlDataString} className={`w-full h-full object-cover bg-neutral-950 pointer-events-none transition-all duration-200 ${placed ? 'opacity-45 grayscale group-hover/local:opacity-75' : ''}`} alt="Uploaded Card" /> : <span className="absolute inset-0 grid place-items-center text-neutral-600"><Icon name="image" /></span>}
-                  <span className="absolute top-1 right-1 rounded border border-white/[0.08] bg-neutral-950/80 px-1 py-0.5 text-[9px] uppercase tracking-widest font-semibold text-neutral-500 shadow-sm backdrop-blur-sm">LOCAL</span>
+                  <span className={`absolute right-1 z-20 rounded border border-white/[0.08] bg-neutral-950/80 px-1 py-0.5 text-[9px] uppercase tracking-widest font-semibold text-neutral-500 shadow-sm backdrop-blur-sm ${selectionIndex >= 0 ? 'top-7' : 'top-1'}`}>LOCAL</span>
                   <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent px-1.5 pb-1 pt-5 text-xs font-medium text-neutral-200 opacity-0 transition-opacity group-hover/local:opacity-100 group-focus-visible/local:opacity-100"><span className="block truncate">{localCard.name || 'Custom Art'}</span></span>
-                  {selectionIndex >= 0 && <span className="animate-scaleIn absolute top-1 left-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-mono font-bold text-white shadow-md">{selectionIndex + 1}</span>}
+                  {selectionIndex >= 0 && <span className="animate-scaleIn absolute top-1.5 right-1.5 z-20 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-mono font-bold text-white shadow-md">{selectionIndex + 1}</span>}
                 </div>
               );
             })}
@@ -1557,11 +1558,12 @@ function CardPool({
                         onDoubleClick={() => onFetchedCardAdd(item, highResImageUrl)}
                         onKeyDown={(event) => { if (event.key === 'Enter') onFetchedCardAdd(item, highResImageUrl); }}
                         style={{ animationDelay: `${index * 25}ms`, transitionDelay: `${index * 25}ms` }}
-                        className={`relative group/card aspect-[245/337] cursor-grab active:cursor-grabbing rounded-md overflow-hidden bg-neutral-900 outline-none animate-fadeIn transition-all opacity-0 translate-y-2 duration-300 ease-out will-change-[transform,opacity] transform-gpu focus-visible:ring-2 focus-visible:ring-red-500 ${selectionIndex >= 0 ? 'ring-2 ring-red-500 scale-[0.98] brightness-110 shadow-lg' : 'border border-white/[0.03] hover:opacity-100 shadow-sm hover:shadow-xl hover:border-white/[0.1]'}`}
+                        className={`relative group/card aspect-[245/337] cursor-grab active:cursor-grabbing rounded-md overflow-hidden bg-neutral-900 border outline-none animate-fadeIn transition-all opacity-0 translate-y-2 duration-300 ease-out will-change-[transform,opacity] transform-gpu focus-visible:ring-2 focus-visible:ring-red-500 ${selectionIndex >= 0 ? 'ring-2 ring-red-500 border-transparent scale-[0.97] brightness-110 shadow-lg shadow-red-950/20' : 'border-white/[0.03] opacity-80 hover:opacity-100 shadow-sm hover:shadow-lg'}`}
                       >
+                        {selectionIndex >= 0 && <span aria-hidden="true" className="pointer-events-none absolute inset-0 z-10 bg-red-500/[0.06] backdrop-blur-[0.5px]" />}
                         <img data-img-id={item.id} src={fullImageUrl} alt={item.name} draggable={false} loading="lazy" className={`w-full h-full object-cover bg-neutral-950 pointer-events-none transition-all duration-200 ${isPlacedInBinder ? 'opacity-45 grayscale group-hover/card:opacity-75' : ''}`} onError={(event) => { if (!event.currentTarget.src.endsWith('/placeholder.png')) event.currentTarget.src = '/placeholder.png'; }} />
                         <span className="pointer-events-none absolute inset-0 flex items-end bg-gradient-to-t from-black/80 via-transparent to-transparent p-2 opacity-0 transition-opacity group-hover/card:opacity-100 group-focus-visible/card:opacity-100"><span className="w-full truncate text-xs font-medium text-neutral-200">{item.name}</span></span>
-                        {selectionIndex >= 0 && <span className="animate-scaleIn absolute top-1 left-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-mono font-bold text-white shadow-md">{selectionIndex + 1}</span>}
+                        {selectionIndex >= 0 && <span className="animate-scaleIn absolute top-1.5 right-1.5 z-20 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-mono font-bold text-white shadow-md">{selectionIndex + 1}</span>}
                       </div>
                     );
                   })}
@@ -2285,9 +2287,10 @@ export default function CardBinder() {
         return [];
       }
     }
+    scrollToNextUnplacedCard('[role="listbox"][aria-label*="Custom"]', 'data-local-card');
     if (!options.silent) notify(`${plural(entries.length, 'image')} added to MichiBinder.`, 'success');
     return entries.map((entry) => entry.id);
-  }, [notify, pool.length, storageMode]);
+  }, [notify, pool.length, scrollToNextUnplacedCard, storageMode]);
 
   const importFetchedCard = useCallback(async (item, highResImageUrl, options = {}) => {
     hydrateCardPrice(item.id, item);
