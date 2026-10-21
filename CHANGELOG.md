@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.6.5
+## Current state — v4.6.6
 
 - **Ledger date:** 2026-10-20
-- **Application state entering this feature pass:** commit `bba6afa` / v4.6.4
+- **Application state entering this feature pass:** commit `92e1b78` / v4.6.5
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,8 +14,8 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets plus the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, required secret, or environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** the preview canvas is vertically contained and custom assets now match TCGdex card geometry
-- **Last verified behavior:** production build plus three-viewport canvas containment, document sizing, custom-grid ratio, image-fit, and scrollbar checks
+- **Last functional change:** Michi custom-card images now use the exact TCGdex catalogue sizing and transition classes
+- **Last verified behavior:** production build plus three-viewport exact-class, custom-grid ratio, image-fit, canvas containment, and scrollbar checks
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## SemVer reconstruction
@@ -650,6 +650,15 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Changed custom-upload cards from the approximate `2.5/3.5` frame to the exact TCGdex `245/337` aspect ratio and standardized their images on `object-contain` presentation.
 - Verified hidden overflow on the workspace, preview surface, and canvas stage; exact viewport-sized document bounds; twelve-card custom-grid rendering; exact card ratio; contained image fit; hidden asset-list scrollbars; and zero browser errors at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.6.5.
+
+## [v4.6.6] — 2026-10-20
+
+### Fixed
+
+- Force-verified the Michi asset viewport uses the exact Cards-tab two-column wrapper with no custom inline style or legacy three-column/short-height override.
+- Retained the exact `aspect-[245/337]` custom-card frame and replaced custom-only full-height/dimming image classes with the precise catalogue image string: `w-full h-auto object-contain bg-neutral-950 transition-opacity duration-200`.
+- Verified the exact wrapper and image class strings, twelve-card rendering, 245/337 geometry, contained image fit, hidden catalogue scrollbars, canvas containment, viewport-sized document bounds, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
+- Advanced package and lockfile metadata to v4.6.6.
 
 ---
 
