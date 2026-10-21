@@ -74,6 +74,48 @@ const TCGDEX_SEARCH_ENDPOINT = `${TCGDEX_API_BASE}/cards?name=`;
 const TCGDEX_SETS_ENDPOINT = `${TCGDEX_API_BASE}/sets`;
 const TCGDEX_ASSET_CDN = 'https://assets.tcgdex.net';
 const TCGDEX_RESULT_LIMIT = 40;
+const INPAINT_PROMPT_CONTENT = `[SYSTEM: IMAGE COMPOSITING & CONTROLOGY PIPELINE]
+
+INPUT REFERENCES:
+- Canvas: @Image1 (Target Environment & Art Style)
+- Subject A: @Image2 (Beast Plush Character Identity)
+- Subject B: @Image3 (Lion Plush Character Identity)
+
+TASK INSTRUCTIONS:
+Perform a regional inpainting and multi-subject composition into @Image1 using the visual features of @Image2 and @Image3.
+
+1. BOUNDARY LOCK & OVERLAP PROTECTION:
+- Maintain the exact aspect ratio, canvas dimensions, and pixel layout of @Image1.
+- Apply strict masking to protect all existing foreground/midground subjects in @Image1. Do not overwrite, obscure, or alter pre-existing characters or core structural elements.
+
+2. SPATIAL ISOLATION & REGIONAL INPAINTING:
+- Identify negative space, structural gaps, or empty slots in the background of @Image1.
+- Inpaint exactly two new subjects into these isolated background areas.
+
+3. SUBJECT A (BEAST PLUSH) EXECUTION:
+- Regenerate the subject from @Image2 into an empty background slot.
+- Maintain a soft, stylized, flat Disney Ufufy-style plush aesthetic. Strictly prohibit realistic fur, claws, or sharp textures.
+
+4. SUBJECT B (LION PLUSH) EXECUTION:
+- Regenerate the subject from @Image3 into an empty background slot.
+- Maintain the shaggy, expressive Muppet-style plush aesthetic.
+
+5. SCALE, PERSPECTIVE & GRID RULING:
+- Anchor both subjects perfectly to the vanishing points, horizon line, and ground plane grid established in @Image1.
+- Apply a strict mathematical scaling rule: Subject B (Lion) must be rendered at exactly 50% (half the height) of Subject A (Beast), calibrated for their respective depths in the scene.
+
+6. FULL STYLE ADAPTATION & REDRAW:
+- Do not collage or overlay. Redraw both subjects entirely within the native medium of @Image1.
+- Extract and perfectly duplicate the line-art weight, brush stroke textures, shading style (e.g., watercolor, gouache, digital paint), color palette, and gradient transitions from @Image1 onto both new subjects.
+
+7. LIGHTING & AMBIENT HARMONY:
+- Illuminate both subjects using the exact light source vector, color temperature, and intensity profile found in @Image1.
+- Generate accurate contact shadows and soft ambient occlusion maps where the subjects touch surfaces, ensuring they look perfectly grounded.
+
+8. POSE & ENVIRONMENT INTERACTION:
+- Both subjects must retain their core recognizable facial features and identities from their references, but they should be drawn in a new dynamic pose or orientation.
+- Have the characters actively interact with the environment (e.g., peeking out from behind an asset, leaning against a wall, or looking toward the main scene action) to make their presence look narratively intentional. (both subject balancing on separate power poles)`;
+const RESTYLE_PROMPT_CONTENT = "Change the artistic style of the two brown plushies to perfectly match the style, color tone, and atmosphere of the rest of the image. Maintain the core shapes, positions, and facial expressions of the plushies so they remain recognizable, but transform their textures, shading, and appearance to blend seamlessly into the background. Leave the surrounding environment completely untouched.";
 const SGD_RATE_ENDPOINT = 'https://open.er-api.com/v6/latest/USD';
 const EUR_PER_USD_FALLBACK = 0.92;
 const IDB_NAME = 'digital-card-binder';
@@ -940,7 +982,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.15.1</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.16.0</span>
         </div>
         <SaveStatus status={saveStatus} />
       </div>
@@ -1005,24 +1047,6 @@ function RailPopover({ title, icon, children }) {
   );
 }
 
-const AI_PROMPT_TEMPLATES = [
-  {
-    id: 'inpaint',
-    title: 'InPaint Prompt',
-    prompt: 'A seamless, high-resolution Pokémon card background extension, clean anime art style, vibrant shading...',
-  },
-  {
-    id: 'restyle',
-    title: 'Restyle Prompt',
-    prompt: 'Transform this illustration into a premium vintage oil painting style, thick texture strokes, classic holo border layout...',
-  },
-  {
-    id: 'gridrip',
-    title: 'GridRip Prompt',
-    prompt: 'Isolate and splice this canvas spreadsheet grid layout array into individual card rectangles, standard aspect ratios...',
-  },
-];
-
 function RightControlRail({
   settings,
   setSettings,
@@ -1039,6 +1063,7 @@ function RightControlRail({
   installPrompt,
   onInstall,
   notify,
+  getGridRipPromptText,
 }) {
   const cleanSize = settings.cardSize;
   const base = baseCardSizeMm(cleanSize);
@@ -1048,14 +1073,6 @@ function RightControlRail({
   const togglePanel = (panel) => setOpenPanel((value) => value === panel ? null : panel);
   const chooseGrid = (layoutId) => { onChooseLayout(layoutId); setOpenPanel(null); };
   const chooseView = (view) => { onViewChange(view); setOpenPanel(null); };
-  const copyPrompt = async (template) => {
-    try {
-      await navigator.clipboard.writeText(template.prompt);
-      notify(`${template.title} copied to clipboard.`, 'success');
-    } catch {
-      notify('Could not copy the prompt to the clipboard.', 'error');
-    }
-  };
 
   return (
     <aside data-control-rail aria-label="Layout and print controls" className="no-print py-3 pr-3 flex items-center justify-center z-40 select-none max-h-[calc(100vh-176px)] shrink-0">
@@ -1153,18 +1170,32 @@ function RightControlRail({
             {openPanel === 'shortcuts' && <RailPopover title="Keyboard shortcuts" icon="keyboard"><ShortcutsContent /></RailPopover>}
           </div>
           <div className="relative flex">
-            <RailButton icon="sparkles" label="AI Prompt Generator" active={openPanel === 'ai-tools'} expanded={openPanel === 'ai-tools'} onClick={() => togglePanel('ai-tools')} />
-            {openPanel === 'ai-tools' && (
+            <RailButton icon="sparkles" label="AI Prompt Generator" active={openPanel === 'ai-prompts'} expanded={openPanel === 'ai-prompts'} onClick={() => setOpenPanel(openPanel === 'ai-prompts' ? null : 'ai-prompts')} />
+            {openPanel === 'ai-prompts' && (
               <RailPopover title="AI Generation Tools" icon="sparkles">
-                {AI_PROMPT_TEMPLATES.map((template) => (
-                  <section key={template.id} className="rounded-lg border border-white/[0.06] bg-neutral-900/65 p-2.5 shadow-sm">
-                    <span className="text-[9px] font-bold tracking-widest text-neutral-500 uppercase font-sans">{template.title}</span>
-                    <div className="mt-1.5 flex items-start gap-2">
-                      <textarea disabled value={template.prompt} aria-label={template.title} rows={3} className="min-h-16 min-w-0 flex-1 resize-none rounded-md border border-white/[0.06] bg-neutral-950/75 px-2 py-1.5 text-[10px] leading-relaxed text-neutral-400 opacity-100 outline-none disabled:cursor-default disabled:opacity-100" />
-                      <ToolButton icon="copy" title={`Copy ${template.title}`} dense onClick={() => copyPrompt(template)} className="border border-white/[0.06] bg-neutral-900" />
+                <div className="space-y-4 py-1 text-left select-text">
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[9px] font-bold tracking-widest text-neutral-500 uppercase font-sans">InPaint Prompt</span>
+                      <button type="button" onClick={() => { navigator.clipboard.writeText(INPAINT_PROMPT_CONTENT); notify('InPaint Prompt copied!', 'success'); }} className="h-6 px-2 inline-flex items-center gap-1 rounded bg-neutral-900 border border-white/[0.04] text-[10px] font-medium text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors focus:outline-none"><Icon name="copy" size={12} /><span>Copy</span></button>
                     </div>
-                  </section>
-                ))}
+                    <div className="rounded-lg border border-white/[0.04] bg-neutral-950 p-2 font-sans text-[10px] leading-relaxed text-neutral-400 max-h-20 overflow-y-auto select-all cursor-text">{INPAINT_PROMPT_CONTENT}</div>
+                  </div>
+                  <div className="flex flex-col gap-1.5 border-t border-white/[0.04] pt-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[9px] font-bold tracking-widest text-neutral-500 uppercase font-sans">Restyle Prompt</span>
+                      <button type="button" onClick={() => { navigator.clipboard.writeText(RESTYLE_PROMPT_CONTENT); notify('Restyle Prompt copied!', 'success'); }} className="h-6 px-2 inline-flex items-center gap-1 rounded bg-neutral-900 border border-white/[0.04] text-[10px] font-medium text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors focus:outline-none"><Icon name="copy" size={12} /><span>Copy</span></button>
+                    </div>
+                    <div className="rounded-lg border border-white/[0.04] bg-neutral-950 p-2 font-sans text-[10px] leading-relaxed text-neutral-400 max-h-20 overflow-y-auto select-all cursor-text">{RESTYLE_PROMPT_CONTENT}</div>
+                  </div>
+                  <div className="flex flex-col gap-1.5 border-t border-white/[0.04] pt-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[9px] font-bold tracking-widest text-neutral-500 uppercase font-sans">GridRip Prompt ({settings.layout})</span>
+                      <button type="button" onClick={() => { navigator.clipboard.writeText(getGridRipPromptText()); notify(`GridRip Prompt (${settings.layout}) copied!`, 'success'); }} className="h-6 px-2 inline-flex items-center gap-1 rounded bg-neutral-900 border border-white/[0.04] text-[10px] font-medium text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors focus:outline-none"><Icon name="copy" size={12} /><span>Copy</span></button>
+                    </div>
+                    <div className="rounded-lg border border-white/[0.04] bg-neutral-950 p-2 font-sans text-[10px] leading-relaxed text-neutral-400 max-h-20 overflow-y-auto select-all cursor-text">{getGridRipPromptText()}</div>
+                  </div>
+                </div>
               </RailPopover>
             )}
           </div>
@@ -1726,6 +1757,19 @@ export default function CardBinder() {
   const [sidebarDropActive, setSidebarDropActive] = useState(false);
   const [editing, setEditing] = useState(null);
   const [stageSize, setStageSize] = useState({ w: 1000, h: 620 });
+
+  const getGridRipPromptText = () => {
+    const defaultEngineHeader = "Act as an expert multimodal AI graphic engineer. Analyze this uploaded image. Your task is to act as a vision-to-prompt engine and completely recreate this exact piece of art as a flawless, high-resolution digital image asset in a lossless PNG format.\nInstructions for the Vision Model:\n1. Extract Visual Data: Automatically extract the exact illustration style, specific characters present, color schemes, and environmental details from the reference image.\n2. Stitch the Art Continuity: Seamlessly merge the background illustration across all panels, ensuring all lines, horizons, and object boundaries align perfectly across the seams.\n";
+    const defaultEngineFooter = "\n4. Clean the Frame: Completely remove the physical binder context, erasing all binder rings, plastic reflections, page distortions, and background tables.\n5. Output Delivery: Export the final asset as a high-definition PNG file with a fully transparent alpha channel background. The layout must feature a clean, crisp, 1-pixel transparent spacer between panels to serve as an artifact-free cut line. ";
+
+    if (settings.layout === '2x2') {
+      return defaultEngineHeader + "3. Format the Grid & Cards: Format the final output as a flat, digital 2x2 grid layout. Force every individual card in the grid to maintain a strict, unwarped, standard 2:3 vertical trading card aspect ratio. Every individual card must feature sharp, perfectly square, 90-degree corners with absolutely no rounded edges." + defaultEngineFooter + "Set the final global canvas output to an exact 2:3 aspect ratio.";
+    }
+    if (settings.layout === '3x3' || settings.layout === '4x3') {
+      return defaultEngineHeader + "3. Format the Grid & Cards: Format the final output as a flat, digital 3x3 grid layout. Force every individual card in the grid to maintain a strict, unwarped, standard 2:3 vertical trading card aspect ratio. Every individual card must feature sharp, perfectly square, 90-degree corners with absolutely no rounded edges." + defaultEngineFooter + "Set the final global canvas output to an exact 3:4 aspect ratio.";
+    }
+    return defaultEngineHeader + "3. Format the Grid & Cards: Format the final output as a flat digital card grid layout layout." + defaultEngineFooter;
+  };
 
   const stageRef = useRef(null);
   const timelineScrollRef = useRef(null);
@@ -4181,6 +4225,7 @@ export default function CardBinder() {
                 installPrompt={installPrompt}
                 onInstall={async () => { await installPrompt.prompt(); setInstallPrompt(null); }}
                 notify={notify}
+                getGridRipPromptText={getGridRipPromptText}
               />
             </div>
             <FloatingNavigation
