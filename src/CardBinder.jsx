@@ -1002,7 +1002,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.20.3</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.20.4</span>
         </div>
         <SaveStatus status={saveStatus} pool={pool} />
       </div>
@@ -2512,39 +2512,56 @@ export default function CardBinder() {
     notify('Connecting to remote cloud vault…', 'info');
 
     try {
-      const cleanUser = usernameString.trim();
-      // Fetch the primary root profile where ImgBB mounts public uploads.
+      const cleanUser = usernameString.trim().toLowerCase();
+      const dynamicCallbackName = `imgbb_callback_${Date.now()}`;
       const targetProfileUrl = `https://${cleanUser}.imgbb.com/`;
-      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetProfileUrl)}`;
+      const targetUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetProfileUrl)}&callback=${encodeURIComponent(dynamicCallbackName)}`;
 
-      const response = await fetch(proxyUrl);
-      if (!response.ok) throw new Error(`Proxy gateway error: status ${response.status}`);
+      const htmlString = await new Promise((resolve, reject) => {
+        const scriptElement = document.createElement('script');
+        scriptElement.src = targetUrl;
+        scriptElement.id = dynamicCallbackName;
 
-      const json = await response.json();
-      const htmlString = json.contents;
-      if (!htmlString) throw new Error('Cloud response profile data empty.');
+        const cleanup = () => {
+          scriptElement.remove();
+          delete window[dynamicCallbackName];
+        };
 
-      const normalizedHtml = htmlString
-        .replace(/\\u002F/gi, '/')
-        .replace(/\\u0026/gi, '&')
-        .replace(/\\\//g, '/')
-        .replace(/&amp;/g, '&');
-      const imageRegex = /https:\/\/i\.ibb\.co\/[a-zA-Z0-9]+\/[^"']+\.(?:png|jpg|jpeg|webp)/gi;
-      const directUrls = normalizedHtml.match(imageRegex) || [];
-      const uniqueUrls = [...new Set(directUrls)];
+        window[dynamicCallbackName] = (response) => {
+          cleanup();
+          if (response?.contents) resolve(response.contents);
+          else reject(new Error('Payload collection wrapper empty.'));
+        };
+
+        scriptElement.onerror = () => {
+          cleanup();
+          reject(new Error('Network gateway proxy handshaking blocked.'));
+        };
+
+        document.body.appendChild(scriptElement);
+      });
+
+      const directImageRegex = /https:\/\/i\.ibb\.co\/[a-zA-Z0-9]+\/[^"']+\.(?:png|jpg|jpeg|webp)/g;
+      const matches = htmlString.match(directImageRegex) || [];
+      const uniqueUrls = [...new Set(matches)];
 
       if (uniqueUrls.length === 0) {
-        const thumbRegex = /https:\/\/thumb\.ibb\.co\/[a-zA-Z0-9]+\/[^"']+\.(?:png|jpg|jpeg|webp)/gi;
-        const thumbUrls = normalizedHtml.match(thumbRegex) || [];
-        thumbUrls.forEach((url) => {
-          const fullUrl = url.replace('thumb.ibb.co', 'i.ibb.co');
-          if (!uniqueUrls.includes(fullUrl)) uniqueUrls.push(fullUrl);
+        const viewerPathRegex = /https:\/\/ibb\.co\/[a-zA-Z0-9]+/g;
+        const viewerLinks = htmlString.match(viewerPathRegex) || [];
+        const deduplicatedViewers = [...new Set(viewerLinks)];
+
+        deduplicatedViewers.forEach((link) => {
+          const pathSegments = link.split('/');
+          const imageHash = pathSegments.pop() || pathSegments.pop();
+          if (imageHash && imageHash !== 'albums') {
+            uniqueUrls.push(`https://i.ibb.co/${imageHash}/image.png`);
+          }
         });
       }
 
       if (uniqueUrls.length === 0) {
         setSaveStatus('saved');
-        notify('Cloud rehydration failed. Verify the ImgBB username and public asset visibility.', 'error');
+        notify('No public images discovered on this profile view.', 'error');
         return [];
       }
 
@@ -2575,11 +2592,11 @@ export default function CardBinder() {
         return addedIds;
       }
 
-      throw new Error('All file content download streams failed.');
+      throw new Error('All image streaming paths failed.');
     } catch (error) {
       console.error('Downstream Cloud Rehydration Fault:', error);
       setSaveStatus('saved');
-      notify('Cloud rehydration failed. Verify network connectivity.', 'error');
+      notify('Cloud rehydration failed. Verify username privacy rules.', 'error');
       return [];
     }
   }, [addFiles, notify]);
