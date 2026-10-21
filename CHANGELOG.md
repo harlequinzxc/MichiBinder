@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.12.0
+## Current state — v4.12.1
 
 - **Ledger date:** 2026-10-21
-- **Application state entering this feature pass:** commit `09a2e26` / v4.11.7
+- **Application state entering this feature pass:** commit `e4f0d06` / v4.12.0
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,8 +14,8 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets plus the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, required secret, or environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** independent Cards/Michi scroll-position memory with passive tab restoration and no tab-triggered first-unplaced snap
-- **Last verified behavior:** strict full-ledger SemVer audit, production build, three-viewport 520px Cards and 360px Michi restoration, zero passive-tab auto-scroll calls, synchronized v4.12.0 title pill, and zero browser errors
+- **Last functional change:** permanently mounted Cards/Michi panel trees with memory-first restoration and first-activation unplaced targeting
+- **Last verified behavior:** production build, three-viewport permanent panel/scroll-node identity, first-zero-memory targeting, exact 520px Cards and 360px Michi restoration, preserved lookahead/removal triggers, synchronized v4.12.1 title pill, and zero browser errors
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## Strict SemVer policy and audit
@@ -1031,6 +1031,21 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Verified the synchronized `v4.12.0` title pill and zero browser errors at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.12.0.
 
+## [v4.12.1] — 2026-10-21
+
+### Fixed
+
+- Kept both Cards and Michi panel trees permanently mounted and switched only their wrapper display state, preventing tab transitions from replacing search controls, result nodes, upload nodes, or their native scroll containers.
+- Refined v4.12.0 tab restoration so positive saved offsets restore directly, while a zero-memory first activation invokes the shared first-unplaced targeter after a 50ms paint delay.
+- Preserved result-hydration, lazy-lookahead, placement, movement, removal, and Clear Binder targeting independently from tab visibility.
+
+### Verified
+
+- Verified Cards/Michi panel wrappers and both scroll nodes retain object identity and remain connected across repeated bidirectional transitions.
+- Verified first zero-memory activations target `custom-1` and `tcg-1`, then remembered activations restore Cards to 520px and Michi to 360px without additional auto-scroll calls or tab-row displacement.
+- Reverified automatic TCGdex page-2 lookahead, individual-removal and Clear Binder snap-back, the synchronized `v4.12.1` title pill, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
+- Advanced package and lockfile metadata to v4.12.1.
+
 ---
 
 ## Current architecture and engineering rationale
@@ -1088,7 +1103,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 ### Sidebar source and typography system
 
 - Cards and Michi share `selectedCardIds` but keep independent source semantics. Their active tabs use a neutral slate surface; inactive tabs remain muted until hover.
-- Cards and Michi retain independent inner-container scroll offsets across passive tab transitions. First-unplaced targeting runs only after catalogue hydration or binder/catalogue data changes, not when a user merely changes tabs.
+- Cards and Michi panel trees remain mounted under display-toggled wrappers, retaining their search/upload controls and native scroll nodes. Each tab restores a positive remembered offset; a zero-memory first activation targets the first unplaced item, while hydration and binder/catalogue data changes retain their own targeting triggers.
 - Sidebar typography follows three semantic tiers: 12px medium actions/options, 11px secondary descriptions, and 9px uppercase semibold system context. TCGdex and upload counters are deliberate 10px text-only readout exceptions.
 - Search and Card set controls share a 36px height, neutral-950 surface, six-percent white border, six-pixel radius, 12px horizontal padding, six-pixel vertical padding, and 12px medium foreground. The set block sits 14px below search.
 - Michi's upload capsule uses a 20px Lucide upload glyph, 24px vertical padding, and neutral hairline hover treatment. Its zero-asset state is a three-column centered feature callout rather than an unstructured sentence.
@@ -1181,7 +1196,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - README's workspace/control description has not yet been brought in line with the latest rail menus.
 - Historical SemVer labels are not Git tags or GitHub Releases. Commit links remain the release evidence.
 - There is no account, cloud sync, collaboration, telemetry, backend, or environment-secret layer. Those are deliberate scope boundaries, not half-built modules.
-- No active functional workspace task was open when v4.12.0 was recorded.
+- No active functional workspace task was open when v4.12.1 was recorded.
 
 ## Incoming engineer hand-off brief
 

@@ -940,7 +940,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.12.0</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.12.1</span>
         </div>
         <SaveStatus status={saveStatus} />
       </div>
@@ -1310,6 +1310,7 @@ function CardPool({
   onLoadMore,
   onFetchedCardDragStart,
   onFetchedCardAdd,
+  scrollToNextUnplacedCard,
 }) {
   const searchActive = Boolean(searchQuery.trim() || selectedSet);
   const customCards = customUploadedCards.map((item) => ({ ...item, localUrlDataString: images[item.id] || item.src || '' }));
@@ -1347,12 +1348,18 @@ function CardPool({
     setTimeout(() => {
       if (tab === 'cards') {
         const container = document.querySelector('[data-tcgdex-results]');
-        if (container) container.scrollTop = cardsScrollPosRef.current;
+        if (container) {
+          if (cardsScrollPosRef.current > 0) container.scrollTop = cardsScrollPosRef.current;
+          else scrollToNextUnplacedCard('[data-tcgdex-results]', 'data-tcgdex-card');
+        }
       } else if (tab === 'michi') {
         const container = document.querySelector('[role="listbox"][aria-label*="Custom"]');
-        if (container) container.scrollTop = michiScrollPosRef.current;
+        if (container) {
+          if (michiScrollPosRef.current > 0) container.scrollTop = michiScrollPosRef.current;
+          else scrollToNextUnplacedCard('[role="listbox"][aria-label*="Custom"]', 'data-local-card');
+        }
       }
-    }, 40);
+    }, 50);
   };
   return (
     <aside
@@ -1384,8 +1391,8 @@ function CardPool({
         </div>
       </nav>
 
-      {activeTab === 'michi' ? (
-        <section aria-label="Michi custom assets" className="flex min-h-0 flex-1 flex-col px-4 pb-4">
+      <div data-card-pool-panel="michi" className={`${activeTab === 'michi' ? 'block' : 'hidden'} flex min-h-0 flex-1 flex-col px-4 pb-4`}>
+        <section aria-label="Michi custom assets" className="flex min-h-0 flex-1 flex-col">
           <div data-local-upload className={`relative w-full cursor-pointer select-none rounded-lg border border-dashed border-neutral-800 bg-neutral-950/40 px-4 py-6 text-center transition-all hover:border-neutral-700 hover:bg-neutral-950/80 group ${sidebarDropActive && !slotDropActive ? '!border-red-600 !bg-red-950/30' : ''}`}>
             <input
               ref={inputRef}
@@ -1454,8 +1461,9 @@ function CardPool({
             )}
           </div>
         </section>
-      ) : (
-        <>
+      </div>
+
+      <div data-card-pool-panel="cards" className={`${activeTab === 'cards' ? 'block' : 'hidden'} flex min-h-0 flex-1 flex-col`}>
           <div className="px-4 pb-3">
             <form
               role="search"
@@ -1570,8 +1578,7 @@ function CardPool({
               <p className="mt-1 text-[11px] leading-relaxed text-neutral-400">Enter a Pokémon name or select a set to browse TCGdex.</p>
             </div>
           )}
-        </>
-      )}
+      </div>
       {slotDropActive && <div className="pointer-events-none absolute inset-0 z-40 grid place-items-center bg-red-950/80 p-6 text-center text-sm font-semibold text-red-100 backdrop-blur-sm"><span className="flex items-center gap-2 rounded-xl border border-red-400/30 bg-red-500/15 px-4 py-3"><Icon name="trash" />Drop to remove from binder</span></div>}
     </aside>
   );
@@ -3993,6 +4000,7 @@ export default function CardBinder() {
             onLoadMore={onLoadMore}
             onFetchedCardDragStart={startFetchedCardDrag}
             onFetchedCardAdd={addFetchedCardToPage}
+            scrollToNextUnplacedCard={scrollToNextUnplacedCard}
           />
           <main data-dynamic-workspace data-zen-mode={isZenMode} className="relative flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-neutral-950">
             <div data-preview-surface className="relative flex min-h-0 w-full flex-1 items-center overflow-hidden">
