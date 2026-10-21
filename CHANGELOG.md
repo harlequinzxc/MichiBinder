@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.20.5
+## Current state — v4.20.6
 
 - **Ledger date:** 2026-10-22
-- **Application state entering this feature pass:** commit `a8176dd` / v4.20.4
+- **Application state entering this feature pass:** commit `9d02a96` / v4.20.5
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,8 +14,8 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets, ImgBB multipart uploads/CDN assets through a client-embedded API credential, ImgBB public-profile retrieval through AllOrigins, and the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, or required environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** downstream ImgBB rehydration now streams authenticated upload URLs from the durable pool ledger with a device-session vault fallback, eliminating public-profile HTML and proxy parsing
-- **Last verified behavior:** production build, persisted-pool ingestion, session-vault fallback and deduplication, fresh-upload vault tracking, zero proxy requests, cloud-source persistence across reload, synchronized v4.20.5 title pill, and zero browser errors
+- **Last functional change:** downstream ImgBB rehydration now ingests a user-supplied public text manifest, extracts unique direct-CDN assets, and streams them without profile scraping, proxy gateways, or device-session lookup state
+- **Last verified behavior:** production build, blank-cache and fresh-device manifest ingestion, duplicate suppression, query-bearing CDN URLs, empty-manifest recovery, two-file upload continuity, zero proxy/session-vault use, cloud-source persistence across reload, synchronized v4.20.6 title pill, and zero browser errors
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## Strict SemVer policy and audit
@@ -34,7 +34,7 @@ The 2026-10-21 full-ledger audit confirmed the three post-inception major bounda
 2. **v3.0.0:** the toolbar/tray composition was dismantled and rebuilt as the four-area workspace with contextual bottom navigation.
 3. **v4.0.0:** top-heavy configuration controls were removed and replaced by the standalone right utility rail plus cohesive bottom structural controller.
 
-The audit also confirmed that presentation-only releases remain patches; capability releases such as TCGdex integration, source workspaces, valuation, upload deletion, print slicing, and first-unplaced tracking remain minors; and later fixes that complete those existing contracts remain patches. Specifically, v4.8.2 restored the Custom metric removed during v4.8.1 consolidation, while v4.11.1–v4.11.7 corrected lifecycle and print-slicing gaps in capabilities introduced by v4.11.0 and earlier print releases. Persistent per-tab scroll memory is a new stateful interaction and therefore begins v4.12.0 rather than v4.11.8; continuously measurable inactive-panel background scrolling is likewise a new cross-tab capability and begins v4.15.0; premium layout-aware prompt compilation and copy workflows begin v4.16.0, while their preview-format and prompt-copy corrections remain the v4.16.1 patch; remote public-asset ingestion begins v4.17.0, its replacement with bulk Imgur album deconstruction and concurrent streaming begins v4.18.0, the CORS-safe public-page scraper correction remains the v4.18.1 patch, cloud-first ImgBB upload interception begins v4.19.0, cross-device downstream ImgBB profile rehydration begins v4.20.0, the GridRip boundary-instruction correction remains the v4.20.1 patch, the cloud-control/header presentation correction remains the v4.20.2 patch, the downstream root-profile parser correction remains the v4.20.3 patch, the JSONP profile-loader correction remains the v4.20.4 patch, and the device-ledger rehydration correction remains the v4.20.5 patch.
+The audit also confirmed that presentation-only releases remain patches; capability releases such as TCGdex integration, source workspaces, valuation, upload deletion, print slicing, and first-unplaced tracking remain minors; and later fixes that complete those existing contracts remain patches. Specifically, v4.8.2 restored the Custom metric removed during v4.8.1 consolidation, while v4.11.1–v4.11.7 corrected lifecycle and print-slicing gaps in capabilities introduced by v4.11.0 and earlier print releases. Persistent per-tab scroll memory is a new stateful interaction and therefore begins v4.12.0 rather than v4.11.8; continuously measurable inactive-panel background scrolling is likewise a new cross-tab capability and begins v4.15.0; premium layout-aware prompt compilation and copy workflows begin v4.16.0, while their preview-format and prompt-copy corrections remain the v4.16.1 patch; remote public-asset ingestion begins v4.17.0, its replacement with bulk Imgur album deconstruction and concurrent streaming begins v4.18.0, the CORS-safe public-page scraper correction remains the v4.18.1 patch, cloud-first ImgBB upload interception begins v4.19.0, cross-device downstream ImgBB profile rehydration begins v4.20.0, the GridRip boundary-instruction correction remains the v4.20.1 patch, the cloud-control/header presentation correction remains the v4.20.2 patch, the downstream root-profile parser correction remains the v4.20.3 patch, the JSONP profile-loader correction remains the v4.20.4 patch, the device-ledger rehydration correction remains the v4.20.5 patch, and the public-manifest registry correction remains the v4.20.6 patch.
 
 Historical entries are ordered from oldest to newest. Commit links, rather than nonexistent retrospective Git tags, are the immutable references.
 
@@ -1376,6 +1376,23 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Verified zero AllOrigins requests, six-pixel non-overlapping cloud-control spacing, exact full-width CTA classes, zero unexpected browser errors, unchanged runtime dependencies, and retained GridRip boundary instructions.
 - Rebuilt the production bundle and advanced package, lockfile, and title-pill metadata to v4.20.5.
 
+## [v4.20.6] — 2026-10-22
+
+### Fixed
+
+- Replaced device-local pool/session-vault retrieval with a public manifest registry that works from an entirely blank browser cache or a fresh device.
+- Removed every `imgbb_cloud_sync_vault` read/write, the obsolete username lookup contract, and all remaining profile-scraping or proxy assumptions from the downstream path.
+- Added direct plain-text manifest fetching, bounded global extraction of `i.ibb.co` PNG/JPG/JPEG/WEBP sources, empty-entry filtering, duplicate suppression, and query-string preservation.
+- Added concurrent direct-image downloads with response and MIME validation, safe trailing-path filenames, partial-failure isolation, and durable CDN source pointers on reconstructed files.
+- Rewired the cloud form to `cloudManifest`, added the public-manifest URL placeholder and accessible label, and retained the exact stacked panel, full-width 32px input/button, and six-pixel control gap.
+- Preserved the cloud-first multi-upload path, pool persistence structures, CLOUD labels, and global Saved to Cloud behavior without adding runtime dependencies.
+
+### Verified
+
+- Verified blank-cache two-asset manifest ingestion with duplicate suppression, fresh-device embedded-manifest parsing with a query-bearing CDN URL, empty-manifest recovery, and a subsequent two-file authenticated upload at 1600×1000, 1366×768, and 1200×700.
+- Verified one manifest fetch per submission, zero AllOrigins requests, complete session-vault removal, six-pixel non-overlapping controls, exact full-width CTA classes, reload restoration, zero unexpected browser errors, and retained GridRip boundary instructions.
+- Rebuilt the production bundle and advanced package, lockfile, and title-pill metadata to v4.20.6.
+
 ---
 
 ## Current architecture and engineering rationale
@@ -1438,7 +1455,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Local uploads are keyed by exact filename for replacement: a collision retains the custom asset ID, updates its binary/source URL, preserves every slot assignment, and remounts the corresponding inventory row through its dynamic image-source-length key.
 - Sidebar typography follows three semantic tiers: 12px medium actions/options, 11px secondary descriptions, and 9px uppercase semibold system context. TCGdex and upload counters are deliberate 10px text-only readout exceptions.
 - Search and Card set controls share a 36px height, neutral-950 surface, six-percent white border, six-pixel radius, 12px horizontal padding, six-pixel vertical padding, and 12px medium foreground. The set block sits 14px below search.
-- Michi's upload capsule uses a 20px Lucide upload glyph, 24px vertical padding, and neutral hairline hover treatment. A compact ImgBB live-status panel sits directly beneath it; picker and native drop inputs upload concurrently before durable local ingestion, while the embedded username form vertically stacks full-width controls without overlap. Successful authenticated uploads append their CDN sources to a deduplicated device-session vault. Downstream rehydration streams unique cloud URLs from the persisted pool first and falls back to that session vault, without public-profile HTML or open-proxy parsing. Persisted source pointers drive fixed-footprint emerald CLOUD versus muted LOCAL badges without changing the grid geometry. Its zero-asset state is a three-column centered feature callout rather than an unstructured sentence.
+- Michi's upload capsule uses a 20px Lucide upload glyph, 24px vertical padding, and neutral hairline hover treatment. A compact ImgBB live-status panel sits directly beneath it; picker and native drop inputs upload concurrently before durable local ingestion, while the public-manifest form vertically stacks full-width controls without overlap. Downstream rehydration fetches plain text from the submitted manifest, extracts and deduplicates direct `i.ibb.co` media, then streams all valid images concurrently without profile HTML, proxy gateways, or device-session state. Persisted source pointers drive fixed-footprint emerald CLOUD versus muted LOCAL badges without changing the grid geometry. Its zero-asset state is a three-column centered feature callout rather than an unstructured sentence.
 
 ### Timeline, rail, and viewport boundaries
 
@@ -1529,7 +1546,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - README's workspace/control description has not yet been brought in line with the latest rail menus.
 - Historical SemVer labels are not Git tags or GitHub Releases. Commit links remain the release evidence.
 - There is no MichiBinder account, collaboration, telemetry, backend, or environment-secret layer. ImgBB synchronization remains a client-side integration using the configured public credential and public-profile gateway.
-- The v4.20.5 downstream ImgBB device-ledger rehydration hotfix is complete; no active functional workspace task remains open.
+- The v4.20.6 autonomous cloud manifest registry hotfix is complete; no active functional workspace task remains open.
 
 ## Incoming engineer hand-off brief
 

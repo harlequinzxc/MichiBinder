@@ -1002,7 +1002,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.20.5</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.20.6</span>
         </div>
         <SaveStatus status={saveStatus} pool={pool} />
       </div>
@@ -1501,9 +1501,9 @@ function CardPool({
 
           <div className="mt-3 flex flex-col gap-2 rounded-lg border border-white/[0.04] bg-neutral-950 p-2.5 shadow-inner">
             <div className="flex items-center justify-between"><div className="flex flex-col"><span className="text-[10px] font-semibold text-neutral-200">Persistent Cloud Backup</span><span className="text-[8px] font-medium text-neutral-500 font-mono tracking-wide uppercase">Active via ImgBB CDN</span></div><div className="flex items-center gap-1.5 text-[9px] font-bold text-emerald-400 font-sans tracking-wide uppercase"><span className="size-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_currentColor] animate-pulse" />Live</div></div>
-            <form onSubmit={(e) => { e.preventDefault(); const val = e.currentTarget.elements.cloudUser.value; if(val.trim()){ pullAssetsFromImgBBCloud(val); e.currentTarget.reset(); } }}>
+            <form onSubmit={(e) => { e.preventDefault(); const val = e.currentTarget.elements.cloudManifest.value; if(val.trim()){ pullAssetsFromImgBBCloud(val); e.currentTarget.reset(); } }}>
               <div className="flex flex-col gap-1.5 w-full">
-                <input name="cloudUser" type="text" aria-label="ImgBB username" placeholder="Enter ImgBB username..." className="h-8 w-full bg-neutral-900 border border-white/[0.06] rounded-md px-2.5 text-xs font-medium text-neutral-200 placeholder-neutral-600 focus:outline-none focus:ring-1 focus:ring-red-500/50" />
+                <input name="cloudManifest" type="text" aria-label="Public cloud manifest URL" placeholder="Paste your public manifest URL..." className="h-8 w-full bg-neutral-900 border border-white/[0.06] rounded-md px-2.5 text-xs font-medium text-neutral-200 placeholder-neutral-600 focus:outline-none focus:ring-1 focus:ring-red-500/50" />
                 <button type="submit" className="w-full h-8 flex items-center justify-center rounded-md bg-neutral-800 text-zinc-200 border border-white/[0.04] font-semibold text-xs transition-all hover:bg-neutral-700 active:scale-[0.98]">Pull from Cloud</button>
               </div>
             </form>
@@ -2474,16 +2474,6 @@ export default function CardBinder() {
         if (!file?.type?.startsWith('image/')) return null;
         const cloudUrl = await uploadImageToImgBB(file);
         if (!cloudUrl) return null;
-        try {
-          const cachedVault = JSON.parse(sessionStorage.getItem('imgbb_cloud_sync_vault') || '[]');
-          const currentVault = Array.isArray(cachedVault) ? cachedVault.filter((url) => typeof url === 'string') : [];
-          if (!currentVault.includes(cloudUrl)) {
-            currentVault.push(cloudUrl);
-            sessionStorage.setItem('imgbb_cloud_sync_vault', JSON.stringify(currentVault));
-          }
-        } catch {
-          // Session storage can be unavailable in hardened privacy contexts; durable pool persistence still proceeds.
-        }
         const syntheticFile = new File(
           [file],
           file.name || `cloud-asset-${index + 1}.png`,
@@ -2512,73 +2502,53 @@ export default function CardBinder() {
     }
   }, [addFiles, notify]);
 
-  const pullAssetsFromImgBBCloud = useCallback(async (usernameString) => {
+  const pullAssetsFromImgBBCloud = useCallback(async (manifestUrlString) => {
     setSaveStatus('saving');
-    notify('Querying authenticated cloud media ledger…', 'info');
+    notify('Streaming remote cloud asset matrix…', 'info');
 
     try {
-      const rawUploadedCards = pool.filter((item) => (
-        item.source === 'upload'
-        && typeof item.src === 'string'
-        && (item.src.includes('imgbb.com') || item.src.includes('i.ibb.co'))
-      ));
-      const uniqueUrls = [...new Set(rawUploadedCards.map((item) => item.src))];
+      const manifestUrl = String(manifestUrlString || '').trim();
+      const response = await fetch(manifestUrl);
+      if (!response.ok) throw new Error(`Cloud manifest request failed with status ${response.status}.`);
+
+      const dataText = await response.text();
+      const directImageRegex = /https:\/\/i\.ibb\.co\/[a-zA-Z0-9]+\/[^\s"'<>\\]+?\.(?:png|jpg|jpeg|webp)(?:\?[^\s"'<>\\]*)?/gi;
+      const parsedUrls = (dataText.match(directImageRegex) || []).filter(Boolean);
+      const uniqueUrls = [...new Set(parsedUrls)];
 
       if (uniqueUrls.length === 0) {
-        const sessionCache = sessionStorage.getItem('imgbb_cloud_sync_vault');
-        if (sessionCache) {
-          const cachedUrls = JSON.parse(sessionCache);
-          if (Array.isArray(cachedUrls)) {
-            uniqueUrls.push(...cachedUrls.filter((url) => (
-              typeof url === 'string'
-              && (url.includes('imgbb.com') || url.includes('i.ibb.co'))
-            )));
-          }
-        }
-      }
-
-      const deduplicatedUrls = [...new Set(uniqueUrls)];
-      if (deduplicatedUrls.length === 0) {
         setSaveStatus('saved');
-        notify('No active cloud assets tracked on this device. Upload fresh images to populate your cloud vault.', 'warn');
+        notify('No active cloud cards tracked in this manifest index.', 'warn');
         return [];
       }
 
-      notify(`Streaming ${deduplicatedUrls.length} authenticated cloud assets…`, 'info');
-
-      const downloadedSyntheticFiles = await Promise.all(deduplicatedUrls.map(async (url, index) => {
+      const downloadedSyntheticFiles = (await Promise.all(uniqueUrls.map(async (url, index) => {
         try {
           const fileResponse = await fetch(url);
           if (!fileResponse.ok) return null;
-
           const blob = await fileResponse.blob();
           if (!blob.type?.startsWith('image/')) return null;
-          const urlPathName = new URL(url).pathname.split('/').pop() || `cloud-card-${index}`;
-          const fileName = urlPathName.includes('.') ? urlPathName : `${urlPathName}.png`;
-          const file = new File([blob], safeFileName(fileName), { type: blob.type });
+          const urlPathName = new URL(url).pathname.split('/').filter(Boolean).pop() || `cloud-card-${index}`;
+          const deducedFileName = urlPathName.includes('.') ? urlPathName : `${urlPathName}.png`;
+          const file = new File([blob], safeFileName(deducedFileName), { type: blob.type });
           return Object.assign(file, { src: url, id: uid('cloud') });
         } catch {
           return null;
         }
-      }));
+      }))).filter(Boolean);
 
-      const validFiles = downloadedSyntheticFiles.filter(Boolean);
-
-      if (validFiles.length > 0) {
-        const addedIds = await addFiles(validFiles);
-        if (!addedIds.length) throw new Error('Cloud assets could not be registered locally.');
-        notify(`Successfully rehydrated ${validFiles.length} custom cloud assets.`, 'success');
-        return addedIds;
-      }
-
-      throw new Error('All image streaming paths failed.');
+      if (!downloadedSyntheticFiles.length) throw new Error('All image streaming paths failed.');
+      const addedIds = await addFiles(downloadedSyntheticFiles);
+      if (!addedIds.length) throw new Error('Cloud assets could not be registered locally.');
+      notify(`Successfully rehydrated ${downloadedSyntheticFiles.length} custom cloud assets.`, 'success');
+      return addedIds;
     } catch (error) {
-      console.error('Downstream Cloud Rehydration Fault:', error);
+      console.error('Cloud manifest rehydration failed:', error);
       setSaveStatus('saved');
-      notify('Cloud rehydration failed. Verify network connectivity.', 'error');
+      notify('Cloud rehydration failed. Verify manifest access and network connectivity.', 'error');
       return [];
     }
-  }, [pool, addFiles, notify]);
+  }, [addFiles, notify]);
 
   const importFetchedCard = useCallback(async (item, highResImageUrl, options = {}) => {
     hydrateCardPrice(item.id, item);
