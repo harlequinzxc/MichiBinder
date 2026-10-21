@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.6.6
+## Current state — v4.6.7
 
 - **Ledger date:** 2026-10-20
-- **Application state entering this feature pass:** commit `92e1b78` / v4.6.5
+- **Application state entering this feature pass:** commit `bf35038` / v4.6.6
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,8 +14,8 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets plus the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, required secret, or environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** Michi custom-card images now use the exact TCGdex catalogue sizing and transition classes
-- **Last verified behavior:** production build plus three-viewport exact-class, custom-grid ratio, image-fit, canvas containment, and scrollbar checks
+- **Last functional change:** Michi cards retain exact catalogue geometry while restoring the grayscale placed-card indicator
+- **Last verified behavior:** production build plus three-viewport direct-child grid structure, placed/unplaced image styling, ratio, containment, and scrollbar checks
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## SemVer reconstruction
@@ -659,6 +659,15 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Retained the exact `aspect-[245/337]` custom-card frame and replaced custom-only full-height/dimming image classes with the precise catalogue image string: `w-full h-auto object-contain bg-neutral-950 transition-opacity duration-200`.
 - Verified the exact wrapper and image class strings, twelve-card rendering, 245/337 geometry, contained image fit, hidden catalogue scrollbars, canvas containment, viewport-sized document bounds, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.6.6.
+
+## [v4.6.7] — 2026-10-20
+
+### Fixed
+
+- Confirmed the Michi branch has one master two-column scroll grid directly wrapping every `customCards.map(...)` item, with no nested grid or custom height override.
+- Restored the placed-card image indicator through `opacity-45 grayscale group-hover/local:opacity-75` while retaining the catalogue-aligned `w-full h-auto object-contain bg-neutral-950 transition-all duration-200` base.
+- Verified twelve custom cards remain direct children of the sole grid, exact 245/337 geometry, 0.45 placed opacity, grayscale filtering, unmodified unplaced presentation, canvas containment, hidden list scrollbars, viewport-sized document bounds, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
+- Advanced package and lockfile metadata to v4.6.7.
 
 ---
 
