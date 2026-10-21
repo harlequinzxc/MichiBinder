@@ -1226,6 +1226,7 @@ function CardPool({
   customUploadedCards,
   selectedCardIds,
   placedIds,
+  placedTcgdexIds,
   images,
   inputRef,
   onFiles,
@@ -1437,6 +1438,7 @@ function CardPool({
                     const fullImageUrl = item.image ? `${item.image}/low.jpg` : '/placeholder.png';
                     const highResImageUrl = item.image ? `${item.image}/high.jpg` : '/placeholder.png';
                     const selectionIndex = selectedCardIds.indexOf(item.id);
+                    const isPlacedInBinder = placedTcgdexIds.has(item.id);
                     return (
                       <div
                         key={item.id}
@@ -1465,7 +1467,7 @@ function CardPool({
                         style={{ animationDelay: `${index * 25}ms`, transitionDelay: `${index * 25}ms` }}
                         className={`relative group/card aspect-[245/337] cursor-grab active:cursor-grabbing rounded-md overflow-hidden bg-neutral-900 outline-none animate-fadeIn transition-all opacity-0 translate-y-2 duration-300 ease-out will-change-[transform,opacity] transform-gpu focus-visible:ring-2 focus-visible:ring-red-500 ${selectionIndex >= 0 ? 'ring-2 ring-red-500 scale-[0.98] brightness-110 shadow-lg' : 'border border-white/[0.03] hover:opacity-100 shadow-sm hover:shadow-xl hover:border-white/[0.1]'}`}
                       >
-                        <img data-img-id={item.id} src={fullImageUrl} alt={item.name} draggable={false} loading="lazy" className="w-full h-auto object-contain bg-neutral-950 transition-opacity duration-200" onError={(event) => { if (!event.currentTarget.src.endsWith('/placeholder.png')) event.currentTarget.src = '/placeholder.png'; }} />
+                        <img data-img-id={item.id} src={fullImageUrl} alt={item.name} draggable={false} loading="lazy" className={`w-full h-full object-cover bg-neutral-950 pointer-events-none transition-all duration-200 ${isPlacedInBinder ? 'opacity-45 grayscale group-hover/card:opacity-75' : ''}`} onError={(event) => { if (!event.currentTarget.src.endsWith('/placeholder.png')) event.currentTarget.src = '/placeholder.png'; }} />
                         <span className="pointer-events-none absolute inset-0 flex items-end bg-gradient-to-t from-black/80 via-transparent to-transparent p-2 opacity-0 transition-opacity group-hover/card:opacity-100 group-focus-visible/card:opacity-100"><span className="w-full truncate text-xs font-medium text-neutral-200">{item.name}</span></span>
                         {selectionIndex >= 0 && <span className="animate-scaleIn absolute top-1 left-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-mono font-bold text-white shadow-md">{selectionIndex + 1}</span>}
                       </div>
@@ -1645,6 +1647,10 @@ export default function CardBinder() {
   const visible = useMemo(() => visibleAssignments(pages, dims), [pages, dims]);
   const hidden = useMemo(() => hiddenAssignments(pages, dims), [pages, dims]);
   const placedIds = useMemo(() => new Set(visible.map((assignment) => assignment.id)), [visible]);
+  const allPlacedIds = useMemo(() => new Set(pages.flatMap((page) => Object.values(page.slots || {}))), [pages]);
+  const placedTcgdexIds = useMemo(() => new Set(pool
+    .filter((item) => item.source === 'tcgdex' && item.tcgdexId && allPlacedIds.has(item.id))
+    .map((item) => item.tcgdexId)), [pool, allPlacedIds]);
   const visiblePool = useMemo(() => pool.filter((item) => !settings.hidePlaced || !placedIds.has(item.id)), [pool, settings.hidePlaced, placedIds]);
   const selectedOrdered = useMemo(() => pool.filter((item) => selectedCardIds.includes(item.id)).map((item) => item.id), [pool, selectedCardIds]);
   const selectedFetchedCards = useMemo(() => fetchedCards.filter((item) => selectedCardIds.includes(item.id)), [fetchedCards, selectedCardIds]);
@@ -3696,6 +3702,7 @@ export default function CardBinder() {
             customUploadedCards={customUploadedCards}
             selectedCardIds={selectedCardIds}
             placedIds={placedIds}
+            placedTcgdexIds={placedTcgdexIds}
             images={images}
             inputRef={inputRef}
             onFiles={addFiles}

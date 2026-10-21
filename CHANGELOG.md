@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.7.0
+## Current state — v4.7.1
 
 - **Ledger date:** 2026-10-20
-- **Application state entering this feature pass:** commit `8689316` / v4.6.8
+- **Application state entering this feature pass:** commit `29eaf8a` / v4.7.0
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,8 +14,8 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets plus the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, required secret, or environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** Michi uploads now sort chronologically, retain placed-state styling, and support confirmed clear-all deletion from the list, binder, and storage
-- **Last verified behavior:** production build plus three-viewport chronological-order, placed-style, clear-all persistence, grid, native-scroll, containment, and document-bound checks
+- **Last functional change:** TCGdex catalogue results now mirror Michi placed-card grayscale and hover treatment
+- **Last verified behavior:** production build plus three-viewport placed/unplaced TCGdex catalogue styling, isolated hover, and zero-browser-error checks
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## SemVer reconstruction
@@ -693,6 +693,16 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Restored the placed-upload image treatment with 0.45 opacity, grayscale, and 0.75 hover opacity over the full-height `object-cover` image geometry.
 - Verified ascending display from reverse-ordered persisted input, twelve direct non-overlapping grid children, placed-state styling, exact confirmation copy and button classes, retention of unrelated TCGdex pool and slot data, immediate persisted custom-data removal, native list scrolling, canvas containment, viewport-sized document bounds, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.7.0.
+
+## [v4.7.1] — 2026-10-20
+
+### Fixed
+
+- Added an all-sheet placed-asset index and mapped placed TCGdex pool assets back to canonical TCGdex IDs so catalogue results can detect binder placement without assuming the app's object-based slot model matches the API-card model.
+- Matched catalogue artwork to the Michi full-frame `object-cover` treatment and applied 0.45 opacity plus grayscale whenever the canonical card is placed anywhere in the binder.
+- Used the existing named `group/card` hover channel for 0.75 placed-card hover opacity, preventing the catalogue container's outer `group` from brightening every placed result when a different card is hovered.
+- Verified placed and unplaced image classes, 0.45 placed opacity, grayscale filtering, full-frame cover behavior, isolated hover state, 0.75 hover opacity, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
+- Advanced package and lockfile metadata to v4.7.1.
 
 ---
 
