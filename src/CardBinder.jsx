@@ -1002,7 +1002,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.20.4</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.20.5</span>
         </div>
         <SaveStatus status={saveStatus} pool={pool} />
       </div>
@@ -2474,6 +2474,16 @@ export default function CardBinder() {
         if (!file?.type?.startsWith('image/')) return null;
         const cloudUrl = await uploadImageToImgBB(file);
         if (!cloudUrl) return null;
+        try {
+          const cachedVault = JSON.parse(sessionStorage.getItem('imgbb_cloud_sync_vault') || '[]');
+          const currentVault = Array.isArray(cachedVault) ? cachedVault.filter((url) => typeof url === 'string') : [];
+          if (!currentVault.includes(cloudUrl)) {
+            currentVault.push(cloudUrl);
+            sessionStorage.setItem('imgbb_cloud_sync_vault', JSON.stringify(currentVault));
+          }
+        } catch {
+          // Session storage can be unavailable in hardened privacy contexts; durable pool persistence still proceeds.
+        }
         const syntheticFile = new File(
           [file],
           file.name || `cloud-asset-${index + 1}.png`,
@@ -2503,71 +2513,40 @@ export default function CardBinder() {
   }, [addFiles, notify]);
 
   const pullAssetsFromImgBBCloud = useCallback(async (usernameString) => {
-    if (!usernameString || !usernameString.trim()) {
-      notify('Please enter a valid ImgBB username.', 'warn');
-      return [];
-    }
-
     setSaveStatus('saving');
-    notify('Connecting to remote cloud vault…', 'info');
+    notify('Querying authenticated cloud media ledger…', 'info');
 
     try {
-      const cleanUser = usernameString.trim().toLowerCase();
-      const dynamicCallbackName = `imgbb_callback_${Date.now()}`;
-      const targetProfileUrl = `https://${cleanUser}.imgbb.com/`;
-      const targetUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetProfileUrl)}&callback=${encodeURIComponent(dynamicCallbackName)}`;
-
-      const htmlString = await new Promise((resolve, reject) => {
-        const scriptElement = document.createElement('script');
-        scriptElement.src = targetUrl;
-        scriptElement.id = dynamicCallbackName;
-
-        const cleanup = () => {
-          scriptElement.remove();
-          delete window[dynamicCallbackName];
-        };
-
-        window[dynamicCallbackName] = (response) => {
-          cleanup();
-          if (response?.contents) resolve(response.contents);
-          else reject(new Error('Payload collection wrapper empty.'));
-        };
-
-        scriptElement.onerror = () => {
-          cleanup();
-          reject(new Error('Network gateway proxy handshaking blocked.'));
-        };
-
-        document.body.appendChild(scriptElement);
-      });
-
-      const directImageRegex = /https:\/\/i\.ibb\.co\/[a-zA-Z0-9]+\/[^"']+\.(?:png|jpg|jpeg|webp)/g;
-      const matches = htmlString.match(directImageRegex) || [];
-      const uniqueUrls = [...new Set(matches)];
+      const rawUploadedCards = pool.filter((item) => (
+        item.source === 'upload'
+        && typeof item.src === 'string'
+        && (item.src.includes('imgbb.com') || item.src.includes('i.ibb.co'))
+      ));
+      const uniqueUrls = [...new Set(rawUploadedCards.map((item) => item.src))];
 
       if (uniqueUrls.length === 0) {
-        const viewerPathRegex = /https:\/\/ibb\.co\/[a-zA-Z0-9]+/g;
-        const viewerLinks = htmlString.match(viewerPathRegex) || [];
-        const deduplicatedViewers = [...new Set(viewerLinks)];
-
-        deduplicatedViewers.forEach((link) => {
-          const pathSegments = link.split('/');
-          const imageHash = pathSegments.pop() || pathSegments.pop();
-          if (imageHash && imageHash !== 'albums') {
-            uniqueUrls.push(`https://i.ibb.co/${imageHash}/image.png`);
+        const sessionCache = sessionStorage.getItem('imgbb_cloud_sync_vault');
+        if (sessionCache) {
+          const cachedUrls = JSON.parse(sessionCache);
+          if (Array.isArray(cachedUrls)) {
+            uniqueUrls.push(...cachedUrls.filter((url) => (
+              typeof url === 'string'
+              && (url.includes('imgbb.com') || url.includes('i.ibb.co'))
+            )));
           }
-        });
+        }
       }
 
-      if (uniqueUrls.length === 0) {
+      const deduplicatedUrls = [...new Set(uniqueUrls)];
+      if (deduplicatedUrls.length === 0) {
         setSaveStatus('saved');
-        notify('No public images discovered on this profile view.', 'error');
+        notify('No active cloud assets tracked on this device. Upload fresh images to populate your cloud vault.', 'warn');
         return [];
       }
 
-      notify(`Streaming ${uniqueUrls.length} remote cloud assets…`, 'info');
+      notify(`Streaming ${deduplicatedUrls.length} authenticated cloud assets…`, 'info');
 
-      const downloadedSyntheticFiles = await Promise.all(uniqueUrls.map(async (url, index) => {
+      const downloadedSyntheticFiles = await Promise.all(deduplicatedUrls.map(async (url, index) => {
         try {
           const fileResponse = await fetch(url);
           if (!fileResponse.ok) return null;
@@ -2596,10 +2575,10 @@ export default function CardBinder() {
     } catch (error) {
       console.error('Downstream Cloud Rehydration Fault:', error);
       setSaveStatus('saved');
-      notify('Cloud rehydration failed. Verify username privacy rules.', 'error');
+      notify('Cloud rehydration failed. Verify network connectivity.', 'error');
       return [];
     }
-  }, [addFiles, notify]);
+  }, [pool, addFiles, notify]);
 
   const importFetchedCard = useCallback(async (item, highResImageUrl, options = {}) => {
     hydrateCardPrice(item.id, item);
