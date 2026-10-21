@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.9.4
+## Current state — v4.9.5
 
 - **Ledger date:** 2026-10-21
-- **Application state entering this feature pass:** commit `455ced7` / v4.9.3
+- **Application state entering this feature pass:** commit `8b7a745` / v4.9.4
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,8 +14,8 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets plus the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, required secret, or environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** normalized print slot grid-column/grid-row shorthands with explicit starts and dynamic spans
-- **Last verified behavior:** production build plus three-viewport print checks for 2×1, 2×2, and 3×3 spans, covered-pocket omission, exact track geometry, contained imagery, and zero browser errors
+- **Last functional change:** forced A4-ratio 3×3 print sheets with auto-flowing spans and full-cover print artwork
+- **Last verified behavior:** production build plus three-viewport exact print classes/styles, 2×1/2×2/3×3 spans, covered-pocket omission, sheet containment, cover imagery, PDF output, and zero browser errors
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## SemVer reconstruction
@@ -838,6 +838,21 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Verified exact `1 / span 2`, `2 / span 2`, and `1 / span 3` print shorthands for 2×1, 2×2, and 3×3 cards, alongside explicit normal-pocket placement.
 - Verified a page containing 2×1 and 2×2 merges renders only five canonical slot wrappers, a 3×3 page renders only one, physical bounds match each span, custom 100×50mm tracks remain 2:1, print images remain contained, and no browser errors occur at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.9.4.
+
+## [v4.9.5] — 2026-10-21
+
+### Changed
+
+- Replaced the physical-unit print `SheetGrid` surface with the requested dedicated A4-ratio print sheet using an explicit three-column, three-row CSS Grid, fixed gap/padding tokens, white paper treatment, and clipped print bounds.
+- Changed canonical print slot wrappers to full-size relative grid items whose `gridColumn` and `gridRow` values are driven directly by each active column/row span.
+- Changed print artwork to full-cell `object-cover` rendering through the exact `printable-card-image` class while retaining saved object positioning.
+- Preserved cut guides as a non-interactive overlay and continued deriving slots through the canonical merge-aware generator so covered pocket indices are omitted.
+
+### Verified
+
+- Verified exact sheet, slot, and image classes; explicit `repeat(3, 1fr)` columns/rows; computed three-track output; A4 aspect; hidden overflow; and `object-cover` rendering.
+- Verified 2×1, 2×2, and 3×3 span strings, five canonical wrappers for a combined 2×1/2×2 page, one wrapper for a full 3×3 page, complete slot containment, valid PDF output, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
+- Advanced package and lockfile metadata to v4.9.5.
 
 ---
 

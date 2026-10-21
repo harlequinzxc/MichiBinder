@@ -3770,25 +3770,34 @@ export default function CardBinder() {
       <style>{`@page { size: ${paper.w} ${paper.h}; margin: 0; }`}</style>
       {printPages.map((page) => (
         <section key={page.id} className="print-page">
-          <SheetGrid
-            page={page}
-            card={card}
-            gap={settings.gap}
-            unit={`${printFit.toFixed(4)}in`}
-            dims={dims}
-            getSlotProps={(slot) => ({
-              style: {
-                gridColumn: `${slot.colStart || 'auto'} / ${slot.colSpan ? `span ${slot.colSpan}` : 'span 1'}`,
-                gridRow: `${slot.rowStart || 'auto'} / ${slot.rowSpan ? `span ${slot.rowSpan}` : 'span 1'}`,
-              },
-            })}
-            renderSlot={(slot) => {
+          <div
+            data-print-sheet
+            className="grid grid-cols-3 gap-2 w-full aspect-[210/297] bg-white text-black p-4 overflow-hidden print:m-0"
+            style={{
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gridTemplateRows: 'repeat(3, 1fr)',
+            }}
+          >
+            {getSlots(page, { rows: 3, cols: 3 }).map((slot) => {
               const id = page.slots[slot.key];
               const src = images[id] || pool.find((item) => item.id === id)?.src;
               const crop = id ? getCrop(page, slot.key, id) : { x: 50, y: 50 };
-              return <div className="size-full overflow-hidden bg-white" style={settings.cutGuides ? { outline: '0.2pt solid #9ca3af' } : undefined}>{src && <img src={src} alt="" className="w-full h-full object-contain printable-card-image print:max-w-full print:max-h-full" style={{ objectPosition: `${crop.x}% ${crop.y}%` }} />}</div>;
-            }}
-          />
+              return (
+                <div
+                  key={slot.key}
+                  data-print-slot={slot.key}
+                  className="w-full h-full relative overflow-hidden bg-neutral-100/50"
+                  style={{
+                    gridColumn: `span ${slot.colSpan || 1}`,
+                    gridRow: `span ${slot.rowSpan || 1}`,
+                  }}
+                >
+                  {src && <img src={src} alt="" className="w-full h-full object-cover printable-card-image" style={{ objectPosition: `${crop.x}% ${crop.y}%` }} />}
+                  {settings.cutGuides && <span aria-hidden="true" className="pointer-events-none absolute inset-0 z-10" style={{ outline: '0.2pt solid #9ca3af' }} />}
+                </div>
+              );
+            })}
+          </div>
         </section>
       ))}
     </div>
