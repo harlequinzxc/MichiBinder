@@ -1084,26 +1084,32 @@ function SheetGrid({ page, card, gap, unit, dims, animate = false, renderSlot, g
   );
 }
 
-function SaveStatus({ status, isFolderLinked }) {
-  const saving = status === 'saving';
-  const failed = status === 'error';
-  const disconnected = !saving && !failed && !isFolderLinked;
-  const label = failed ? 'Save failed' : saving ? 'Saving...' : disconnected ? 'No Folder Picked' : 'Local Hub Sync Active';
+function SaveStatus({ isFolderLinked }) {
+  const label = isFolderLinked ? 'Folder Connected' : 'No Folder Picked';
   return (
     <div
       data-engine-badge
-      className={`min-w-[142px] shrink-0 text-xs flex items-center gap-1.5 ${failed ? 'font-medium text-red-300' : saving ? 'text-neutral-200 font-medium animate-pulse' : disconnected ? 'text-red-400 font-medium' : 'text-zinc-400 font-medium'}`}
+      className="min-w-[142px] shrink-0"
       aria-live="polite"
       aria-label={`Local storage: ${label}`}
-      title={disconnected ? 'No local folder connected' : 'Local persistence status'}
+      title={isFolderLinked ? 'Local folder connected' : 'No local folder connected'}
     >
-      <span className={`size-1.5 rounded-full ${failed ? 'bg-red-400' : saving ? 'bg-amber-400' : disconnected ? 'bg-red-500' : 'bg-neutral-500'} shadow-[0_0_8px_currentColor]`} />
-      <span>{label}</span>
+      {isFolderLinked ? (
+        <span className="text-emerald-400/90 font-medium text-xs flex items-center gap-1.5">
+          <span className="size-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.6)] animate-pulse" />
+          Folder Connected
+        </span>
+      ) : (
+        <span className="text-zinc-500 font-medium text-xs flex items-center gap-1.5">
+          <span className="size-1.5 rounded-full bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.6)] animate-pulse" />
+          No Folder Picked
+        </span>
+      )}
     </div>
   );
 }
 
-function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, onToggleZenMode, saveStatus, isFolderLinked, currencyDisplay, onToggleCurrency, portfolioValueLabel }) {
+function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, onToggleZenMode, isFolderLinked, currencyDisplay, onToggleCurrency, portfolioValueLabel }) {
   const isZenMode = !isLeftSidebarOpen && !showBottomTimeline;
   const zenModeTitle = isZenMode ? 'Exit Focus Mode' : 'Enter Focus Mode';
 
@@ -1123,9 +1129,9 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.22.0</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.22.1</span>
         </div>
-        <SaveStatus status={saveStatus} isFolderLinked={isFolderLinked} />
+        <SaveStatus isFolderLinked={isFolderLinked} />
       </div>
 
       <div className="flex shrink-0 items-center justify-end gap-2">
@@ -1487,9 +1493,8 @@ function CardPool({
   uploadAndRegisterFiles,
   syncPoolFromLocalDirectory,
   isFolderLinked,
-  handleDirectoryConnect,
-  handleDirectorySync,
-  unlinkDirectoryHandle,
+  handleFolderAction,
+  handleDisconnectFolder,
   onClearAllUploads,
   onClearAllBinderCards,
   handleRemoveCustomCard,
@@ -1625,16 +1630,12 @@ function CardPool({
           </div>
 
           <div className="mt-3 flex flex-col gap-2 rounded-lg border border-white/[0.04] bg-neutral-950 p-2.5 shadow-inner">
-            <div className="flex items-center justify-between"><div className="flex flex-col"><span className="text-[10px] font-semibold text-neutral-200">Asset Folder Connection</span><span className="text-[8px] font-medium text-neutral-500 font-mono tracking-wide uppercase">Native Disk Directory</span></div></div>
+            <div className="flex items-center justify-between"><div className="flex flex-col"><span className="text-[10px] font-semibold text-neutral-200">Cloud-Free Storage</span><span className="text-[8px] font-medium text-neutral-500 font-mono tracking-wide uppercase">Custom Card Art Folder</span></div></div>
             <input type="file" webkitdirectory="" directory="" multiple className="hidden" id="hub-directory-picker" onChange={(e) => { const files = Array.from(e.target.files || []); if(files.length) { syncPoolFromLocalDirectory(files); } e.target.value = ''; }} />
             <div className="flex flex-col gap-1.5 w-full" data-folder-link-actions>
+              <button type="button" onClick={handleFolderAction} className="w-full h-8 flex items-center justify-center rounded-md bg-neutral-800 text-zinc-200 border border-white/[0.04] font-semibold text-xs transition-all hover:bg-neutral-700 active:scale-[0.98]">{isFolderLinked ? 'Sync' : 'Link Folder'}</button>
               {isFolderLinked ? (
-                <button type="button" onClick={handleDirectorySync} className="w-full h-8 flex items-center justify-center rounded-md bg-neutral-800 text-zinc-200 border border-white/[0.04] font-semibold text-xs transition-all hover:bg-neutral-700 active:scale-[0.98]">Sync</button>
-              ) : (
-                <button type="button" onClick={handleDirectoryConnect} className="w-full h-8 flex items-center justify-center rounded-md bg-neutral-800 text-zinc-200 border border-white/[0.04] font-semibold text-xs transition-all hover:bg-neutral-700 active:scale-[0.98]">Mount Local Hub Folder</button>
-              )}
-              {isFolderLinked ? (
-                <button type="button" onClick={unlinkDirectoryHandle} className="w-full text-center text-[9px] font-bold tracking-widest text-neutral-500 hover:text-red-400 uppercase font-sans mt-0.5 transition-colors cursor-pointer">Disconnect Folder</button>
+                <button type="button" onClick={handleDisconnectFolder} className="w-full text-center text-[9px] font-bold tracking-widest text-neutral-500 hover:text-red-400 uppercase font-sans mt-0.5 transition-colors cursor-pointer">Disconnect Folder</button>
               ) : (
                 <span aria-hidden="true" className="invisible w-full select-none text-center text-[9px] font-bold tracking-widest uppercase font-sans mt-0.5">Disconnect Folder</span>
               )}
@@ -1913,7 +1914,7 @@ export default function CardBinder() {
   const [saveStatus, setSaveStatus] = useState('saved');
   const [storageMode, setStorageMode] = useState('indexeddb');
   const [directoryHandle, setDirectoryHandle] = useState(null);
-  const [isFolderLinked, setIsFolderLinked] = useState(false);
+  const isFolderLinked = Boolean(directoryHandle);
   const [hydrated, setHydrated] = useState(false);
   const [toasts, setToasts] = useState([]);
   const [openPanel, setOpenPanel] = useState(null);
@@ -2001,7 +2002,6 @@ export default function CardBinder() {
         return;
       }
       setDirectoryHandle(handle);
-      setIsFolderLinked(true);
     }).catch(() => {});
     return () => { live = false; };
   }, []);
@@ -2987,13 +2987,14 @@ export default function CardBinder() {
   const handleDirectorySync = useCallback(async () => {
     const targetBinderId = activeBinderIdRef.current;
     if (!directoryHandle) {
-      setIsFolderLinked(false);
       notify('Choose a local asset folder before syncing.', 'warn');
       return [];
     }
     try {
       const permitted = await ensureDirectoryReadPermission(directoryHandle);
       if (!permitted) {
+        setDirectoryHandle(null);
+        await idbDeleteDirectoryHandle().catch(() => {});
         notify('Folder access is required to synchronize local assets.', 'error');
         return [];
       }
@@ -3022,7 +3023,6 @@ export default function CardBinder() {
       if (!permitted) throw new Error('Directory read permission was not granted.');
       await idbPutDirectoryHandle(handle);
       setDirectoryHandle(handle);
-      setIsFolderLinked(true);
       const files = await collectDirectoryHandleFiles(handle);
       if (activeBinderIdRef.current !== targetBinderId) {
         notify('Folder connected. Sync again to import it into the active binder.', 'info');
@@ -3037,9 +3037,12 @@ export default function CardBinder() {
     }
   }, [ensureDirectoryReadPermission, collectDirectoryHandleFiles, syncPoolFromLocalDirectory, notify]);
 
-  const unlinkDirectoryHandle = useCallback(async () => {
+  const handleFolderAction = useCallback(() => (
+    directoryHandle ? handleDirectorySync() : handleDirectoryConnect()
+  ), [directoryHandle, handleDirectorySync, handleDirectoryConnect]);
+
+  const handleDisconnectFolder = useCallback(async () => {
     setDirectoryHandle(null);
-    setIsFolderLinked(false);
     setSaveStatus('saved');
     const picker = document.getElementById('hub-directory-picker');
     if (picker) picker.value = '';
@@ -4766,7 +4769,6 @@ export default function CardBinder() {
           setIsLeftSidebarOpen={setIsLeftSidebarOpen}
           showBottomTimeline={showBottomTimeline}
           onToggleZenMode={handleToggleZenMode}
-          saveStatus={saveStatus}
           isFolderLinked={isFolderLinked}
           currencyDisplay={currencyDisplay}
           onToggleCurrency={() => setCurrencyDisplay((value) => value === 'SGD' ? 'USD' : 'SGD')}
@@ -4816,9 +4818,8 @@ export default function CardBinder() {
             uploadAndRegisterFiles={uploadAndRegisterFiles}
             syncPoolFromLocalDirectory={syncPoolFromLocalDirectory}
             isFolderLinked={isFolderLinked}
-            handleDirectoryConnect={handleDirectoryConnect}
-            handleDirectorySync={handleDirectorySync}
-            unlinkDirectoryHandle={unlinkDirectoryHandle}
+            handleFolderAction={handleFolderAction}
+            handleDisconnectFolder={handleDisconnectFolder}
             onClearAllUploads={handleClearAllUploads}
             onClearAllBinderCards={handleClearAllBinderCards}
             handleRemoveCustomCard={handleRemoveCustomCard}
