@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.11.5
+## Current state — v4.11.6
 
 - **Ledger date:** 2026-10-21
-- **Application state entering this feature pass:** commit `0c0b3ae` / v4.11.4
+- **Application state entering this feature pass:** commit `b82f5da` / v4.11.5
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,8 +14,8 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets plus the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, required secret, or environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** isolated custom-print structural metadata plus shared precomputed background slicing across both print scopes
-- **Last verified behavior:** production build plus three-viewport custom 1×1/2×1/2×2/3×3 sizing, paired-page compaction, standard merged-card slice matrices, valid PDF output, synchronized v4.11.5 title pill, and zero-browser-error checks
+- **Last functional change:** container-local catalogue scrolling that preserves the parent sidebar and header-tab geometry
+- **Last verified behavior:** production build plus three-viewport relative-offset scrolling, automatic page-2 lookahead, removal/clear snap-back, zero Cards/Michi tab displacement, synchronized v4.11.6 title pill, and zero-browser-error checks
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## SemVer reconstruction
@@ -985,6 +985,20 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Verified the synchronized `v4.11.5` title pill and zero browser errors at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.11.5.
 
+## [v4.11.6] — 2026-10-21
+
+### Fixed
+
+- Replaced card-level `scrollIntoView` calls in the first-unplaced catalogue engine with container-local `scrollTo` updates derived from target and container bounding rectangles plus the current inner scroll offset.
+- Preserved the 150ms painted-layout delay and automatic TCGdex pagination lookahead while preventing catalogue movement from propagating to the parent sidebar or its Cards/Michi tab row.
+
+### Verified
+
+- Verified the deep lookahead target computes a 3,682px inner-container destination while the Cards/Michi tab row remains at an identical viewport position before and after scrolling.
+- Reverified automatic page-2 loading, individual-removal and Clear Binder snap-back, smooth container-local scrolling, and the absence of card-level `scrollIntoView` calls.
+- Verified the synchronized `v4.11.6` title pill and zero browser errors at 1600×1000, 1366×768, and 1200×700.
+- Advanced package and lockfile metadata to v4.11.6.
+
 ---
 
 ## Current architecture and engineering rationale
@@ -1134,7 +1148,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - README's workspace/control description has not yet been brought in line with the latest rail menus.
 - Historical SemVer labels are not Git tags or GitHub Releases. Commit links remain the release evidence.
 - There is no account, cloud sync, collaboration, telemetry, backend, or environment-secret layer. Those are deliberate scope boundaries, not half-built modules.
-- No active functional workspace task was open when v4.11.5 was recorded.
+- No active functional workspace task was open when v4.11.6 was recorded.
 
 ## Incoming engineer hand-off brief
 
