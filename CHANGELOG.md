@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.11.0
+## Current state — v4.11.1
 
 - **Ledger date:** 2026-10-21
-- **Application state entering this feature pass:** commit `95b2139` / v4.10.1
+- **Application state entering this feature pass:** commit `640959c` / v4.11.0
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,8 +14,8 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets plus the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, required secret, or environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** first-unplaced smooth auto-scroll across Cards/Michi tab changes, imports, placements, and moves
-- **Last verified behavior:** production build plus three-viewport tab/placement targeting, shared placed hooks, smooth nearest scrolling, imported-card advancement, and zero-browser-error checks
+- **Last functional change:** top-aligned first-unplaced scrolling on result hydration plus the requested v1.4.1 header badge
+- **Last verified behavior:** production build plus three-viewport query/set hydration, tab/placement targeting, smooth start alignment, exact version badge typography, and zero-browser-error checks
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## SemVer reconstruction
@@ -904,6 +904,23 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Verified Michi advances from placed Custom A to Custom B on tab activation, then to Custom C after placing Custom B.
 - Verified every captured call uses `{ behavior: 'smooth', block: 'nearest' }`, import and placement hooks both resolve against committed state, and no browser errors occur at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.11.0.
+
+## [v4.11.1] — 2026-10-21
+
+### Added
+
+- Added the requested literal `v1.4.1` identity badge adjacent to the MichiBinder title using the exact low-profile monospace pill typography and surface tokens.
+- Added a 100ms first-unplaced auto-scroll trigger after every successful TCGdex result hydration, including query and set-filter result lifecycles.
+
+### Changed
+
+- Changed all shared first-unplaced scroll calls from nearest-block alignment to smooth top-boundary alignment through `block: 'start'`.
+
+### Verified
+
+- Verified initial query hydration and subsequent set-filter hydration both target the first unplaced TCGdex card with smooth start alignment.
+- Reverified Cards/Michi tab switches, Michi placement advancement, imported TCGdex placement advancement, exact `v1.4.1` badge copy/classes, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
+- Advanced package and lockfile metadata to v4.11.1.
 
 ---
 

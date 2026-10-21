@@ -117,7 +117,7 @@ const scrollToNextUnplacedCard = (containerSelector, itemAttribute) => {
     const container = document.querySelector(containerSelector);
     if (!container) return;
     const nextTarget = container.querySelector(`[${itemAttribute}]:not([data-placed])`);
-    if (nextTarget) nextTarget.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    if (nextTarget) nextTarget.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 };
 const uid = (prefix = 'id') => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
@@ -917,6 +917,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v1.4.1</span>
         </div>
         <SaveStatus status={saveStatus} />
       </div>
@@ -1966,6 +1967,7 @@ export default function CardBinder() {
       }
       if (searchAbortRef.current !== controller) return;
       setFetchedCards((currentCards) => nextPage === 1 ? normalized : [...currentCards, ...normalized]);
+      setTimeout(() => scrollToNextUnplacedCard('[data-tcgdex-results]', 'data-tcgdex-card'), 100);
       setHasMoreCards(hasNext);
     } catch (error) {
       if (error?.name === 'AbortError' || searchAbortRef.current !== controller) return;
