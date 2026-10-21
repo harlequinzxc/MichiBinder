@@ -158,26 +158,51 @@ const uid = (prefix = 'id') => `${prefix}-${Date.now().toString(36)}-${Math.rand
 const keyOf = (row, col) => `${row}-${col}`;
 const isEditableTarget = (element) => Boolean(element?.matches?.('input, textarea, select, [contenteditable="true"]'));
 const hasFiles = (dataTransfer) => Array.from(dataTransfer?.types || []).includes('Files');
-const fetchImgurAlbumImages = async (urlString) => {
-  const trimmedUrl = typeof urlString === 'string' ? urlString.trim() : '';
-  let url;
+const fetchImgurAlbumImages = async (albumUrlString) => {
   try {
-    url = new URL(trimmedUrl);
-  } catch {
+    const url = new URL(albumUrlString.trim());
+
+    if (/\.(?:png|jpg|jpeg|webp|gif)$/i.test(url.pathname)) {
+      return [url.href];
+    }
+
+    const hashMatch = url.pathname.match(/\/(?:a|gallery|t\/[^/]+)\/([a-zA-Z0-9]+)/) || url.pathname.match(/^\/([a-zA-Z0-9]{5,7})$/);
+    if (!hashMatch) return [];
+    const albumHash = hashMatch[1];
+
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(`https://imgur.com/a/${albumHash}`)}`;
+    const response = await fetch(proxyUrl);
+    if (!response.ok) return [];
+
+    const json = await response.json();
+    const htmlString = json.contents;
+    if (!htmlString) return [];
+
+    const mediaRegex = /"hash":"([a-zA-Z0-9]+)"\s*,\s*"ext":"(\.[a-zA-Z0-9]+)"/g;
+    const directUrls = [];
+    let match;
+
+    while ((match = mediaRegex.exec(htmlString)) !== null) {
+      const fileHash = match[1];
+      const extension = match[2];
+      if (fileHash !== albumHash) {
+        directUrls.push(`https://i.imgur.com/${fileHash}${extension}`);
+      }
+    }
+
+    const uniqueUrls = [...new Set(directUrls)];
+    if (uniqueUrls.length === 0) {
+      const metaOgImageMatch = htmlString.match(/property="og:image"\s+content="([^"]+)"/) || htmlString.match(/content="([^"]+)"\s+property="og:image"/);
+      if (metaOgImageMatch && !metaOgImageMatch[1].includes('imgur-logo')) {
+        return [metaOgImageMatch[1].replace(/\?.*$/, '')];
+      }
+    }
+
+    return uniqueUrls;
+  } catch (error) {
+    console.error('Founder Scraper Engine operational fault:', error);
     return [];
   }
-
-  const albumMatch = url.pathname.match(/\/(?:a|gallery)\/([a-zA-Z0-9]+)/);
-  if (albumMatch) {
-    const albumId = albumMatch[1];
-    const response = await fetch(`https://api.imgur.com/post/v1/albums/${albumId}?include=media`);
-    if (!response.ok) throw new Error(`Imgur album request failed with status ${response.status}.`);
-    const data = JSON.parse(await response.text());
-    return data?.media?.map((item) => item.url).filter(Boolean) || [];
-  }
-
-  if (/\.(?:png|jpe?g|webp)$/i.test(url.pathname)) return [url.href];
-  return [];
 };
 const tcgdexImageBase = (image) => {
   const value = typeof image === 'string' ? image.trim().replace(/\/$/, '') : '';
@@ -1003,7 +1028,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.18.0</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.18.1</span>
         </div>
         <SaveStatus status={saveStatus} />
       </div>
