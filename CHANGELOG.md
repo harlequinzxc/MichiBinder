@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.14.0
+## Current state — v4.14.1
 
 - **Ledger date:** 2026-10-21
-- **Application state entering this feature pass:** commit `cf7a339` / v4.13.1
+- **Application state entering this feature pass:** commit `bba3e8a` / v4.14.0
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,8 +14,8 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets plus the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, required secret, or environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** exact-filename custom upload replacement that preserves asset IDs and live binder placements, plus DOM-settled deletion targeting
-- **Last verified behavior:** production build, three-viewport IndexedDB binary overwrite and binder refresh, localStorage fallback replacement, duplicate suppression, dynamic row remounting, delayed `custom-11` deletion targeting, synchronized v4.14.0 title pill, and zero browser errors
+- **Last functional change:** top-centered reposition guidance, direct print-scope commands, and universal 400px bottom-anchored rail popovers with 60vh ceilings
+- **Last verified behavior:** production build, exact 8px reposition offset and centered text, direct one-/two-card print commands, absent passive radio/primary print controls, four 400px bottom anchors across timeline states, synchronized v4.14.1 title pill, and zero browser errors
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## Strict SemVer policy and audit
@@ -1118,6 +1118,22 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Reverified fresh upload behavior, synchronized `v4.14.0` title styling, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.14.0.
 
+## [v4.14.1] — 2026-10-21
+
+### Fixed
+
+- Returned the active crop-reposition instruction to the frame's top-center 8px inset and centered its text with an explicit flex alignment shell.
+- Removed the redundant **Open print dialog** primary action and passive selected-radio treatment from Print / PDF; **Include all** and **Uploads only** are now visually identical command blocks that set scope and launch printing directly.
+- Expanded every shared rail popover to a 400px desktop footprint with a 60vh ceiling.
+- Reanchored shared rail popovers from `top-0`/right-origin to `bottom-0`/bottom-right-origin so panels grow upward from each trigger and remain clear of the timeline boundary as the drawer opens or collapses.
+
+### Verified
+
+- Verified the reposition pill stays horizontally centered at an exact 8px top inset with computed flex, centered alignment and no browser errors.
+- Verified Print / PDF exposes no primary print-dialog button, radio roles, `aria-checked` state, or selected indicator; direct Uploads Only and Include All commands compile one and two placed cards respectively.
+- Verified Print / PDF, Card size, and AI Generation Tools resolve to 400px widths, exact 60vh ceilings, and zero bottom-anchor drift with the timeline both expanded and collapsed at 1600×1000, 1366×768, and 1200×700.
+- Advanced package and lockfile metadata to v4.14.1.
+
 ---
 
 ## Current architecture and engineering rationale
@@ -1188,9 +1204,9 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - The source sidebar consumes width when open; the right-side main tree receives the remainder.
 - The preview surface is one flex row containing the scrollable stage and detached rail. The stage stops at the rail's left edge, including the rail padding zone; the surface permits overflow so rail dialogs can overlay lower workspace bands while the main workspace remains the outer clip boundary.
 - The rail has no full-height edge divider and no `self-start`; its outer box is vertically centered against the **live preview surface**, not the complete main column. Collapsing the timeline changes preview height, so the rail's vertical center moves.
-- The rail begins with Print / PDF, Print setup, then Grid selection. Print Scope choices immediately launch their selected compilation; Print setup uses `FileSliders`; Card size uses `RulerDimensionLine` and owns both its preset selector and horizontal 80–125% scale controls.
+- The rail begins with Print / PDF, Print setup, then Grid selection. Print scope is exposed as two stateless command blocks that immediately select and launch their compilation; Print setup uses `FileSliders`; Card size uses `RulerDimensionLine` and owns both its preset selector and horizontal 80–125% scale controls.
 - Keyboard shortcuts are followed by AI Prompt Generator, whose InPaint, Restyle, and GridRip cards copy fixed templates through the Clipboard API and report the result through standard toasts.
-- Every rail dialog is absolutely anchored at `right-full mr-3 top-0` relative to its trigger. Panels use a uniform 288px width, cap at 50vh, and scroll internally when their content is longer.
+- Every rail dialog is absolutely anchored at `right-full mr-3 bottom-0` relative to its trigger and animates from the bottom-right. Panels use a uniform 400px width, cap at 60vh, and scroll internally when their content is longer.
 - Database/Custom/Density is absolutely anchored to the preview bottom edge. It uses the self-hosted Inter sans stack and is not part of the timeline or bottom controller flow.
 - The bottom controller owns Undo/Redo, Merge/Unmerge/reset/clear, spread navigation, Add, Duplicate, Delete, and timeline toggle. One-pixel dividers separate its History, Slot Structure, and Spread Navigation pockets.
 - The timeline is a sibling below the preview/controller inside the right-side main tree. Its 300ms elastic slide/fade transitions height, opacity, and padding; collapsed geometry still resolves to zero height, padding, and border so the preview reclaims the full band.
@@ -1246,7 +1262,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 8. **`CardBinder.jsx` is highly coupled.** Broad rewrites can cross persistence, printing, drag state, physical ownership, and layout geometry even when the request appears visual.
 9. **README has small UI drift.** Its workspace table still assigns sizing/preview/print controls to the top utility bar; those controls now live in the right rail and Print / PDF menu.
 10. **Large smooth-scroll jumps are not instantaneous.** Headless Chromium sometimes needed several seconds to settle after many rapid additions; the final target remained correct.
-11. **Long rail dialogs scroll internally.** Print Setup and Keyboard Shortcuts cap at 40vh to preserve uniform trigger-relative anchoring; their lower content is not visible all at once on short landscape viewports.
+11. **Long rail dialogs scroll internally.** Shared popovers cap at 60vh under the uniform bottom-relative anchor; lower content may still require internal scrolling on short landscape viewports.
 12. **Custom compact print is intentionally arrangement-lossy.** It preserves private images, crops, and source dimensions through temporary metadata, but not live page labels or source-page placement. That is current behavior, not an unfinished pagination loop.
 
 ## Historical dead ends and pitfalls
@@ -1271,7 +1287,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - README's workspace/control description has not yet been brought in line with the latest rail menus.
 - Historical SemVer labels are not Git tags or GitHub Releases. Commit links remain the release evidence.
 - There is no account, cloud sync, collaboration, telemetry, backend, or environment-secret layer. Those are deliberate scope boundaries, not half-built modules.
-- No active functional workspace task was open when v4.14.0 was recorded.
+- No active functional workspace task was open when v4.14.1 was recorded.
 
 ## Incoming engineer hand-off brief
 

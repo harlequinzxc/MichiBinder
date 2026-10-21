@@ -940,7 +940,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.14.0</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.14.1</span>
         </div>
         <SaveStatus status={saveStatus} />
       </div>
@@ -993,7 +993,7 @@ function RailPopover({ title, icon, children }) {
       data-rail-popover
       role="dialog"
       aria-label={title}
-      className="absolute right-full mr-3 top-0 rounded-xl bg-neutral-950/95 border border-white/[0.08] p-3 z-50 flex max-h-[50vh] w-72 flex-col gap-2 overflow-y-auto shadow-[0_16px_40px_rgba(0,0,0,0.8)] backdrop-blur-xl animate-scaleIn origin-right"
+      className="absolute right-full mr-3 bottom-0 rounded-xl bg-neutral-950/95 border border-white/[0.08] p-3 z-50 flex max-h-[60vh] w-[400px] flex-col gap-2 overflow-y-auto shadow-[0_16px_40px_rgba(0,0,0,0.8)] backdrop-blur-xl animate-scaleIn origin-bottom-right"
       onPointerDown={(event) => event.stopPropagation()}
     >
       <div className="flex items-center gap-2 border-b border-white/[0.06] pb-2 text-[11px] font-semibold text-neutral-100">
@@ -1028,7 +1028,6 @@ function RightControlRail({
   setSettings,
   onChooseLayout,
   onViewChange,
-  printScope,
   setPrintScope,
   onPrint,
   openPanel,
@@ -1066,23 +1065,16 @@ function RightControlRail({
             <RailButton icon="printer" label="Print / PDF" active={openPanel === 'print-menu'} expanded={openPanel === 'print-menu'} onClick={() => togglePanel('print-menu')} />
             {openPanel === 'print-menu' && (
               <RailPopover title="Print / PDF" icon="printer">
-                <button type="button" onClick={onPrint} className="flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-red-500/25 bg-red-950/55 px-3 text-[11px] font-semibold text-red-100 transition-colors hover:bg-red-900/65 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500">
-                  <Icon name="printer" />
-                  <span>Open print dialog</span>
-                </button>
-                <div className="border-t border-white/[0.06] pt-2">
-                  <span className="mb-1.5 block text-[9px] font-bold tracking-widest text-neutral-500 uppercase">Print scope</span>
-                  <div role="radiogroup" aria-label="Print scope" className="flex flex-col gap-1">
-                    {[
-                      { value: 'all', label: 'Include all', detail: 'Every placed card' },
-                      { value: 'custom', label: 'Uploads only', detail: 'Private uploads only' },
-                    ].map((option) => (
-                      <button key={option.value} type="button" role="radio" aria-checked={printScope === option.value} onClick={option.value === 'all' ? () => { setPrintScope('all'); setTimeout(() => onPrint(), 50); } : () => { setPrintScope('custom'); setTimeout(() => onPrint(), 50); }} className={`flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${printScope === option.value ? 'border-red-500/25 bg-red-950/55 text-red-200' : 'border-white/[0.05] bg-neutral-900/60 text-neutral-300 hover:bg-neutral-800'}`}>
-                        <span className={`grid size-4 shrink-0 place-items-center rounded-full border ${printScope === option.value ? 'border-red-400/50 bg-red-500/15' : 'border-white/10 bg-neutral-950'}`}>{printScope === option.value && <span className="size-1.5 rounded-full bg-red-400" />}</span>
-                        <span className="min-w-0"><strong className="block text-[11px] font-semibold">{option.label}</strong><span className="block truncate text-[9px] text-neutral-500">{option.detail}</span></span>
-                      </button>
-                    ))}
-                  </div>
+                <span className="text-[9px] font-bold tracking-widest text-neutral-500 uppercase">Print scope</span>
+                <div className="grid gap-1.5">
+                  <button type="button" onClick={() => { setPrintScope('all'); setTimeout(() => onPrint(), 50); }} className="flex w-full items-center gap-2 rounded-lg border border-white/[0.05] bg-neutral-900/60 px-3 py-2 text-left transition-colors hover:bg-neutral-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500">
+                    <Icon name="layers" className="text-neutral-400" />
+                    <span className="min-w-0"><strong className="block text-[11px] font-semibold text-neutral-200">Include all</strong><span className="block text-[9px] text-neutral-500">Every placed card</span></span>
+                  </button>
+                  <button type="button" onClick={() => { setPrintScope('custom'); setTimeout(() => onPrint(), 50); }} className="flex w-full items-center gap-2 rounded-lg border border-white/[0.05] bg-neutral-900/60 px-3 py-2 text-left transition-colors hover:bg-neutral-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500">
+                    <Icon name="upload" className="text-neutral-400" />
+                    <span className="min-w-0"><strong className="block text-[11px] font-semibold text-neutral-200">Uploads only</strong><span className="block text-[9px] text-neutral-500">Private uploads only</span></span>
+                  </button>
                 </div>
               </RailPopover>
             )}
@@ -3736,7 +3728,7 @@ export default function CardBinder() {
           </span>
         )}
         {slot.mergeId && <span className="absolute bottom-1.5 left-1.5 z-40 rounded-full bg-red-700/90 px-1.5 py-0.5 text-[9px] font-bold text-white shadow">{boxDims(slot)}</span>}
-        {isEditing && <span className="absolute left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-500 px-2.5 py-1 text-[9px] font-bold text-amber-950 shadow-md backdrop-blur-sm select-none">Drag to reposition</span>}
+        {isEditing && <span className="absolute left-1/2 top-2 z-50 -translate-x-1/2 rounded-full bg-amber-500 px-2.5 py-0.5 text-[9px] font-bold text-amber-950 shadow text-center flex items-center justify-center select-none">Drag to reposition</span>}
       </div>
     );
   };
@@ -4171,7 +4163,6 @@ export default function CardBinder() {
                 setSettings={setSettings}
                 onChooseLayout={chooseLayout}
                 onViewChange={(view) => { commitEditing(); setSettings((value) => ({ ...value, view })); }}
-                printScope={printScope}
                 setPrintScope={setPrintScope}
                 onPrint={handlePrint}
                 openPanel={openPanel}
