@@ -495,19 +495,22 @@ const getCrop = (page, key, imageId) => {
 };
 
 function compactCustomPrintPages(pages, dims, customIds) {
-  const instances = pages.flatMap((page) => getSlots(page, dims)
-    .filter((slot) => page.slots[slot.key] && customIds.has(page.slots[slot.key]))
-    .map((slot) => ({
-      id: page.slots[slot.key],
-      colSpan: slot.colSpan || 1,
-      rowSpan: slot.rowSpan || 1,
-      crop: getCrop(page, slot.key, page.slots[slot.key]),
-    })));
+  const instances = pages.flatMap((page) =>
+    getSlots(page, dims)
+      .filter((slot) => page.slots[slot.key] && customIds.has(page.slots[slot.key]))
+      .map((slot) => ({
+        id: page.slots[slot.key],
+        colSpan: slot.colSpan || 1,
+        rowSpan: slot.rowSpan || 1,
+        crop: getCrop(page, slot.key, page.slots[slot.key]),
+      }))
+  );
   if (!instances.length) return [];
 
   const pageCapacity = dims.rows * dims.cols;
   const occupiedPageCount = Math.ceil(instances.length / pageCapacity);
   const physicalPageCount = Math.ceil(occupiedPageCount / 2) * 2;
+
   const compiledPages = Array.from({ length: physicalPageCount }, (_, pageIndex) => ({
     id: `print-custom-page-${pageIndex + 1}`,
     sheetId: `print-custom-sheet-${Math.floor(pageIndex / 2) + 1}`,
@@ -515,6 +518,7 @@ function compactCustomPrintPages(pages, dims, customIds) {
     merges: [],
     slots: {},
     crops: {},
+    metaData: {},
   }));
 
   let instanceIndex = 0;
@@ -524,9 +528,13 @@ function compactCustomPrintPages(pages, dims, customIds) {
         if (instanceIndex >= instances.length) break;
         const key = keyOf(row, col);
         const instance = instances[instanceIndex];
+
         page.slots[key] = instance.id;
-        page.slots[`${key}-meta`] = { colSpan: instance.colSpan, rowSpan: instance.rowSpan };
-        if (instance.crop.x !== 50 || instance.crop.y !== 50) page.crops[key] = { img: instance.id, ...instance.crop };
+        page.metaData[key] = { colSpan: instance.colSpan, rowSpan: instance.rowSpan };
+
+        if (instance.crop.x !== 50 || instance.crop.y !== 50) {
+          page.crops[key] = { img: instance.id, ...instance.crop };
+        }
         instanceIndex += 1;
       }
     }
@@ -916,7 +924,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.11.4</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.11.5</span>
         </div>
         <SaveStatus status={saveStatus} />
       </div>
@@ -3845,9 +3853,12 @@ export default function CardBinder() {
             {getPrintCells(page, { rows: 3, cols: 3 }).map((slot) => {
               const id = page.slots[slot.key];
               const cardImageURL = images[id] || pool.find((item) => item.id === id)?.src;
-              const customMeta = page.slots[`${slot.key}-meta`];
+              const customMeta = page.metaData?.[slot.key];
               const colSpan = customMeta ? customMeta.colSpan : (slot.colSpan || 1);
               const rowSpan = customMeta ? customMeta.rowSpan : (slot.rowSpan || 1);
+              const bgX = colSpan > 1 ? ((slot.currentColOffset || 0) / (colSpan - 1)) * 100 : 0;
+              const bgY = rowSpan > 1 ? ((slot.currentRowOffset || 0) / (rowSpan - 1)) * 100 : 0;
+
               return (
                 <div
                   key={slot.printKey}
@@ -3865,15 +3876,7 @@ export default function CardBinder() {
                       style={{
                         backgroundImage: `url(${cardImageURL})`,
                         backgroundSize: `${colSpan * 100}% ${rowSpan * 100}%`,
-                        backgroundPosition: `${
-                          colSpan > 1
-                            ? ((slot.currentColOffset || 0) / (colSpan - 1)) * 100
-                            : 0
-                        }% ${
-                          rowSpan > 1
-                            ? ((slot.currentRowOffset || 0) / (rowSpan - 1)) * 100
-                            : 0
-                        }%`,
+                        backgroundPosition: `${bgX}% ${bgY}%`,
                         backgroundRepeat: 'no-repeat',
                       }}
                     />

@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.11.4
+## Current state — v4.11.5
 
 - **Ledger date:** 2026-10-21
-- **Application state entering this feature pass:** commit `efcc57a` / v4.11.3
+- **Application state entering this feature pass:** commit `0c0b3ae` / v4.11.4
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,8 +14,8 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets plus the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, required secret, or environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** lazy-load first-unplaced lookahead plus snap-back scrolling after slot removal and database-card clearing
-- **Last verified behavior:** production build plus three-viewport automatic page-2 lookahead, removal/clear snap-back, query/set hydration, tab/placement advancement, synchronized v4.11.4 title pill, and zero-browser-error checks
+- **Last functional change:** isolated custom-print structural metadata plus shared precomputed background slicing across both print scopes
+- **Last verified behavior:** production build plus three-viewport custom 1×1/2×1/2×2/3×3 sizing, paired-page compaction, standard merged-card slice matrices, valid PDF output, synchronized v4.11.5 title pill, and zero-browser-error checks
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## SemVer reconstruction
@@ -970,6 +970,21 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Reverified query/set hydration, Cards/Michi tab and placement advancement, exact placed-state skipping, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.11.4.
 
+## [v4.11.5] — 2026-10-21
+
+### Fixed
+
+- Moved compact custom-print span metadata out of the card-assignment `slots` map and into an isolated per-page `metaData` dictionary keyed by the temporary 1×1 print slot.
+- Preserved source dimensions and non-centered crops while keeping compacted slot values as pure asset IDs, eliminating metadata objects from canonical card lookup paths.
+- Unified custom and standard print rendering around resolved column/row spans and precomputed background offsets before each physical pocket slice is emitted.
+
+### Verified
+
+- Verified compact custom output retains ordered 1×1, 2×1, 2×2, and 3×3 source dimensions across two nine-cell pages with 9/3 populated slots, database-card exclusion, and valid PDF generation.
+- Reverified standard 2×1, 2×2, and 3×3 merged artwork across the complete expected background-position matrices.
+- Verified the synchronized `v4.11.5` title pill and zero browser errors at 1600×1000, 1366×768, and 1200×700.
+- Advanced package and lockfile metadata to v4.11.5.
+
 ---
 
 ## Current architecture and engineering rationale
@@ -1072,7 +1087,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Print-fit uses a 0.125-inch safe margin and supports A4, Letter, A3, and Tabloid.
 - `all` scope preserves binder page placement, valid cards, crops, and optional empty-page skipping.
 - `custom` scope is **implemented**, not unfinished. `compactCustomPrintPages` gathers canonical private-upload anchors through `getSlots`, orders them by source page/slot, captures column/row spans and non-centered crops, repacks instances sequentially at current grid capacity, auto-paginates overflow, and builds temporary front/back sheet identities for printing.
-- Temporary custom-slot metadata carries each source instance's dimensions into the print renderer; standard printing falls back to canonical merge-derived dimensions. The custom compiler does not mutate the live binder and intentionally does not preserve section names or the source page arrangement because it is a compact print-only projection.
+- Temporary custom-slot metadata lives in an isolated per-page `metaData` dictionary and carries each source instance's dimensions into the print renderer without entering the asset-ID `slots` map; standard printing falls back to canonical merge-derived dimensions. The custom compiler does not mutate the live binder and intentionally does not preserve section names or the source page arrangement because it is a compact print-only projection.
 - Browser print settings remain outside application control. Correct output requires matching paper, margins None, scale 100%, and Background graphics enabled; browser “Fit to page” breaks physical size.
 
 ### PWA and deployment
@@ -1119,7 +1134,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - README's workspace/control description has not yet been brought in line with the latest rail menus.
 - Historical SemVer labels are not Git tags or GitHub Releases. Commit links remain the release evidence.
 - There is no account, cloud sync, collaboration, telemetry, backend, or environment-secret layer. Those are deliberate scope boundaries, not half-built modules.
-- No active functional workspace task was open when v4.11.4 was recorded.
+- No active functional workspace task was open when v4.11.5 was recorded.
 
 ## Incoming engineer hand-off brief
 
