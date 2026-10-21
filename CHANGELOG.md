@@ -2,20 +2,20 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.19.0
+## Current state — v4.20.0
 
 - **Ledger date:** 2026-10-22
-- **Application state entering this feature pass:** commit `d18d246` / v4.18.1
+- **Application state entering this feature pass:** commit `31ea698` / v4.19.0
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
 - **Primary source:** `src/CardBinder.jsx`, approximately 3,450 lines containing the data model, persistence, catalogue integration, interactions, print tree, and most UI components
 - **Supporting source:** `src/index.css` for Tailwind import, print media, page-turn depth, sleeve materials, portrait guard, and animations
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
-- **Network boundary:** TCGdex REST/API assets, ImgBB multipart uploads/CDN assets through a client-embedded API credential, and the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, or required environment variable
+- **Network boundary:** TCGdex REST/API assets, ImgBB multipart uploads/CDN assets through a client-embedded API credential, ImgBB public-profile retrieval through AllOrigins, and the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, or required environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** concurrent ImgBB cloud upload interception across the file picker and every native-file drop target before unchanged local ingestion/persistence
-- **Last verified behavior:** production build, exact multipart key/image POST fields, nine upload attempts with partial/total failure handling, stable cloud-status geometry, all five input/drop routes, seven-asset persisted reload recovery, synchronized v4.19.0 title pill, and zero unexpected browser errors
+- **Last functional change:** downstream ImgBB profile synchronization with deduplicated concurrent rehydration, durable cloud-source recovery pointers, and dynamic CLOUD/LOCAL inventory badges
+- **Last verified behavior:** production build, encoded profile proxy routing, escaped/direct CDN URL extraction, duplicate suppression, partial-download recovery, stable sync-panel geometry, persisted source/badge restoration, synchronized v4.20.0 title pill, and zero unexpected browser errors
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## Strict SemVer policy and audit
@@ -34,7 +34,7 @@ The 2026-10-21 full-ledger audit confirmed the three post-inception major bounda
 2. **v3.0.0:** the toolbar/tray composition was dismantled and rebuilt as the four-area workspace with contextual bottom navigation.
 3. **v4.0.0:** top-heavy configuration controls were removed and replaced by the standalone right utility rail plus cohesive bottom structural controller.
 
-The audit also confirmed that presentation-only releases remain patches; capability releases such as TCGdex integration, source workspaces, valuation, upload deletion, print slicing, and first-unplaced tracking remain minors; and later fixes that complete those existing contracts remain patches. Specifically, v4.8.2 restored the Custom metric removed during v4.8.1 consolidation, while v4.11.1–v4.11.7 corrected lifecycle and print-slicing gaps in capabilities introduced by v4.11.0 and earlier print releases. Persistent per-tab scroll memory is a new stateful interaction and therefore begins v4.12.0 rather than v4.11.8; continuously measurable inactive-panel background scrolling is likewise a new cross-tab capability and begins v4.15.0; premium layout-aware prompt compilation and copy workflows begin v4.16.0, while their preview-format and prompt-copy corrections remain the v4.16.1 patch; remote public-asset ingestion begins v4.17.0, its replacement with bulk Imgur album deconstruction and concurrent streaming begins v4.18.0, the CORS-safe public-page scraper correction remains the v4.18.1 patch, and replacing link ingestion with cloud-first ImgBB upload interception begins v4.19.0.
+The audit also confirmed that presentation-only releases remain patches; capability releases such as TCGdex integration, source workspaces, valuation, upload deletion, print slicing, and first-unplaced tracking remain minors; and later fixes that complete those existing contracts remain patches. Specifically, v4.8.2 restored the Custom metric removed during v4.8.1 consolidation, while v4.11.1–v4.11.7 corrected lifecycle and print-slicing gaps in capabilities introduced by v4.11.0 and earlier print releases. Persistent per-tab scroll memory is a new stateful interaction and therefore begins v4.12.0 rather than v4.11.8; continuously measurable inactive-panel background scrolling is likewise a new cross-tab capability and begins v4.15.0; premium layout-aware prompt compilation and copy workflows begin v4.16.0, while their preview-format and prompt-copy corrections remain the v4.16.1 patch; remote public-asset ingestion begins v4.17.0, its replacement with bulk Imgur album deconstruction and concurrent streaming begins v4.18.0, the CORS-safe public-page scraper correction remains the v4.18.1 patch, cloud-first ImgBB upload interception begins v4.19.0, and cross-device downstream ImgBB profile rehydration begins v4.20.0.
 
 Historical entries are ordered from oldest to newest. Commit links, rather than nonexistent retrospective Git tags, are the immutable references.
 
@@ -1278,6 +1278,27 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Verified file-picker, sidebar, stage, binder-slot, and timeline-thumbnail upload paths; status-panel and upload-box geometry remain unchanged during delayed cloud writes, and seven successful assets survive persisted reloads at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.19.0.
 
+## [v4.20.0] — 2026-10-22
+
+### Added
+
+- Added `pullAssetsFromImgBBCloud`, which validates an ImgBB username, fetches its public profile through the encoded AllOrigins gateway, normalizes escaped page markup, and extracts direct ImgBB CDN image URLs.
+- Added deduplicated concurrent cloud downloads with HTTP/MIME validation, native `File` reconstruction, safe terminal-path filenames, partial-failure isolation, and batch forwarding through the existing `addFiles` pipeline.
+- Added a compact Sync Down username form inside the Persistent Cloud Backup panel with connecting, success-count, and failure feedback.
+- Added dynamic fixed-footprint CLOUD and LOCAL source badges; persisted ImgBB/ibb CDN sources use the emerald cloud treatment while non-cloud custom assets retain the muted local treatment.
+
+### Changed
+
+- Extended the existing optional pool `src` contract so cloud uploads and rehydrated files retain their direct recovery URL and supplied cloud identity while IndexedDB remains the primary runtime image source.
+- Cloud source URLs now remain the persistence fallback in both IndexedDB and local-storage modes without changing the schema version or disturbing local-only and TCGdex source behavior.
+
+### Verified
+
+- Verified escaped and plain ImgBB CDN extraction, duplicate URL suppression, one failed download filtered from a three-asset profile, and the exact two-asset rehydration success count.
+- Verified invalid usernames, empty public profiles, proxy failures, and individual asset failures remain contained with expected diagnostics and no pool mutation.
+- Verified one LOCAL and three CLOUD badges before and after reload, exact badge variants, unchanged panel/upload geometry during delayed synchronization, and zero unexpected browser errors at 1600×1000, 1366×768, and 1200×700.
+- Advanced package and lockfile metadata to v4.20.0.
+
 ---
 
 ## Current architecture and engineering rationale
@@ -1340,7 +1361,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Local uploads are keyed by exact filename for replacement: a collision retains the custom asset ID, updates its binary/source URL, preserves every slot assignment, and remounts the corresponding inventory row through its dynamic image-source-length key.
 - Sidebar typography follows three semantic tiers: 12px medium actions/options, 11px secondary descriptions, and 9px uppercase semibold system context. TCGdex and upload counters are deliberate 10px text-only readout exceptions.
 - Search and Card set controls share a 36px height, neutral-950 surface, six-percent white border, six-pixel radius, 12px horizontal padding, six-pixel vertical padding, and 12px medium foreground. The set block sits 14px below search.
-- Michi's upload capsule uses a 20px Lucide upload glyph, 24px vertical padding, and neutral hairline hover treatment. A compact ImgBB live-status panel sits directly beneath it; picker and native drop inputs upload concurrently to the cloud gateway before successful native `File` batches enter the unchanged durable local pipeline. Its zero-asset state is a three-column centered feature callout rather than an unstructured sentence.
+- Michi's upload capsule uses a 20px Lucide upload glyph, 24px vertical padding, and neutral hairline hover treatment. A compact ImgBB live-status panel sits directly beneath it; picker and native drop inputs upload concurrently before durable local ingestion, while the embedded username form can rehydrate a public profile through AllOrigins. Persisted source pointers drive fixed-footprint emerald CLOUD versus muted LOCAL badges without changing the grid geometry. Its zero-asset state is a three-column centered feature callout rather than an unstructured sentence.
 
 ### Timeline, rail, and viewport boundaries
 
@@ -1431,7 +1452,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - README's workspace/control description has not yet been brought in line with the latest rail menus.
 - Historical SemVer labels are not Git tags or GitHub Releases. Commit links remain the release evidence.
 - There is no account, cloud sync, collaboration, telemetry, backend, or environment-secret layer. Those are deliberate scope boundaries, not half-built modules.
-- The v4.19.0 ImgBB cloud-uplink release is complete; no active functional workspace task remains open.
+- The v4.20.0 downstream ImgBB synchronization release is complete; no active functional workspace task remains open.
 
 ## Incoming engineer hand-off brief
 

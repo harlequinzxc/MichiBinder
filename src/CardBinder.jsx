@@ -999,7 +999,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.19.0</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.20.0</span>
         </div>
         <SaveStatus status={saveStatus} />
       </div>
@@ -1361,6 +1361,7 @@ function CardPool({
   images,
   inputRef,
   uploadAndRegisterFiles,
+  pullAssetsFromImgBBCloud,
   onClearAllUploads,
   onClearAllBinderCards,
   handleRemoveCustomCard,
@@ -1495,9 +1496,15 @@ function CardPool({
             </span>
           </div>
 
-          <div className="mt-3 flex items-center justify-between rounded-lg border border-white/[0.04] bg-neutral-950 p-2.5 shadow-inner">
-            <div className="flex flex-col"><span className="text-[10px] font-semibold text-neutral-200">Persistent Cloud Backup</span><span className="text-[8px] font-medium text-neutral-500 font-mono tracking-wide uppercase">Active via ImgBB CDN</span></div>
-            <div className="flex items-center gap-1.5 text-[9px] font-bold text-emerald-400 font-sans tracking-wide uppercase"><span className="size-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_currentColor] animate-pulse" />Live</div>
+          <div className="mt-3 flex flex-col rounded-lg border border-white/[0.04] bg-neutral-950 p-2.5 shadow-inner">
+            <div className="flex items-center justify-between">
+              <div className="flex flex-col"><span className="text-[10px] font-semibold text-neutral-200">Persistent Cloud Backup</span><span className="text-[8px] font-medium text-neutral-500 font-mono tracking-wide uppercase">Active via ImgBB CDN</span></div>
+              <div className="flex items-center gap-1.5 text-[9px] font-bold text-emerald-400 font-sans tracking-wide uppercase"><span className="size-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_currentColor] animate-pulse" />Live</div>
+            </div>
+            <form className="relative" onSubmit={(e) => { e.preventDefault(); const val = e.currentTarget.elements.cloudUser.value; if(val.trim()){ pullAssetsFromImgBBCloud(val); e.currentTarget.reset(); } }}>
+              <input type="text" name="cloudUser" aria-label="ImgBB username" placeholder="Enter ImgBB username to sync custom assets down…" className="mt-2 h-7 w-full bg-neutral-900 border border-white/[0.06] rounded-md px-2 text-[11px] font-medium text-neutral-200 placeholder-neutral-600 focus:outline-none focus:ring-1 focus:ring-red-500/50" />
+              <button type="submit" className="absolute right-2 top-[22px] -translate-y-1/2 text-[9px] font-semibold uppercase tracking-wide text-neutral-500 transition-colors hover:text-emerald-400 focus:outline-none">Sync Down</button>
+            </form>
           </div>
 
           <div className="mt-3 mb-2 flex items-center justify-between border-b border-white/[0.04] px-1 py-1.5 select-none">
@@ -1515,6 +1522,7 @@ function CardPool({
             }).map((localCard, _index, orderedCards) => {
               const selectionIndex = selectedCardIds.indexOf(localCard.id);
               const placed = placedIds.has(localCard.id);
+              const cloudHosted = typeof localCard.src === 'string' && (localCard.src.includes('imgbb.com') || localCard.src.includes('i.ibb.co'));
               return (
                 <div
                   key={`${localCard.id}-${localCard.localUrlDataString ? localCard.localUrlDataString.length : 0}-${localCard.name}`}
@@ -1538,7 +1546,7 @@ function CardPool({
                     <Trash size={12} />
                   </button>
                   {localCard.localUrlDataString ? <img src={localCard.localUrlDataString} className={`w-full h-full object-cover bg-neutral-950 pointer-events-none transition-all duration-200 ${placed ? 'opacity-45 grayscale group-hover/local:opacity-75' : ''}`} alt="Uploaded Card" /> : <span className="absolute inset-0 grid place-items-center text-neutral-600"><Icon name="image" /></span>}
-                  <span className={`absolute right-1 z-20 rounded border border-white/[0.08] bg-neutral-950/80 px-1 py-0.5 text-[9px] uppercase tracking-widest font-semibold text-neutral-500 shadow-sm backdrop-blur-sm ${selectionIndex >= 0 ? 'top-7' : 'top-1'}`}>LOCAL</span>
+                  <span className={`absolute right-1 z-20 rounded border px-1 py-0.5 text-[9px] uppercase tracking-widest shadow-sm backdrop-blur-sm ${cloudHosted ? 'border-emerald-500/30 bg-emerald-950/80 text-emerald-400 font-medium' : 'border-white/[0.08] bg-neutral-950/80 text-neutral-500 font-semibold'} ${selectionIndex >= 0 ? 'top-7' : 'top-1'}`}>{cloudHosted ? 'CLOUD' : 'LOCAL'}</span>
                   <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent px-1.5 pb-1 pt-5 text-xs font-medium text-neutral-200 opacity-0 transition-opacity group-hover/local:opacity-100 group-focus-visible/local:opacity-100"><span className="block truncate">{localCard.name || 'Custom Art'}</span></span>
                   {selectionIndex >= 0 && <span className="animate-scaleIn absolute top-1.5 right-1.5 z-20 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-mono font-bold text-white shadow-md">{selectionIndex + 1}</span>}
                 </div>
@@ -2332,7 +2340,9 @@ export default function CardBinder() {
       const exactName = file.name || '';
       const existing = source === 'upload' && exactName ? existingUploadsByName.get(exactName) : null;
       const pendingId = source === 'upload' && exactName ? pendingIdsByName.get(exactName) : null;
-      const id = existing?.id || pendingId || uid('image');
+      const cloudAssetId = typeof file.id === 'string' ? file.id.trim() : '';
+      const cloudSrc = typeof file.src === 'string' ? file.src.trim() : '';
+      const id = existing?.id || pendingId || cloudAssetId || uid('image');
       if (source === 'upload' && exactName && !pendingIdsByName.has(exactName)) pendingIdsByName.set(exactName, id);
       const previousEntry = entriesById.get(id);
       entriesById.set(id, {
@@ -2343,6 +2353,7 @@ export default function CardBinder() {
         added: added + index,
         createdAt: existing?.createdAt || previousEntry?.createdAt || new Date(added + index).toISOString(),
         replacing: Boolean(existing),
+        ...(cloudSrc ? { cloudSrc } : {}),
         ...(tcgdexId ? { tcgdexId } : {}),
       });
     });
@@ -2377,7 +2388,8 @@ export default function CardBinder() {
           createdAt: item.createdAt || entry.createdAt,
           ...(entry.tcgdexId ? { tcgdexId: entry.tcgdexId } : {}),
         };
-        if (fallbackSources) updated.src = fallbackSources[entry.id];
+        const persistedSource = entry.cloudSrc || fallbackSources?.[entry.id];
+        if (persistedSource) updated.src = persistedSource;
         else delete updated.src;
         return updated;
       });
@@ -2386,7 +2398,7 @@ export default function CardBinder() {
         name: entry.name,
         source: entry.source,
         createdAt: entry.createdAt,
-        ...(fallbackSources ? { src: fallbackSources[entry.id] } : {}),
+        ...(entry.cloudSrc || fallbackSources?.[entry.id] ? { src: entry.cloudSrc || fallbackSources[entry.id] } : {}),
         ...(entry.tcgdexId ? { tcgdexId: entry.tcgdexId } : {}),
       }));
       return [...updatedPool, ...additions];
@@ -2484,6 +2496,67 @@ export default function CardBinder() {
       console.error('ImgBB cloud synchronization failed:', error);
       setSaveStatus('error');
       notify('Cloud synchronization failed. Verify the selected images and try again.', 'error');
+      return [];
+    }
+  }, [addFiles, notify]);
+
+  const pullAssetsFromImgBBCloud = useCallback(async (usernameString) => {
+    setSaveStatus('saving');
+    notify('Connecting to remote cloud vault…', 'info');
+    try {
+      const username = String(usernameString || '').trim().replace(/^@/, '');
+      if (!/^[a-zA-Z0-9_-]+$/.test(username)) throw new Error('Invalid ImgBB username.');
+      const profileUrl = `https://${username}.imgbb.com/`;
+      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(profileUrl)}`;
+      const response = await fetch(proxyUrl);
+      if (!response.ok) throw new Error(`Cloud profile request failed with status ${response.status}.`);
+      const json = await response.json();
+      const htmlString = json.contents;
+      if (!htmlString) throw new Error('Cloud profile returned no public layout data.');
+
+      const normalizedHtml = htmlString
+        .replace(/\\u002F/gi, '/')
+        .replace(/\\u0026/gi, '&')
+        .replace(/\\\//g, '/')
+        .replace(/&amp;/g, '&');
+      const assetRegex = /https:\/\/(?:(?:i\.)?ibb\.co|[a-zA-Z0-9.-]+\.imgbb\.com)\/[a-zA-Z0-9_-]+\/[^"'\\\s<>]+?\.(?:png|jpg|jpeg|webp)(?:\?[^"'\\\s<>]*)?/gi;
+      const remoteUrls = [...new Set(normalizedHtml.match(assetRegex) || [])];
+      if (!remoteUrls.length) throw new Error('No public ImgBB assets were discovered.');
+
+      const downloadedSyntheticFiles = (await Promise.all(remoteUrls.map(async (assetUrl, index) => {
+        try {
+          const assetResponse = await fetch(assetUrl);
+          if (!assetResponse.ok) throw new Error(`Cloud asset request failed with status ${assetResponse.status}.`);
+          const blob = await assetResponse.blob();
+          if (!blob.type?.startsWith('image/')) return null;
+          const terminalSegment = new URL(assetUrl).pathname.split('/').filter(Boolean).pop() || `cloud-asset-${index + 1}`;
+          let filename;
+          try {
+            filename = safeFileName(decodeURIComponent(terminalSegment));
+          } catch {
+            filename = safeFileName(terminalSegment);
+          }
+          if (!/\.(?:png|jpe?g|webp)$/i.test(filename)) {
+            const extension = blob.type === 'image/jpeg' ? '.jpg' : blob.type === 'image/webp' ? '.webp' : '.png';
+            filename += extension;
+          }
+          const file = new File([blob], filename, { type: blob.type });
+          return Object.assign(file, { src: assetUrl, id: uid('cloud') });
+        } catch (error) {
+          console.error(`ImgBB cloud asset download failed for ${assetUrl}:`, error);
+          return null;
+        }
+      }))).filter(Boolean);
+      if (!downloadedSyntheticFiles.length) throw new Error('No valid cloud image downloads completed.');
+
+      const addedIds = await addFiles(downloadedSyntheticFiles);
+      if (!addedIds.length) throw new Error('Cloud assets could not be registered locally.');
+      notify(`Successfully rehydrated ${downloadedSyntheticFiles.length} custom cloud assets.`, 'success');
+      return addedIds;
+    } catch (error) {
+      console.error('ImgBB downstream synchronization failed:', error);
+      setSaveStatus('error');
+      notify('Cloud rehydration failed. Verify the ImgBB username and public asset visibility.', 'error');
       return [];
     }
   }, [addFiles, notify]);
@@ -4174,6 +4247,7 @@ export default function CardBinder() {
             images={images}
             inputRef={inputRef}
             uploadAndRegisterFiles={uploadAndRegisterFiles}
+            pullAssetsFromImgBBCloud={pullAssetsFromImgBBCloud}
             onClearAllUploads={handleClearAllUploads}
             onClearAllBinderCards={handleClearAllBinderCards}
             handleRemoveCustomCard={handleRemoveCustomCard}
