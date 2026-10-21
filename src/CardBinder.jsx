@@ -940,7 +940,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.11.7</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.12.0</span>
         </div>
         <SaveStatus status={saveStatus} />
       </div>
@@ -1310,10 +1310,11 @@ function CardPool({
   onLoadMore,
   onFetchedCardDragStart,
   onFetchedCardAdd,
-  scrollToNextUnplacedCard,
 }) {
   const searchActive = Boolean(searchQuery.trim() || selectedSet);
   const customCards = customUploadedCards.map((item) => ({ ...item, localUrlDataString: images[item.id] || item.src || '' }));
+  const cardsScrollPosRef = useRef(0);
+  const michiScrollPosRef = useRef(0);
   const catalogScrollLockRef = useRef(false);
   useEffect(() => {
     if (!isLoading) catalogScrollLockRef.current = false;
@@ -1331,10 +1332,27 @@ function CardPool({
   };
   const chooseTab = (tab) => {
     if (tab === activeTab) return;
+
+    if (activeTab === 'cards') {
+      const cardsContainer = document.querySelector('[data-tcgdex-results]');
+      if (cardsContainer) cardsScrollPosRef.current = cardsContainer.scrollTop;
+    } else if (activeTab === 'michi') {
+      const michiContainer = document.querySelector('[role="listbox"][aria-label*="Custom"]');
+      if (michiContainer) michiScrollPosRef.current = michiContainer.scrollTop;
+    }
+
     onClearSelection();
     setActiveTab(tab);
-    if (tab === 'cards') setTimeout(() => scrollToNextUnplacedCard('[data-tcgdex-results]', 'data-tcgdex-card'), 60);
-    if (tab === 'michi') setTimeout(() => scrollToNextUnplacedCard('[role="listbox"][aria-label*="Custom"]', 'data-local-card'), 60);
+
+    setTimeout(() => {
+      if (tab === 'cards') {
+        const container = document.querySelector('[data-tcgdex-results]');
+        if (container) container.scrollTop = cardsScrollPosRef.current;
+      } else if (tab === 'michi') {
+        const container = document.querySelector('[role="listbox"][aria-label*="Custom"]');
+        if (container) container.scrollTop = michiScrollPosRef.current;
+      }
+    }, 40);
   };
   return (
     <aside
@@ -3975,7 +3993,6 @@ export default function CardBinder() {
             onLoadMore={onLoadMore}
             onFetchedCardDragStart={startFetchedCardDrag}
             onFetchedCardAdd={addFetchedCardToPage}
-            scrollToNextUnplacedCard={scrollToNextUnplacedCard}
           />
           <main data-dynamic-workspace data-zen-mode={isZenMode} className="relative flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-neutral-950">
             <div data-preview-surface className="relative flex min-h-0 w-full flex-1 items-center overflow-hidden">

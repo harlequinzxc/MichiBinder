@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.11.7
+## Current state — v4.12.0
 
 - **Ledger date:** 2026-10-21
-- **Application state entering this feature pass:** commit `b221ebc` / v4.11.6
+- **Application state entering this feature pass:** commit `09a2e26` / v4.11.7
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,25 +14,27 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets plus the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, required secret, or environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** arbitrary-matrix Uploads-only decomposition into ordered 1×1 puzzle slices with per-slice offsets
-- **Last verified behavior:** production build plus three-viewport 2×1/1×2/3×3/4×3/1×3/2×2 decomposition, four-page 32-slice ordering, standard print-slice regression, valid PDF output, synchronized v4.11.7 title pill, and zero-browser-error checks
+- **Last functional change:** independent Cards/Michi scroll-position memory with passive tab restoration and no tab-triggered first-unplaced snap
+- **Last verified behavior:** strict full-ledger SemVer audit, production build, three-viewport 520px Cards and 360px Michi restoration, zero passive-tab auto-scroll calls, synchronized v4.12.0 title pill, and zero browser errors
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
-## SemVer reconstruction
+## Strict SemVer policy and audit
 
-Versions are assigned retrospectively to every commit because historical package metadata remained at `1.0.0` and no release tags were created. The package and lockfile were first synchronized with the reconstructed ledger in commit `69ad992`; this pass advances both to v4.2.3.
+Versions through v4.2.3 were reconstructed retrospectively because the earliest package metadata remained at `1.0.0` and no Git tags or GitHub Releases existed. Package and lockfile metadata first synchronized with that ledger in commit `69ad992`; subsequent entries record the version assigned to each completed change set.
 
-The classification reflects the requested strict release logic:
+MichiBinder applies SemVer to its user-visible application contract:
 
-- **PATCH** — compatible visual polish, spacing, alignment, typography, assets, race-condition fixes, and documentation.
-- **MINOR** — a backward-compatible functional feature or operational module.
-- **MAJOR** — a layout or rendering paradigm was replaced rather than extended.
+- **PATCH** — a backward-compatible correction or completion of existing behavior, including visual/accessibility polish, timing and lifecycle fixes, compatibility repairs, documentation, and internal refactors that add no independent workflow.
+- **MINOR** — a new backward-compatible capability, workflow, stateful interaction, data source, or operational module.
+- **MAJOR** — an incompatible replacement of a layout, rendering, persistence, or interaction paradigm rather than an extension of the current contract.
 
-Three post-inception architectural breaks justify major releases:
+The 2026-10-21 full-ledger audit confirmed the three post-inception major boundaries:
 
 1. **v2.0.0:** the flat page viewport was replaced by the preserved 3D spread/rotation engine.
 2. **v3.0.0:** the toolbar/tray composition was dismantled and rebuilt as the four-area workspace with contextual bottom navigation.
 3. **v4.0.0:** top-heavy configuration controls were removed and replaced by the standalone right utility rail plus cohesive bottom structural controller.
+
+The audit also confirmed that presentation-only releases remain patches; capability releases such as TCGdex integration, source workspaces, valuation, upload deletion, print slicing, and first-unplaced tracking remain minors; and later fixes that complete those existing contracts remain patches. Specifically, v4.8.2 restored the Custom metric removed during v4.8.1 consolidation, while v4.11.1–v4.11.7 corrected lifecycle and print-slicing gaps in capabilities introduced by v4.11.0 and earlier print releases. Persistent per-tab scroll memory is a new stateful interaction and therefore begins v4.12.0 rather than v4.11.8.
 
 Historical entries are ordered from oldest to newest. Commit links, rather than nonexistent retrospective Git tags, are the immutable references.
 
@@ -741,12 +743,9 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 
 ## [v4.8.2] — 2026-10-21
 
-### Added
-
-- Added a Custom workspace metric between Binder and Density that counts every custom-upload placement across all pages through the assignment-map model and reports the total in the row's accessibility label.
-
 ### Fixed
 
+- Restored the Custom workspace metric between Binder and Density after the v4.8.1 metric consolidation, counting every custom-upload placement across all pages through the assignment-map model and reporting the total in the row's accessibility label.
 - Changed each timeline page frame to visible overflow with centered flex containment, removing the strict clipping that could hide lower miniature rows.
 - Wrapped each complete timeline sheet grid in one GPU-backed, center-origin 0.85 scale container to create a consistent visual buffer without altering page or slot geometry.
 - Standardized miniature card images on full-size `object-contain` rendering with a 1px corner radius so their aspect ratios remain intact at filmstrip scale.
@@ -907,14 +906,14 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 
 ## [v4.11.1] — 2026-10-21
 
-### Added
-
-- Added the requested literal `v1.4.1` identity badge adjacent to the MichiBinder title using the exact low-profile monospace pill typography and surface tokens.
-- Added a 100ms first-unplaced auto-scroll trigger after every successful TCGdex result hydration, including query and set-filter result lifecycles.
-
 ### Changed
 
+- Introduced the requested literal `v1.4.1` identity badge adjacent to the MichiBinder title as presentation-only identity polish using the exact low-profile monospace pill typography and surface tokens.
 - Changed all shared first-unplaced scroll calls from nearest-block alignment to smooth top-boundary alignment through `block: 'start'`.
+
+### Fixed
+
+- Corrected query and set-filter hydration timing with a 100ms first-unplaced trigger after every successful TCGdex result update.
 
 ### Verified
 
@@ -952,11 +951,11 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 
 ## [v4.11.4] — 2026-10-21
 
-### Added
+### Fixed
 
-- Extended first-unplaced catalogue tracking with lazy-load lookahead: when every painted TCGdex result is already placed and another result page exists, the shared observer advances pagination automatically.
-- Added a result-hydration effect that reevaluates the first-unplaced target whenever fetched card data or lookahead state changes.
-- Added post-removal snap-back tracking for individual binder-pocket removal and Clear Binder so newly available Cards or Michi assets return to the top boundary.
+- Completed first-unplaced catalogue tracking for lazy-loaded results: when every painted TCGdex result is already placed and another result page exists, the shared observer advances pagination automatically.
+- Made result hydration reevaluate the first-unplaced target whenever fetched card data or lookahead state changes.
+- Corrected post-removal tracking for individual binder-pocket removal and Clear Binder so newly available Cards or Michi assets return to the top boundary.
 
 ### Changed
 
@@ -1013,6 +1012,24 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Verified the 4×3 matrix emits all twelve 400%×300% slices at 0/33.3333/66.6667/100% horizontal and 0/50/100% vertical offsets.
 - Reverified standard 2×1, 2×2, and 3×3 merged-card slicing, valid PDF output, the synchronized `v4.11.7` title pill, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.11.7.
+
+## [v4.12.0] — 2026-10-21
+
+### Added
+
+- Added independent mutable Cards and Michi scroll-position memory inside the source-panel component.
+- Added 40ms post-render restoration so each catalogue returns to its exact prior inner-container offset after a tab transition.
+
+### Changed
+
+- Removed first-unplaced auto-scroll calls from passive Cards/Michi tab toggles; automatic targeting now remains limited to result hydration and binder/catalogue data modifications.
+- Re-audited the complete ledger against the documented application-level SemVer contract, clarified the PATCH/MINOR/MAJOR boundaries, and corrected v4.8.2 and v4.11.4 section labels to identify restoration/completion work as fixes.
+
+### Verified
+
+- Verified Cards restores to 520px and Michi restores to 360px after repeated bidirectional tab transitions, with no passive-tab calls to the first-unplaced scroll engine and no tab-row displacement.
+- Verified the synchronized `v4.12.0` title pill and zero browser errors at 1600×1000, 1366×768, and 1200×700.
+- Advanced package and lockfile metadata to v4.12.0.
 
 ---
 
@@ -1071,6 +1088,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 ### Sidebar source and typography system
 
 - Cards and Michi share `selectedCardIds` but keep independent source semantics. Their active tabs use a neutral slate surface; inactive tabs remain muted until hover.
+- Cards and Michi retain independent inner-container scroll offsets across passive tab transitions. First-unplaced targeting runs only after catalogue hydration or binder/catalogue data changes, not when a user merely changes tabs.
 - Sidebar typography follows three semantic tiers: 12px medium actions/options, 11px secondary descriptions, and 9px uppercase semibold system context. TCGdex and upload counters are deliberate 10px text-only readout exceptions.
 - Search and Card set controls share a 36px height, neutral-950 surface, six-percent white border, six-pixel radius, 12px horizontal padding, six-pixel vertical padding, and 12px medium foreground. The set block sits 14px below search.
 - Michi's upload capsule uses a 20px Lucide upload glyph, 24px vertical padding, and neutral hairline hover treatment. Its zero-asset state is a three-column centered feature callout rather than an unstructured sentence.
@@ -1163,7 +1181,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - README's workspace/control description has not yet been brought in line with the latest rail menus.
 - Historical SemVer labels are not Git tags or GitHub Releases. Commit links remain the release evidence.
 - There is no account, cloud sync, collaboration, telemetry, backend, or environment-secret layer. Those are deliberate scope boundaries, not half-built modules.
-- No active functional workspace task was open when v4.11.7 was recorded.
+- No active functional workspace task was open when v4.12.0 was recorded.
 
 ## Incoming engineer hand-off brief
 
