@@ -1331,9 +1331,8 @@ function CardPool({
           </div>
 
           <div className="mt-3 mb-2 flex items-center justify-between border-b border-white/[0.04] px-1 py-1.5 select-none">
-            <span className="text-[9px] font-bold tracking-widest text-neutral-400 uppercase font-sans block mb-1.5">Your Uploads</span>
+            <h3 className="text-[9px] font-bold tracking-widest text-neutral-400 uppercase font-sans block mb-1.5">YOUR UPLOADS ({customUploadedCards.length})</h3>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-sans font-medium text-neutral-500 tracking-normal">{customUploadedCards.length} assets</span>
               <button type="button" onClick={onClearAllUploads} className="text-[10px] font-medium text-neutral-500 hover:text-red-400 transition-colors uppercase tracking-wider focus:outline-none">Clear All</button>
             </div>
           </div>
@@ -1487,7 +1486,6 @@ function CardPool({
           ) : (
             <div className="mx-4 mt-1 rounded-lg border border-dashed border-white/[0.05] bg-neutral-900/20 px-5 py-10 text-center">
               <Icon name="sparkles" className="mx-auto mb-2 text-neutral-600" />
-              <p className="text-xs font-medium text-neutral-400">Search the public card catalog</p>
               <p className="mt-1 text-[11px] leading-relaxed text-neutral-400">Enter a Pokémon name or select a set to browse TCGdex.</p>
             </div>
           )}
@@ -1679,6 +1677,9 @@ export default function CardBinder() {
   const customUploadedIds = useMemo(() => new Set(customUploadedCards.map((item) => item.id)), [customUploadedCards]);
   const allPoolIds = useMemo(() => new Set(pool.map((item) => item.id)), [pool]);
   const tcgdexAssetIds = useMemo(() => new Set(pool.filter((item) => item.source === 'tcgdex').map((item) => item.id)), [pool]);
+  const totalPlacedCardsCount = useMemo(() => pages.reduce((total, page) => (
+    total + Object.values(page.slots || {}).filter((assetId) => tcgdexAssetIds.has(assetId) || customUploadedIds.has(assetId)).length
+  ), 0), [pages, tcgdexAssetIds, customUploadedIds]);
   const priceKeyByAssetId = useMemo(() => new Map(pool.map((item) => [item.id, item.tcgdexId || item.id])), [pool]);
   const getCardPriceUSD = useCallback((assetId) => positiveMoney(cardPrices[priceKeyByAssetId.get(assetId) || assetId]), [cardPrices, priceKeyByAssetId]);
   const portfolioValuationAssetIds = useMemo(() => pages
@@ -3787,10 +3788,8 @@ export default function CardBinder() {
               onDragOver={(event) => { if (!combineMode && (['pool', 'remote', 'remote-batch'].includes(dragRef.current?.kind) || hasFiles(event.dataTransfer))) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; } }}
               onDrop={handleStageDrop}
             >
-              <div data-workspace-metrics aria-label={`Database ${fetchedCards.length} items, Custom ${customUploadedCards.length} uploaded, Density ${currentFilledCount} of ${layout.pockets} filled${spreadValueLabel ? `, Spread Value ${spreadValueLabel}` : ''}`} className="pointer-events-none absolute bottom-3 left-6 z-40 flex items-center gap-3 rounded-md border border-white/[0.06] bg-neutral-950/85 px-2.5 py-1.5 font-sans shadow-lg backdrop-blur-sm select-none">
-                <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="text-neutral-500 font-semibold tracking-wider text-[9px] uppercase">DATABASE</span><strong className="font-sans text-[10px] font-medium tracking-tight bg-gradient-to-r from-neutral-400 via-neutral-300 to-neutral-200 bg-clip-text text-transparent">{fetchedCards.length} ITEMS</strong></span>
-                <span aria-hidden="true" className="h-3 w-px bg-white/[0.08]" />
-                <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="text-neutral-500 font-semibold tracking-wider text-[9px] uppercase">CUSTOM</span><strong className="font-sans text-[10px] font-medium tracking-tight bg-gradient-to-r from-neutral-400 via-neutral-300 to-neutral-200 bg-clip-text text-transparent">{customUploadedCards.length} UPLOADED</strong></span>
+              <div data-workspace-metrics aria-label={`Binder ${totalPlacedCardsCount} cards, Density ${currentFilledCount} of ${layout.pockets} filled${spreadValueLabel ? `, Spread Value ${spreadValueLabel}` : ''}`} className="pointer-events-none absolute bottom-3 left-6 z-40 flex items-center gap-3 rounded-md border border-white/[0.06] bg-neutral-950/85 px-2.5 py-1.5 font-sans shadow-lg backdrop-blur-sm select-none">
+                <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="text-[9px] font-semibold text-neutral-500 uppercase tracking-widest">BINDER</span><strong className="font-sans text-[10px] font-medium tracking-tight bg-gradient-to-r from-neutral-400 via-neutral-300 to-neutral-200 bg-clip-text text-transparent">{totalPlacedCardsCount} CARDS</strong></span>
                 <span aria-hidden="true" className="h-3 w-px bg-white/[0.08]" />
                 <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="text-neutral-500 font-semibold tracking-wider text-[9px] uppercase">DENSITY</span><strong className="font-sans text-[10px] font-medium tracking-tight bg-gradient-to-r from-neutral-400 via-neutral-300 to-neutral-200 bg-clip-text text-transparent">{currentFilledCount}/{layout.pockets} FILLED</strong></span>
                 {spreadValueLabel && (

@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.8.0
+## Current state — v4.8.1
 
-- **Ledger date:** 2026-10-20
-- **Application state entering this feature pass:** commit `4f33dfa` / v4.7.1
+- **Ledger date:** 2026-10-21
+- **Application state entering this feature pass:** commit `96e8365` / v4.8.0
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,8 +14,8 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets plus the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, required secret, or environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** unified sidebar typography, database-only binder clearing, and wheel/overlay timeline navigation
-- **Last verified behavior:** production build plus three-viewport typography, destructive-scope, persistence, wheel translation, fixed-step smooth-scroll, overlay, and zero-browser-error checks
+- **Last functional change:** simplified catalogue/upload copy and consolidated workspace placement telemetry
+- **Last verified behavior:** production build plus three-viewport empty-state copy, upload-count heading, all-page binder-card count, typography, accessibility label, and zero-browser-error checks
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## SemVer reconstruction
@@ -724,6 +724,20 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Verified cancel and confirm Clear Binder paths, removal of only database slots/crops, preservation of custom slots/crops and both pool records, and persisted results.
 - Verified overflow across a 40-page timeline, 180px wheel translation, smooth +400px/-400px overlay movement, exact overlay classes, 16px icons, typography classes, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.8.0.
+
+## [v4.8.1] — 2026-10-21
+
+### Changed
+
+- Simplified the empty Cards catalogue state to a single TCGdex browsing instruction beneath its icon, removing the competing headline.
+- Moved the live Michi asset total into the uppercase Your Uploads heading and removed the separate assets metadata readout.
+- Replaced the inventory-oriented Database and Custom workspace metrics with one Binder card metric that totals placed TCGdex and custom cards across every page while retaining the premium gradient number treatment.
+- Updated the workspace metrics accessibility label to report the consolidated binder-card total alongside current-page density and optional spread value.
+
+### Verified
+
+- Verified exact empty-state copy, absence of the removed catalogue headline and standalone asset counter, live `YOUR UPLOADS (1)` heading copy/class, an all-page `BINDER 4 CARDS` test total, exact metadata class, gradient number treatment, consolidated accessibility text, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
+- Advanced package and lockfile metadata to v4.8.1.
 
 ---
 
