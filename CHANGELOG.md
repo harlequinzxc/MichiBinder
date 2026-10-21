@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.20.0
+## Current state — v4.20.1
 
 - **Ledger date:** 2026-10-22
-- **Application state entering this feature pass:** commit `31ea698` / v4.19.0
+- **Application state entering this feature pass:** commit `57b4091` / v4.20.0
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,8 +14,8 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets, ImgBB multipart uploads/CDN assets through a client-embedded API credential, ImgBB public-profile retrieval through AllOrigins, and the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, or required environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** downstream ImgBB profile synchronization with deduplicated concurrent rehydration, durable cloud-source recovery pointers, and dynamic CLOUD/LOCAL inventory badges
-- **Last verified behavior:** production build, encoded profile proxy routing, escaped/direct CDN URL extraction, duplicate suppression, partial-download recovery, stable sync-panel geometry, persisted source/badge restoration, synchronized v4.20.0 title pill, and zero unexpected browser errors
+- **Last functional change:** GridRip's 2×2 and shared 3×3/4×3 prompts now require dynamic outer-canvas expansion instead of enforcing fixed global aspect ratios
+- **Last verified behavior:** production build, exact replacement sentence in both generated GridRip branches, removal of both superseded global-canvas aspect-ratio instructions, synchronized v4.20.1 title pill, and unchanged prompt copy behavior
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## Strict SemVer policy and audit
@@ -34,7 +34,7 @@ The 2026-10-21 full-ledger audit confirmed the three post-inception major bounda
 2. **v3.0.0:** the toolbar/tray composition was dismantled and rebuilt as the four-area workspace with contextual bottom navigation.
 3. **v4.0.0:** top-heavy configuration controls were removed and replaced by the standalone right utility rail plus cohesive bottom structural controller.
 
-The audit also confirmed that presentation-only releases remain patches; capability releases such as TCGdex integration, source workspaces, valuation, upload deletion, print slicing, and first-unplaced tracking remain minors; and later fixes that complete those existing contracts remain patches. Specifically, v4.8.2 restored the Custom metric removed during v4.8.1 consolidation, while v4.11.1–v4.11.7 corrected lifecycle and print-slicing gaps in capabilities introduced by v4.11.0 and earlier print releases. Persistent per-tab scroll memory is a new stateful interaction and therefore begins v4.12.0 rather than v4.11.8; continuously measurable inactive-panel background scrolling is likewise a new cross-tab capability and begins v4.15.0; premium layout-aware prompt compilation and copy workflows begin v4.16.0, while their preview-format and prompt-copy corrections remain the v4.16.1 patch; remote public-asset ingestion begins v4.17.0, its replacement with bulk Imgur album deconstruction and concurrent streaming begins v4.18.0, the CORS-safe public-page scraper correction remains the v4.18.1 patch, cloud-first ImgBB upload interception begins v4.19.0, and cross-device downstream ImgBB profile rehydration begins v4.20.0.
+The audit also confirmed that presentation-only releases remain patches; capability releases such as TCGdex integration, source workspaces, valuation, upload deletion, print slicing, and first-unplaced tracking remain minors; and later fixes that complete those existing contracts remain patches. Specifically, v4.8.2 restored the Custom metric removed during v4.8.1 consolidation, while v4.11.1–v4.11.7 corrected lifecycle and print-slicing gaps in capabilities introduced by v4.11.0 and earlier print releases. Persistent per-tab scroll memory is a new stateful interaction and therefore begins v4.12.0 rather than v4.11.8; continuously measurable inactive-panel background scrolling is likewise a new cross-tab capability and begins v4.15.0; premium layout-aware prompt compilation and copy workflows begin v4.16.0, while their preview-format and prompt-copy corrections remain the v4.16.1 patch; remote public-asset ingestion begins v4.17.0, its replacement with bulk Imgur album deconstruction and concurrent streaming begins v4.18.0, the CORS-safe public-page scraper correction remains the v4.18.1 patch, cloud-first ImgBB upload interception begins v4.19.0, cross-device downstream ImgBB profile rehydration begins v4.20.0, and the GridRip boundary-instruction correction remains the v4.20.1 patch.
 
 Historical entries are ordered from oldest to newest. Commit links, rather than nonexistent retrospective Git tags, are the immutable references.
 
@@ -1299,6 +1299,18 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Verified one LOCAL and three CLOUD badges before and after reload, exact badge variants, unchanged panel/upload geometry during delayed synchronization, and zero unexpected browser errors at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.20.0.
 
+## [v4.20.1] — 2026-10-22
+
+### Changed
+
+- Replaced the fixed final global-canvas aspect-ratio sentence in both GridRip generation branches with the requested instruction to preserve every edge and dynamically expand the outer canvas around the complete grid.
+- Kept the individual-card 2:3 ratio, grid dimensions, seam continuity, transparent spacing, and layout-aware 2×2 versus shared 3×3/4×3 content unchanged.
+
+### Verified
+
+- Verified the new boundary-expansion sentence occurs exactly twice and both obsolete final global-canvas aspect-ratio instructions are absent.
+- Reverified the generated and copied GridRip text for 2×2, 3×3, and 4×3 layouts, synchronized the title pill, and advanced package and lockfile metadata to v4.20.1.
+
 ---
 
 ## Current architecture and engineering rationale
@@ -1370,7 +1382,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - The preview surface is one flex row containing the scrollable stage and detached rail. The stage stops at the rail's left edge, including the rail padding zone; the surface permits overflow so rail dialogs can overlay lower workspace bands while the main workspace remains the outer clip boundary.
 - The rail has no full-height edge divider and no `self-start`; its outer box is vertically centered against the **live preview surface**, not the complete main column. Collapsing the timeline changes preview height, so the rail's vertical center moves.
 - The rail begins with Print / PDF, Print setup, then Grid selection. Print scope is exposed as two stateless command blocks that immediately select and launch their compilation; Print setup uses `FileSliders`; Card size uses `RulerDimensionLine` and owns both its preset selector and horizontal 80–125% scale controls.
-- Keyboard shortcuts are followed by AI Prompt Generator, whose premium global InPaint and Restyle dictionaries and live layout-aware GridRip compiler render in parity-formatted, monospace, pre-wrapped previews with 160px scroll ceilings, copy exact full-text payloads through the Clipboard API, and report the result through standard toasts.
+- Keyboard shortcuts are followed by AI Prompt Generator, whose premium global InPaint and Restyle dictionaries and live layout-aware GridRip compiler render in parity-formatted, monospace, pre-wrapped previews with 160px scroll ceilings, preserve individual-card ratios while directing the outer canvas to expand without clipping, copy exact full-text payloads through the Clipboard API, and report the result through standard toasts.
 - Every rail dialog is absolutely anchored at `right-full mr-3 top-1/2 -translate-y-1/2` relative to its trigger and animates symmetrically from the right. Panels use a uniform 400px width, cap at 80vh, hide scrollbar chrome, and scroll internally when their content is longer.
 - Database/Custom/Density is absolutely anchored to the preview bottom edge. It uses the self-hosted Inter sans stack and is not part of the timeline or bottom controller flow.
 - The bottom controller owns Undo/Redo, Merge/Unmerge/reset/clear, spread navigation, Add, Duplicate, Delete, and timeline toggle. One-pixel dividers separate its History, Slot Structure, and Spread Navigation pockets.
@@ -1451,8 +1463,8 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Cross-browser print calibration and installed-PWA lifecycle testing remain manual.
 - README's workspace/control description has not yet been brought in line with the latest rail menus.
 - Historical SemVer labels are not Git tags or GitHub Releases. Commit links remain the release evidence.
-- There is no account, cloud sync, collaboration, telemetry, backend, or environment-secret layer. Those are deliberate scope boundaries, not half-built modules.
-- The v4.20.0 downstream ImgBB synchronization release is complete; no active functional workspace task remains open.
+- There is no MichiBinder account, collaboration, telemetry, backend, or environment-secret layer. ImgBB synchronization remains a client-side integration using the configured public credential and public-profile gateway.
+- The v4.20.1 GridRip boundary-instruction release is complete; no active functional workspace task remains open.
 
 ## Incoming engineer hand-off brief
 
