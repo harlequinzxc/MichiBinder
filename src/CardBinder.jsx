@@ -498,16 +498,27 @@ function compactCustomPrintPages(pages, dims, customIds) {
   const instances = pages.flatMap((page) =>
     getSlots(page, dims)
       .filter((slot) => page.slots[slot.key] && customIds.has(page.slots[slot.key]))
-      .map((slot) => ({
-        id: page.slots[slot.key],
-        colSpan: slot.colSpan || 1,
-        rowSpan: slot.rowSpan || 1,
-        crop: getCrop(page, slot.key, page.slots[slot.key]),
-      }))
+      .flatMap((slot) => {
+        const columns = Number(slot.colSpan) || 1;
+        const rows = Number(slot.rowSpan) || 1;
+        const totalSlices = rows * columns;
+
+        return Array.from({ length: totalSlices }, (_, sliceIndex) => ({
+          id: page.slots[slot.key],
+          colSpan: columns,
+          rowSpan: rows,
+          currentRowOffset: Math.floor(sliceIndex / columns),
+          currentColOffset: sliceIndex % columns,
+          crop: getCrop(page, slot.key, page.slots[slot.key]),
+        }));
+      })
   );
+
   if (!instances.length) return [];
 
-  const pageCapacity = dims.rows * dims.cols;
+  const packingRows = Math.min(dims.rows, 3);
+  const packingCols = Math.min(dims.cols, 3);
+  const pageCapacity = packingRows * packingCols;
   const occupiedPageCount = Math.ceil(instances.length / pageCapacity);
   const physicalPageCount = Math.ceil(occupiedPageCount / 2) * 2;
 
@@ -523,14 +534,19 @@ function compactCustomPrintPages(pages, dims, customIds) {
 
   let instanceIndex = 0;
   compiledPages.forEach((page) => {
-    for (let row = 0; row < dims.rows; row += 1) {
-      for (let col = 0; col < dims.cols; col += 1) {
+    for (let row = 0; row < packingRows; row += 1) {
+      for (let col = 0; col < packingCols; col += 1) {
         if (instanceIndex >= instances.length) break;
         const key = keyOf(row, col);
         const instance = instances[instanceIndex];
 
         page.slots[key] = instance.id;
-        page.metaData[key] = { colSpan: instance.colSpan, rowSpan: instance.rowSpan };
+        page.metaData[key] = {
+          colSpan: instance.colSpan,
+          rowSpan: instance.rowSpan,
+          currentColOffset: instance.currentColOffset,
+          currentRowOffset: instance.currentRowOffset,
+        };
 
         if (instance.crop.x !== 50 || instance.crop.y !== 50) {
           page.crops[key] = { img: instance.id, ...instance.crop };
@@ -924,7 +940,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.11.6</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.11.7</span>
         </div>
         <SaveStatus status={saveStatus} />
       </div>
@@ -3863,8 +3879,10 @@ export default function CardBinder() {
               const customMeta = page.metaData?.[slot.key];
               const colSpan = customMeta ? customMeta.colSpan : (slot.colSpan || 1);
               const rowSpan = customMeta ? customMeta.rowSpan : (slot.rowSpan || 1);
-              const bgX = colSpan > 1 ? ((slot.currentColOffset || 0) / (colSpan - 1)) * 100 : 0;
-              const bgY = rowSpan > 1 ? ((slot.currentRowOffset || 0) / (rowSpan - 1)) * 100 : 0;
+              const currentColOffset = customMeta ? customMeta.currentColOffset : (slot.currentColOffset || 0);
+              const currentRowOffset = customMeta ? customMeta.currentRowOffset : (slot.currentRowOffset || 0);
+              const bgX = colSpan > 1 ? (currentColOffset / (colSpan - 1)) * 100 : 0;
+              const bgY = rowSpan > 1 ? (currentRowOffset / (rowSpan - 1)) * 100 : 0;
 
               return (
                 <div

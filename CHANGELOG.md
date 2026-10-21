@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.11.6
+## Current state — v4.11.7
 
 - **Ledger date:** 2026-10-21
-- **Application state entering this feature pass:** commit `b82f5da` / v4.11.5
+- **Application state entering this feature pass:** commit `b221ebc` / v4.11.6
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,8 +14,8 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets plus the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, required secret, or environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** container-local catalogue scrolling that preserves the parent sidebar and header-tab geometry
-- **Last verified behavior:** production build plus three-viewport relative-offset scrolling, automatic page-2 lookahead, removal/clear snap-back, zero Cards/Michi tab displacement, synchronized v4.11.6 title pill, and zero-browser-error checks
+- **Last functional change:** arbitrary-matrix Uploads-only decomposition into ordered 1×1 puzzle slices with per-slice offsets
+- **Last verified behavior:** production build plus three-viewport 2×1/1×2/3×3/4×3/1×3/2×2 decomposition, four-page 32-slice ordering, standard print-slice regression, valid PDF output, synchronized v4.11.7 title pill, and zero-browser-error checks
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## SemVer reconstruction
@@ -999,6 +999,21 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Verified the synchronized `v4.11.6` title pill and zero browser errors at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.11.6.
 
+## [v4.11.7] — 2026-10-21
+
+### Fixed
+
+- Reworked Uploads-only compaction to decompose every custom-card footprint into ordered 1×1 slices using the source card's runtime column and row spans rather than emitting one metadata-bearing cell per card.
+- Added explicit column/row offsets to every temporary slice and taught the print renderer to prioritize those custom offsets while retaining canonical merge offsets for standard binder printing.
+- Capped temporary custom-page packing to the fixed three-column print surface, allowing 4×3 source artwork to continue across print pages without dropping its fourth-column slices.
+
+### Verified
+
+- Verified 2×1, 1×2, 3×3, 4×3, 1×3, and 2×2 uploads produce all 32 expected slices in source order across four nine-cell pages populated 9/9/9/5.
+- Verified the 4×3 matrix emits all twelve 400%×300% slices at 0/33.3333/66.6667/100% horizontal and 0/50/100% vertical offsets.
+- Reverified standard 2×1, 2×2, and 3×3 merged-card slicing, valid PDF output, the synchronized `v4.11.7` title pill, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
+- Advanced package and lockfile metadata to v4.11.7.
+
 ---
 
 ## Current architecture and engineering rationale
@@ -1100,8 +1115,8 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Measurements enter the UI in millimetres and are converted to inches (`1 / 25.4`) for CSS print math.
 - Print-fit uses a 0.125-inch safe margin and supports A4, Letter, A3, and Tabloid.
 - `all` scope preserves binder page placement, valid cards, crops, and optional empty-page skipping.
-- `custom` scope is **implemented**, not unfinished. `compactCustomPrintPages` gathers canonical private-upload anchors through `getSlots`, orders them by source page/slot, captures column/row spans and non-centered crops, repacks instances sequentially at current grid capacity, auto-paginates overflow, and builds temporary front/back sheet identities for printing.
-- Temporary custom-slot metadata lives in an isolated per-page `metaData` dictionary and carries each source instance's dimensions into the print renderer without entering the asset-ID `slots` map; standard printing falls back to canonical merge-derived dimensions. The custom compiler does not mutate the live binder and intentionally does not preserve section names or the source page arrangement because it is a compact print-only projection.
+- `custom` scope is **implemented**, not unfinished. `compactCustomPrintPages` gathers canonical private-upload anchors through `getSlots`, orders them by source page/slot, decomposes every runtime column/row span into ordered 1×1 slices, preserves non-centered crops, packs against the fixed print surface, auto-paginates overflow, and builds temporary front/back sheet identities for printing.
+- Temporary custom-slot metadata lives in an isolated per-page `metaData` dictionary and carries each slice's source dimensions plus row/column offsets into the print renderer without entering the asset-ID `slots` map; standard printing falls back to canonical merge-derived dimensions and offsets. The custom compiler does not mutate the live binder and intentionally does not preserve section names or source-page placement because it is a compact print-only projection.
 - Browser print settings remain outside application control. Correct output requires matching paper, margins None, scale 100%, and Background graphics enabled; browser “Fit to page” breaks physical size.
 
 ### PWA and deployment
@@ -1148,7 +1163,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - README's workspace/control description has not yet been brought in line with the latest rail menus.
 - Historical SemVer labels are not Git tags or GitHub Releases. Commit links remain the release evidence.
 - There is no account, cloud sync, collaboration, telemetry, backend, or environment-secret layer. Those are deliberate scope boundaries, not half-built modules.
-- No active functional workspace task was open when v4.11.6 was recorded.
+- No active functional workspace task was open when v4.11.7 was recorded.
 
 ## Incoming engineer hand-off brief
 
