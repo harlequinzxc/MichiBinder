@@ -12,6 +12,7 @@ import {
   Eye,
   File as FileIcon,
   FileSliders,
+  FolderOpen,
   Grid2X2,
   Grid3X3,
   Image as ImageIcon,
@@ -60,6 +61,8 @@ const MAX_COLS = 4;
 const getLayout = (id) => GRID_LAYOUTS.find((layout) => layout.id === id) || GRID_LAYOUTS[1];
 const MM = 1 / 25.4;
 const STORAGE_KEY = 'digital-card-binder:v1';
+const BINDER_REPOSITORY_KEY = 'digital-card-binder:repository:v1';
+const BINDER_REPOSITORY_VERSION = 1;
 const SCHEMA_VERSION = 5;
 const CARD_PRESETS = [{ id: 'pokemon', label: 'Pokémon TCG', hint: '65 × 90 mm', wMm: 65, hMm: 90 }];
 const SCALE_MIN = 0.8;
@@ -122,7 +125,7 @@ const IDB_NAME = 'digital-card-binder';
 const IDB_STORE = 'images';
 const IDB_HANDLE_STORE = 'directory-handles';
 const IDB_DIRECTORY_HANDLE_KEY = 'active-directory';
-const IDB_VERSION = 2;
+const IDB_VERSION = 3;
 const HISTORY_LIMIT = 30;
 const SHEET_PAD = { top: 0.3, right: 0.3, bottom: 0.3, left: 0.62 };
 const THUMB_BOX = { w: 40, h: 40 * 1.414, pad: 3 };
@@ -652,8 +655,67 @@ function sanitizePage(value = {}) {
   };
 }
 
+const emptyBinderData = (pageCount = 4, settings = {}) => ({
+  currentPage: 0,
+  settings: sanitizeSettings(settings),
+  pool: [],
+  pages: normalizePhysicalPages(emptyPages(pageCount)),
+  cardPrices: {},
+});
+
+const sanitizeBinderRecord = (value = {}, index = 0) => {
+  const pages = normalizePhysicalPages(Array.isArray(value.pages) && value.pages.length ? value.pages.map(sanitizePage) : emptyPages());
+  const pool = Array.isArray(value.pool) ? value.pool.filter((item) => item && typeof item.id === 'string').map((item) => {
+    const tcgdexId = inferTcgdexId(item);
+    return {
+      id: item.id,
+      name: String(item.name || 'Card image'),
+      source: item.source === 'tcgdex' ? 'tcgdex' : 'upload',
+      ...(typeof item.src === 'string' ? { src: item.src } : {}),
+      ...(typeof item.createdAt === 'string' ? { createdAt: item.createdAt } : {}),
+      ...(tcgdexId ? { tcgdexId } : {}),
+    };
+  }) : [];
+  const createdAt = typeof value.createdAt === 'string' ? value.createdAt : new Date().toISOString();
+  return {
+    id: typeof value.id === 'string' && value.id ? value.id : uid('binder'),
+    name: String(value.name || `Collection Binder ${index + 1}`).trim().slice(0, 80) || `Collection Binder ${index + 1}`,
+    cardSet: typeof value.cardSet === 'string' ? value.cardSet : '',
+    createdAt,
+    updatedAt: typeof value.updatedAt === 'string' ? value.updatedAt : createdAt,
+    currentPage: clamp(Math.floor(Number(value.currentPage) || 0), 0, pages.length - 1),
+    settings: sanitizeSettings(value.settings),
+    pool,
+    pages,
+    cardPrices: sanitizePriceMap(value.cardPrices),
+  };
+};
+
+const createBinderRecord = ({ name, gridType = DEFAULT_LAYOUT, pageCount = 20, cardSet = '' }) => {
+  const now = new Date().toISOString();
+  return sanitizeBinderRecord({
+    id: uid('binder'),
+    name,
+    cardSet,
+    createdAt: now,
+    updatedAt: now,
+    ...emptyBinderData(clamp(Math.floor(Number(pageCount) || 20), 1, 100), { layout: getLayout(gridType).id }),
+  });
+};
+
+const serializeBinderWorkspace = (baseBinder, workspace) => ({
+  ...baseBinder,
+  cardSet: workspace.selectedSet,
+  updatedAt: new Date().toISOString(),
+  currentPage: clamp(workspace.currentPage, 0, Math.max(0, workspace.pages.length - 1)),
+  settings: sanitizeSettings(workspace.settings),
+  pool: workspace.pool,
+  pages: normalizePhysicalPages(workspace.pages.map(sanitizePage)),
+  cardPrices: sanitizePriceMap(workspace.cardPrices),
+});
+
 function loadPersisted() {
-  const fallback = { currentPage: 0, settings: sanitizeSettings(), pool: [], pages: emptyPages(), cardPrices: {} };
+  const fallback = emptyBinderData();
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return fallback;
@@ -681,6 +743,48 @@ function loadPersisted() {
   } catch {
     return fallback;
   }
+}
+
+const persistBinderRepository = (binders, activeBinderId) => {
+  localStorage.setItem(BINDER_REPOSITORY_KEY, JSON.stringify({
+    version: BINDER_REPOSITORY_VERSION,
+    savedAt: Date.now(),
+    activeBinderId,
+    binders,
+  }));
+};
+
+function loadBinderRepository() {
+  try {
+    const raw = localStorage.getItem(BINDER_REPOSITORY_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && Number(parsed.version) <= BINDER_REPOSITORY_VERSION && Array.isArray(parsed.binders)) {
+        const binders = parsed.binders.map(sanitizeBinderRecord);
+        const requestedId = typeof parsed.activeBinderId === 'string' ? parsed.activeBinderId : '';
+        return {
+          binders,
+          activeBinderId: binders.some((binder) => binder.id === requestedId) ? requestedId : binders[0]?.id || '',
+        };
+      }
+    }
+  } catch {
+    // A malformed repository falls through to legacy migration or a clean wizard.
+  }
+  if (localStorage.getItem(STORAGE_KEY)) {
+    const legacy = loadPersisted();
+    const binder = sanitizeBinderRecord({
+      id: uid('binder'),
+      name: 'My Collection Binder',
+      cardSet: '',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      ...legacy,
+    });
+    try { persistBinderRepository([binder], binder.id); } catch { /* The debounced save retries after hydration. */ }
+    return { binders: [binder], activeBinderId: binder.id };
+  }
+  return { binders: [], activeBinderId: '' };
 }
 
 let databasePromise;
@@ -724,7 +828,11 @@ const idbGetAll = async () => {
 };
 const idbPutMany = (records) => idbRun('readwrite', (store) => records.forEach((record) => store.put(record)));
 const idbDeleteMany = (ids) => idbRun('readwrite', (store) => ids.forEach((id) => store.delete(id)));
-const idbClear = () => idbRun('readwrite', (store) => store.clear());
+const binderImageRecordId = (binderId, assetId) => `${binderId}::${assetId}`;
+const idbDeleteBinderAssets = (binderId, assetIds) => idbDeleteMany([
+  ...assetIds,
+  ...assetIds.map((assetId) => binderImageRecordId(binderId, assetId)),
+]);
 const idbGetDirectoryHandle = async () => {
   const db = await getDB();
   return new Promise((resolve, reject) => {
@@ -1000,7 +1108,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
   const zenModeTitle = isZenMode ? 'Exit Focus Mode' : 'Enter Focus Mode';
 
   return (
-    <header className="titlebar no-print relative z-[70] h-12 bg-neutral-900 border-b border-white/[0.06] flex items-center justify-between px-4 shrink-0">
+    <header className="titlebar no-print relative z-40 h-12 bg-neutral-900 border-b border-white/[0.06] flex items-center justify-between px-4 shrink-0">
       <div className="flex min-w-0 items-center gap-3">
         <button
           type="button"
@@ -1015,7 +1123,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.21.1</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.22.0</span>
         </div>
         <SaveStatus status={saveStatus} isFolderLinked={isFolderLinked} />
       </div>
@@ -1752,7 +1860,13 @@ function BinderSpine({ view }) {
 }
 
 export default function CardBinder() {
-  const boot = useMemo(loadPersisted, []);
+  const repositoryBoot = useMemo(loadBinderRepository, []);
+  const initialBinder = repositoryBoot.binders.find((binder) => binder.id === repositoryBoot.activeBinderId) || repositoryBoot.binders[0] || null;
+  const boot = useMemo(() => initialBinder || emptyBinderData(), []);
+  const [binders, setBinders] = useState(repositoryBoot.binders);
+  const [activeBinderIdState, setActiveBinderIdState] = useState(initialBinder?.id || '');
+  const activeBinderId = activeBinderIdState;
+  const [isBinderWizardOpen, setIsBinderWizardOpen] = useState(repositoryBoot.binders.length === 0);
   useEffect(() => {
     document.title = "MichiBinder";
   }, []);
@@ -1787,7 +1901,7 @@ export default function CardBinder() {
   const [fetchedCards, setFetchedCards] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [setsList, setSetsList] = useState([]);
-  const [selectedSet, setSelectedSet] = useState('');
+  const [selectedSet, setSelectedSet] = useState(boot.cardSet || '');
   const [catalogPage, setCatalogPage] = useState(1);
   const [hasMoreCards, setHasMoreCards] = useState(true);
   const [searchError, setSearchError] = useState('');
@@ -1841,6 +1955,7 @@ export default function CardBinder() {
   const eurPerUsdRef = useRef(EUR_PER_USD_FALLBACK);
   const priceRequestsRef = useRef(new Map());
   const priceHydratedRef = useRef(new Set());
+  const marketPriceCacheRef = useRef(new Map());
   const marqueeRef = useRef(null);
   const selBoxRef = useRef(selBox);
   const selectionPageIdRef = useRef(selectionPageId);
@@ -1855,12 +1970,18 @@ export default function CardBinder() {
   const sessionIdsRef = useRef(new Set());
   const objectUrlsRef = useRef(new Set());
   const persistedRef = useRef(false);
+  const bindersRef = useRef(binders);
+  const activeBinderIdRef = useRef(activeBinderId);
+  const workspaceStateRef = useRef(null);
   const pagesRef = useRef(pages);
   const currentPageRef = useRef(currentPage);
   const previousPageIndexRef = useRef(currentPage);
   const layoutIdRef = useRef(settings.layout);
   const pastRef = useRef([]);
   const futureRef = useRef([]);
+  bindersRef.current = binders;
+  activeBinderIdRef.current = activeBinderId;
+  workspaceStateRef.current = { selectedSet, currentPage, settings, pool, pages, cardPrices };
 
   useEffect(() => {
     let live = true;
@@ -2013,13 +2134,181 @@ export default function CardBinder() {
     window.setTimeout(() => setToasts((items) => items.filter((item) => item.id !== id)), action ? 6500 : 3400);
   }, []);
 
+  const snapshotActiveBinder = useCallback((baseBinder) => serializeBinderWorkspace(baseBinder, {
+    selectedSet,
+    currentPage,
+    settings,
+    pool,
+    pages,
+    cardPrices,
+  }), [selectedSet, currentPage, settings, pool, pages, cardPrices]);
+
+  const hydrateBinderWorkspace = useCallback((binder) => {
+    const target = sanitizeBinderRecord(binder);
+    const nextPages = normalizePhysicalPages(target.pages);
+    objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    objectUrlsRef.current.clear();
+    sessionIdsRef.current.clear();
+    pageFlipTimerRef.current.forEach((timer) => window.clearTimeout(timer));
+    pageFlipTimerRef.current = [];
+    pageFlipTokenRef.current += 1;
+    window.clearTimeout(searchDebounceRef.current);
+    searchAbortRef.current?.abort();
+    dragRef.current = null;
+    marqueeRef.current = null;
+    panRef.current = null;
+    stageRef.current?.querySelectorAll('[data-drop-active]').forEach((element) => {
+      element.removeAttribute('data-drop-active');
+      element.removeAttribute('data-drop-order');
+    });
+    timelineRevealPageIdRef.current = null;
+    setHydrated(false);
+    setSaveStatus('saving');
+    pagesRef.current = nextPages;
+    currentPageRef.current = target.currentPage;
+    previousPageIndexRef.current = target.currentPage;
+    layoutIdRef.current = target.settings.layout;
+    cardPricesRef.current = target.cardPrices;
+    setPages(nextPages);
+    setCurrentPage(target.currentPage);
+    setSettings(target.settings);
+    setPool(target.pool);
+    setImages(Object.fromEntries(target.pool.filter((item) => item.src).map((item) => [item.id, item.src])));
+    setImageDims({});
+    setCardPrices(target.cardPrices);
+    setSelectedSet(target.cardSet || '');
+    setSearchQuery('');
+    setFetchedCards([]);
+    setCatalogPage(1);
+    setHasMoreCards(Boolean(target.cardSet));
+    setSelectedCardIds([]);
+    setSelectionAnchorId(null);
+    setSelBox(null);
+    setSelectionPageId(null);
+    setMarqueeActive(false);
+    setDragInfo(null);
+    setSidebarDropActive(false);
+    setCombineModeState(false);
+    setEditing(null);
+    editingRef.current = null;
+    setOpenPanel(null);
+    setPageFlip({ animating: false, turned: false, direction: 1, token: 0, plan: null });
+    historyRestoreTimerRef.current.forEach((timer) => window.clearTimeout(timer));
+    historyRestoreTimerRef.current = [];
+    pastRef.current = [];
+    futureRef.current = [];
+    setActiveBinderIdState(target.id);
+    activeBinderIdRef.current = target.id;
+  }, [setPages]);
+
+  const commitAndActivateBinder = useCallback((targetBinder, append = false) => {
+    const currentId = activeBinderIdRef.current;
+    const currentBinders = bindersRef.current;
+    const currentBinder = currentBinders.find((binder) => binder.id === currentId);
+    const committed = currentBinder
+      ? currentBinders.map((binder) => binder.id === currentId ? snapshotActiveBinder(binder) : binder)
+      : currentBinders;
+    const nextBinders = append ? [...committed, targetBinder] : committed;
+    const target = nextBinders.find((binder) => binder.id === targetBinder.id);
+    if (!target) return;
+    bindersRef.current = nextBinders;
+    setBinders(nextBinders);
+    try {
+      persistBinderRepository(nextBinders, target.id);
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      notify('Binder repository could not be saved.', 'error');
+    }
+    hydrateBinderWorkspace(target);
+  }, [snapshotActiveBinder, hydrateBinderWorkspace, notify]);
+
+  const setActiveBinderId = useCallback((binderId) => {
+    if (!binderId || binderId === activeBinderIdRef.current) return;
+    const target = bindersRef.current.find((binder) => binder.id === binderId);
+    if (target) commitAndActivateBinder(target);
+  }, [commitAndActivateBinder]);
+
+  const openNewBinderModal = useCallback(() => setIsBinderWizardOpen(true), []);
+
+  const handleCreateBinder = useCallback((event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const binder = createBinderRecord({
+      name: String(form.get('binderName') || '').trim(),
+      gridType: String(form.get('gridType') || DEFAULT_LAYOUT),
+      pageCount: Number(form.get('pages')) || 20,
+      cardSet: String(form.get('cardSet') || ''),
+    });
+    commitAndActivateBinder(binder, true);
+    setIsBinderWizardOpen(false);
+    notify(`${binder.name} is ready.`, 'success');
+  }, [commitAndActivateBinder, notify]);
+
+  const handleWizardJsonImport = useCallback(async (file) => {
+    try {
+      const parsed = JSON.parse(await file.text());
+      const repositoryCandidate = Array.isArray(parsed?.binders)
+        ? parsed.binders.find((binder) => binder.id === parsed.activeBinderId) || parsed.binders[0]
+        : parsed?.binder || parsed;
+      if (!repositoryCandidate || typeof repositoryCandidate !== 'object' || Array.isArray(repositoryCandidate)) throw new Error('Backup does not contain binder data.');
+      const fallbackName = String(file.name || 'Restored Binder').replace(/\.json$/i, '');
+      const binder = sanitizeBinderRecord({
+        ...repositoryCandidate,
+        id: uid('binder'),
+        name: repositoryCandidate.name || fallbackName,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      commitAndActivateBinder(binder, true);
+      setIsBinderWizardOpen(false);
+      notify(`${binder.name} restored from backup.`, 'success');
+    } catch (error) {
+      console.error('Binder backup import failed:', error);
+      notify('The selected backup file is not a valid binder snapshot.', 'error');
+    }
+  }, [commitAndActivateBinder, notify]);
+
+  useEffect(() => {
+    if (!isBinderWizardOpen) return undefined;
+    const lockWizard = (event) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (bindersRef.current.length) setIsBinderWizardOpen(false);
+    };
+    window.addEventListener('keydown', lockWizard, true);
+    return () => window.removeEventListener('keydown', lockWizard, true);
+  }, [isBinderWizardOpen]);
+
   const hydrateCardPrice = useCallback((cardId, payload = null) => {
     const id = String(cardId || '').trim();
     if (!id) return Promise.resolve(0);
+    const targetBinderId = activeBinderIdRef.current;
     const commitPrice = (price) => {
       if (!(price > 0)) return;
-      cardPricesRef.current = { ...cardPricesRef.current, [id]: price };
-      setCardPrices((currentPrices) => currentPrices[id] === price ? currentPrices : { ...currentPrices, [id]: price });
+      marketPriceCacheRef.current.set(id, price);
+      if (activeBinderIdRef.current === targetBinderId) {
+        cardPricesRef.current = { ...cardPricesRef.current, [id]: price };
+        setCardPrices((currentPrices) => currentPrices[id] === price ? currentPrices : { ...currentPrices, [id]: price });
+        return;
+      }
+      const currentActiveId = activeBinderIdRef.current;
+      const liveWorkspace = workspaceStateRef.current;
+      let nextBinders = bindersRef.current.map((binder) => (
+        binder.id === currentActiveId && liveWorkspace
+          ? serializeBinderWorkspace(binder, liveWorkspace)
+          : binder
+      ));
+      nextBinders = nextBinders.map((binder) => binder.id === targetBinderId
+        ? { ...binder, updatedAt: new Date().toISOString(), cardPrices: { ...binder.cardPrices, [id]: price } }
+        : binder);
+      try {
+        persistBinderRepository(nextBinders, currentActiveId);
+        bindersRef.current = nextBinders;
+        setBinders(nextBinders);
+      } catch {
+        // Price hydration is opportunistic and retries when catalogue data is requested again.
+      }
     };
     const resolvePayloadPriceUSD = (pricePayload) => {
       const tcgplayerPrice = positiveMoney(pricePayload?.marketPriceUSD) || tcgplayerMarketPrice(pricePayload);
@@ -2034,9 +2323,10 @@ export default function CardBinder() {
     };
     const inlinePrice = resolvePayloadPriceUSD(payload);
     if (inlinePrice) commitPrice(inlinePrice);
-    const cachedPrice = inlinePrice || positiveMoney(cardPricesRef.current[id]);
+    const cachedPrice = inlinePrice || positiveMoney(cardPricesRef.current[id]) || positiveMoney(marketPriceCacheRef.current.get(id));
+    if (cachedPrice) commitPrice(cachedPrice);
     const pendingRequest = priceRequestsRef.current.get(id);
-    if (pendingRequest) return pendingRequest;
+    if (pendingRequest) return pendingRequest.then((price) => { if (price) commitPrice(price); return price; });
     if (priceHydratedRef.current.has(id)) return Promise.resolve(cachedPrice);
     priceHydratedRef.current.add(id);
     const request = fetch(`${TCGDEX_API_BASE}/cards/${encodeURIComponent(id)}`, {
@@ -2271,31 +2561,60 @@ export default function CardBinder() {
 
   useEffect(() => {
     let cancelled = false;
+    if (!activeBinderId) {
+      setHydrated(true);
+      setSaveStatus('saved');
+      return () => { cancelled = true; };
+    }
+    const activeRecord = bindersRef.current.find((binder) => binder.id === activeBinderId);
+    const activePoolIds = new Set((activeRecord?.pool || []).map((item) => item.id));
     (async () => {
       try {
         const records = await idbGetAll();
         if (cancelled) return;
-        const recordMap = new Map(records.map((record) => [record.id, record]));
+        const scopedRecords = records.filter((record) => record.binderId === activeBinderId);
+        const scopedAssetIds = new Set(scopedRecords.map((record) => record.assetId || record.id));
+        const legacyRecords = records.filter((record) => !record.binderId && activePoolIds.has(record.id));
+        const legacyToMigrate = legacyRecords.filter((record) => !scopedAssetIds.has(record.id));
+        if (legacyToMigrate.length) {
+          await idbPutMany(legacyToMigrate.map((record) => ({
+            ...record,
+            id: binderImageRecordId(activeBinderId, record.id),
+            assetId: record.id,
+            binderId: activeBinderId,
+          })));
+        }
+        if (legacyRecords.length) await idbDeleteMany(legacyRecords.map((record) => record.id));
+        if (cancelled) return;
+        const recordMap = new Map();
+        [...legacyToMigrate, ...scopedRecords].forEach((record) => {
+          const assetId = record.assetId || record.id;
+          recordMap.set(assetId, { ...record, assetId });
+        });
+        const ownedRecords = [...recordMap.values()];
         const urls = {};
-        records.forEach((record) => {
+        ownedRecords.forEach((record) => {
           const url = URL.createObjectURL(record.blob);
           objectUrlsRef.current.add(url);
-          urls[record.id] = url;
+          urls[record.assetId] = url;
         });
         setImages((value) => ({ ...value, ...urls }));
         setPool((value) => {
           const present = new Set(value.map((item) => item.id));
           const kept = value.filter((item) => recordMap.has(item.id) || item.src || sessionIdsRef.current.has(item.id));
-          const orphans = records.filter((record) => !present.has(record.id)).sort((a, b) => (a.added || 0) - (b.added || 0)).map((record) => {
-            const tcgdexId = inferTcgdexId(record);
-            return {
-              id: record.id,
-              name: record.name || 'Card image',
-              source: record.source === 'tcgdex' ? 'tcgdex' : 'upload',
-              ...(record.added ? { createdAt: new Date(record.added).toISOString() } : {}),
-              ...(tcgdexId ? { tcgdexId } : {}),
-            };
-          });
+          const orphans = ownedRecords
+            .filter((record) => !present.has(record.assetId))
+            .sort((a, b) => (a.added || 0) - (b.added || 0))
+            .map((record) => {
+              const tcgdexId = inferTcgdexId(record);
+              return {
+                id: record.assetId,
+                name: record.name || 'Card image',
+                source: record.source === 'tcgdex' ? 'tcgdex' : 'upload',
+                ...(record.added ? { createdAt: new Date(record.added).toISOString() } : {}),
+                ...(tcgdexId ? { tcgdexId } : {}),
+              };
+            });
           const reconciled = [...kept, ...orphans];
           const valid = new Set(reconciled.map((item) => item.id));
           setPages((currentPages) => {
@@ -2309,7 +2628,7 @@ export default function CardBinder() {
       } catch {
         if (cancelled) return;
         setStorageMode('localstorage');
-        const valid = new Set(boot.pool.filter((item) => item.src).map((item) => item.id));
+        const valid = new Set((activeRecord?.pool || []).filter((item) => item.src).map((item) => item.id));
         setPool((value) => value.filter((item) => item.src || sessionIdsRef.current.has(item.id)));
         setPages((value) => {
           const nextPages = pruneMissingImages(value, valid);
@@ -2321,7 +2640,7 @@ export default function CardBinder() {
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [activeBinderId, setPages]);
 
   useEffect(() => () => {
     objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
@@ -2329,12 +2648,17 @@ export default function CardBinder() {
   }, []);
 
   useEffect(() => {
-    if (!hydrated) return undefined;
+    if (!hydrated || !activeBinderId) return undefined;
     setSaveStatus('saving');
     const timer = window.setTimeout(() => {
       try {
-        const payload = { version: SCHEMA_VERSION, savedAt: Date.now(), currentPage, settings, pool, pages, cardPrices: sanitizePriceMap(cardPrices) };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+        const nextBinders = bindersRef.current.map((binder) => (
+          binder.id === activeBinderId ? snapshotActiveBinder(binder) : binder
+        ));
+        persistBinderRepository(nextBinders, activeBinderId);
+        localStorage.removeItem(STORAGE_KEY);
+        bindersRef.current = nextBinders;
+        setBinders(nextBinders);
         setSaveStatus('saved');
       } catch {
         setSaveStatus('error');
@@ -2342,7 +2666,7 @@ export default function CardBinder() {
       }
     }, 200);
     return () => window.clearTimeout(timer);
-  }, [pages, currentPage, pool, settings, cardPrices, hydrated, notify]);
+  }, [activeBinderId, hydrated, snapshotActiveBinder, notify]);
 
   useEffect(() => {
     const node = stageRef.current;
@@ -2450,11 +2774,52 @@ export default function CardBinder() {
       }));
       return [...updatedPool, ...additions];
     };
+    const commitTargetPool = (fallbackSources = null, createObjectUrls = false) => {
+      if (activeBinderIdRef.current === activeBinderId) {
+        if (createObjectUrls) {
+          const nextImages = {};
+          entries.forEach((entry) => {
+            const url = URL.createObjectURL(entry.file);
+            objectUrlsRef.current.add(url);
+            nextImages[entry.id] = url;
+          });
+          commitImages(nextImages);
+        } else if (fallbackSources) {
+          commitImages(fallbackSources);
+        }
+        setPool((value) => mergePoolEntries(value, fallbackSources));
+        return true;
+      }
+
+      entries.forEach((entry) => sessionIdsRef.current.delete(entry.id));
+      const currentActiveId = activeBinderIdRef.current;
+      const liveWorkspace = workspaceStateRef.current;
+      let nextBinders = bindersRef.current.map((binder) => (
+        binder.id === currentActiveId && liveWorkspace
+          ? serializeBinderWorkspace(binder, liveWorkspace)
+          : binder
+      ));
+      nextBinders = nextBinders.map((binder) => binder.id === activeBinderId ? {
+        ...binder,
+        updatedAt: new Date().toISOString(),
+        pool: mergePoolEntries(binder.pool, fallbackSources),
+      } : binder);
+      try {
+        persistBinderRepository(nextBinders, currentActiveId);
+        bindersRef.current = nextBinders;
+        setBinders(nextBinders);
+      } catch {
+        notify('The upload completed, but its binder record could not be saved.', 'error');
+      }
+      return false;
+    };
 
     if (storageMode === 'indexeddb') {
       try {
         await idbPutMany(entries.map((entry) => ({
-          id: entry.id,
+          id: binderImageRecordId(activeBinderId, entry.id),
+          assetId: entry.id,
+          binderId: activeBinderId,
           name: entry.name,
           type: entry.file.type,
           blob: entry.file,
@@ -2462,14 +2827,7 @@ export default function CardBinder() {
           added: entry.added,
           ...(entry.tcgdexId ? { tcgdexId: entry.tcgdexId } : {}),
         })));
-        const nextImages = {};
-        entries.forEach((entry) => {
-          const url = URL.createObjectURL(entry.file);
-          objectUrlsRef.current.add(url);
-          nextImages[entry.id] = url;
-        });
-        commitImages(nextImages);
-        setPool((value) => mergePoolEntries(value));
+        commitTargetPool(null, true);
         if (!persistedRef.current) {
           persistedRef.current = true;
           navigator.storage?.persist?.().catch(() => {});
@@ -2479,8 +2837,7 @@ export default function CardBinder() {
         try {
           const urls = await Promise.all(entries.map((entry) => readFileAsDataUrl(entry.file)));
           const fallbackSources = Object.fromEntries(entries.map((entry, index) => [entry.id, urls[index]]));
-          commitImages(fallbackSources);
-          setPool((value) => mergePoolEntries(value, fallbackSources));
+          commitTargetPool(fallbackSources);
           notify('IndexedDB is unavailable. Images will use browser storage instead.', 'warn');
         } catch {
           notify('Could not read one or more images.', 'error');
@@ -2491,14 +2848,13 @@ export default function CardBinder() {
       try {
         const urls = await Promise.all(entries.map((entry) => readFileAsDataUrl(entry.file)));
         const fallbackSources = Object.fromEntries(entries.map((entry, index) => [entry.id, urls[index]]));
-        commitImages(fallbackSources);
-        setPool((value) => mergePoolEntries(value, fallbackSources));
+        commitTargetPool(fallbackSources);
       } catch {
         notify('Could not read one or more images.', 'error');
         return [];
       }
     }
-    scrollToNextUnplacedCard('[role="listbox"][aria-label*="Custom"]', 'data-local-card');
+    if (activeBinderIdRef.current === activeBinderId) scrollToNextUnplacedCard('[role="listbox"][aria-label*="Custom"]', 'data-local-card');
     if (!options.silent) {
       const addedCount = entries.length - replacementCount;
       const result = [
@@ -2508,9 +2864,10 @@ export default function CardBinder() {
       notify(`${result} in MichiBinder.`, 'success');
     }
     return entries.map((entry) => entry.id);
-  }, [customUploadedCards, notify, pool.length, scrollToNextUnplacedCard, storageMode]);
+  }, [activeBinderId, customUploadedCards, notify, pool.length, scrollToNextUnplacedCard, storageMode]);
 
   const uploadAndRegisterFiles = useCallback(async (fileList) => {
+    const targetBinderId = activeBinderIdRef.current;
     const files = Array.from(fileList || []).filter((file) => file?.type?.startsWith('image/'));
     if (!files.length) {
       notify('Choose PNG, JPG, WEBP, GIF, or AVIF image files.', 'warn');
@@ -2521,7 +2878,7 @@ export default function CardBinder() {
       return await addFiles(files);
     } catch (error) {
       console.error('Local asset import failed:', error);
-      setSaveStatus('error');
+      if (activeBinderIdRef.current === targetBinderId) setSaveStatus('error');
       notify('Local asset import failed. Verify the selected image files.', 'error');
       return [];
     }
@@ -2581,7 +2938,7 @@ export default function CardBinder() {
           return next;
         });
         try {
-          await idbDeleteMany(staleDirectoryIds);
+          await idbDeleteBinderAssets(activeBinderIdRef.current, staleDirectoryIds);
         } catch {
           // Orphaned binary records are ignored when their pool entries are absent.
         }
@@ -2628,6 +2985,7 @@ export default function CardBinder() {
   }, []);
 
   const handleDirectorySync = useCallback(async () => {
+    const targetBinderId = activeBinderIdRef.current;
     if (!directoryHandle) {
       setIsFolderLinked(false);
       notify('Choose a local asset folder before syncing.', 'warn');
@@ -2640,6 +2998,10 @@ export default function CardBinder() {
         return [];
       }
       const files = await collectDirectoryHandleFiles(directoryHandle);
+      if (activeBinderIdRef.current !== targetBinderId) {
+        notify('Folder scan finished after the workspace changed. Sync again on the active binder.', 'info');
+        return [];
+      }
       return await syncPoolFromLocalDirectory(files);
     } catch (error) {
       console.error('Directory handle traversal failed:', error);
@@ -2649,6 +3011,7 @@ export default function CardBinder() {
   }, [directoryHandle, ensureDirectoryReadPermission, collectDirectoryHandleFiles, syncPoolFromLocalDirectory, notify]);
 
   const handleDirectoryConnect = useCallback(async () => {
+    const targetBinderId = activeBinderIdRef.current;
     if (typeof window.showDirectoryPicker !== 'function') {
       document.getElementById('hub-directory-picker')?.click();
       return [];
@@ -2661,6 +3024,10 @@ export default function CardBinder() {
       setDirectoryHandle(handle);
       setIsFolderLinked(true);
       const files = await collectDirectoryHandleFiles(handle);
+      if (activeBinderIdRef.current !== targetBinderId) {
+        notify('Folder connected. Sync again to import it into the active binder.', 'info');
+        return [];
+      }
       return await syncPoolFromLocalDirectory(files);
     } catch (error) {
       if (error?.name === 'AbortError') return [];
@@ -2686,6 +3053,7 @@ export default function CardBinder() {
   }, [notify]);
 
   const importFetchedCard = useCallback(async (item, highResImageUrl, options = {}) => {
+    const targetBinderId = activeBinderIdRef.current;
     hydrateCardPrice(item.id, item);
     const requestedSource = highResImageUrl || item.url || (item.image ? `${item.image}/high.jpg` : '/placeholder.png');
     const source = requestedSource === '/placeholder.png' || requestedSource.startsWith(`${TCGDEX_ASSET_CDN}/`) ? requestedSource : '/placeholder.png';
@@ -2697,8 +3065,8 @@ export default function CardBinder() {
       const file = new File([blob], `${safeFileName(item.name)} · ${safeFileName(item.id)}.jpg`, { type: blob.type || 'image/jpeg' });
       const ids = await addFiles([file], { source: 'tcgdex', tcgdexId: item.id, silent: options.silent });
       if (ids.length) {
-        if (activeTab === 'cards') scrollToNextUnplacedCard('[data-tcgdex-results]', 'data-tcgdex-card');
-        if (activeTab === 'michi') scrollToNextUnplacedCard('[role="listbox"][aria-label*="Custom"]', 'data-local-card');
+        if (activeBinderIdRef.current === targetBinderId && activeTab === 'cards') scrollToNextUnplacedCard('[data-tcgdex-results]', 'data-tcgdex-card');
+        if (activeBinderIdRef.current === targetBinderId && activeTab === 'michi') scrollToNextUnplacedCard('[role="listbox"][aria-label*="Custom"]', 'data-local-card');
         return ids;
       }
     } catch {
@@ -2706,11 +3074,32 @@ export default function CardBinder() {
       // still remains a valid, persistable source for the binder and print views.
     }
     const id = uid('tcgdex');
-    sessionIdsRef.current.add(id);
-    setImages((value) => ({ ...value, [id]: source }));
-    setPool((value) => [...value, { id, name: item.name || 'Pokémon card', source: 'tcgdex', src: source, tcgdexId: String(item.id) }]);
-    if (activeTab === 'cards') scrollToNextUnplacedCard('[data-tcgdex-results]', 'data-tcgdex-card');
-    if (activeTab === 'michi') scrollToNextUnplacedCard('[role="listbox"][aria-label*="Custom"]', 'data-local-card');
+    const poolItem = { id, name: item.name || 'Pokémon card', source: 'tcgdex', src: source, tcgdexId: String(item.id) };
+    if (activeBinderIdRef.current === targetBinderId) {
+      sessionIdsRef.current.add(id);
+      setImages((value) => ({ ...value, [id]: source }));
+      setPool((value) => [...value, poolItem]);
+      if (activeTab === 'cards') scrollToNextUnplacedCard('[data-tcgdex-results]', 'data-tcgdex-card');
+      if (activeTab === 'michi') scrollToNextUnplacedCard('[role="listbox"][aria-label*="Custom"]', 'data-local-card');
+    } else {
+      const currentActiveId = activeBinderIdRef.current;
+      const liveWorkspace = workspaceStateRef.current;
+      let nextBinders = bindersRef.current.map((binder) => (
+        binder.id === currentActiveId && liveWorkspace
+          ? serializeBinderWorkspace(binder, liveWorkspace)
+          : binder
+      ));
+      nextBinders = nextBinders.map((binder) => binder.id === targetBinderId
+        ? { ...binder, updatedAt: new Date().toISOString(), pool: [...binder.pool, poolItem] }
+        : binder);
+      try {
+        persistBinderRepository(nextBinders, currentActiveId);
+        bindersRef.current = nextBinders;
+        setBinders(nextBinders);
+      } catch {
+        notify('The TCGdex card loaded, but its binder record could not be saved.', 'error');
+      }
+    }
     if (!options.silent) notify(`${item.name || 'Pokémon card'} added from TCGdex.`, 'success');
     return [id];
   }, [activeTab, addFiles, hydrateCardPrice, notify, scrollToNextUnplacedCard]);
@@ -2956,17 +3345,19 @@ export default function CardBinder() {
   }, [commitEditing, applyCanvasChange, activeTab, notify, scrollToNextUnplacedCard]);
 
   const addFetchedCardToPage = useCallback(async (item, highResImageUrl) => {
+    const targetBinderId = activeBinderIdRef.current;
     const ids = await importFetchedCard(item, highResImageUrl);
-    placeCards(ids, currentPageRef.current, null);
+    if (activeBinderIdRef.current === targetBinderId) placeCards(ids, currentPageRef.current, null);
   }, [importFetchedCard, placeCards]);
 
   const fillSelection = useCallback(async () => {
+    const targetBinderId = activeBinderIdRef.current;
     const selectedCount = activeTab === 'cards' ? selectedFetchedCards.length : selectedOrdered.length;
     if (!selectedCount) return;
     const targets = planPlacement(pagesRef.current, currentPageRef.current, null, selectedCount, dimsRef.current);
     if (!targets.length) { notify(`Page ${currentPageRef.current + 1} is full.`, 'warn'); return; }
     const ids = activeTab === 'cards' ? await importFetchedCards(selectedFetchedCards) : selectedOrdered;
-    placeCards(ids, currentPageRef.current, null);
+    if (activeBinderIdRef.current === targetBinderId) placeCards(ids, currentPageRef.current, null);
   }, [activeTab, selectedFetchedCards, selectedOrdered, importFetchedCards, placeCards, notify]);
 
   const removeSlotCard = useCallback((pageId, key) => {
@@ -3193,6 +3584,7 @@ export default function CardBinder() {
   const handleSlotDrop = useCallback(async (event, slot, pageIndex = currentPageRef.current) => {
     event.preventDefault();
     event.stopPropagation();
+    const targetBinderId = activeBinderIdRef.current;
     const payload = getPayload(event);
     const carriesFiles = hasFiles(event.dataTransfer);
     const files = Array.from(event.dataTransfer.files || []);
@@ -3201,19 +3593,20 @@ export default function CardBinder() {
     activateCanvasPage(pageIndex);
     if (carriesFiles) {
       const ids = await uploadAndRegisterFiles(files);
-      placeCards(ids, pageIndex, slot.key);
+      if (activeBinderIdRef.current === targetBinderId) placeCards(ids, pageIndex, slot.key);
     } else if (payload?.kind === 'pool') placeCards(payload.ids, pageIndex, slot.key);
     else if (payload?.kind === 'remote-batch') {
       const ids = await importFetchedCards(payload.cards);
-      placeCards(ids, pageIndex, slot.key);
+      if (activeBinderIdRef.current === targetBinderId) placeCards(ids, pageIndex, slot.key);
     } else if (payload?.kind === 'remote') {
       const ids = await importFetchedCard(payload.card, payload.url);
-      placeCards(ids, pageIndex, slot.key);
+      if (activeBinderIdRef.current === targetBinderId) placeCards(ids, pageIndex, slot.key);
     } else if (payload?.kind === 'slot') moveSlotCard(payload, pageIndex, slot.key);
   }, [combineMode, getPayload, activateCanvasPage, uploadAndRegisterFiles, importFetchedCards, importFetchedCard, placeCards, moveSlotCard, resetDrag]);
 
   const handleStageDrop = useCallback(async (event) => {
     event.preventDefault();
+    const targetBinderId = activeBinderIdRef.current;
     const payload = getPayload(event);
     const carriesFiles = hasFiles(event.dataTransfer);
     const files = Array.from(event.dataTransfer.files || []);
@@ -3221,14 +3614,14 @@ export default function CardBinder() {
     if (combineMode || editingRef.current) return;
     if (carriesFiles) {
       const ids = await uploadAndRegisterFiles(files);
-      placeCards(ids, currentPageRef.current, null);
+      if (activeBinderIdRef.current === targetBinderId) placeCards(ids, currentPageRef.current, null);
     } else if (payload?.kind === 'pool') placeCards(payload.ids, currentPageRef.current, null);
     else if (payload?.kind === 'remote-batch') {
       const ids = await importFetchedCards(payload.cards);
-      placeCards(ids, currentPageRef.current, null);
+      if (activeBinderIdRef.current === targetBinderId) placeCards(ids, currentPageRef.current, null);
     } else if (payload?.kind === 'remote') {
       const ids = await importFetchedCard(payload.card, payload.url);
-      placeCards(ids, currentPageRef.current, null);
+      if (activeBinderIdRef.current === targetBinderId) placeCards(ids, currentPageRef.current, null);
     }
   }, [combineMode, getPayload, uploadAndRegisterFiles, importFetchedCards, importFetchedCard, placeCards, resetDrag]);
 
@@ -3250,20 +3643,21 @@ export default function CardBinder() {
   const handleThumbDrop = useCallback(async (event, pageIndex) => {
     event.preventDefault();
     event.stopPropagation();
+    const targetBinderId = activeBinderIdRef.current;
     const payload = getPayload(event);
     const carriesFiles = hasFiles(event.dataTransfer);
     const files = Array.from(event.dataTransfer.files || []);
     resetDrag(event);
     if (carriesFiles) {
       const ids = await uploadAndRegisterFiles(files);
-      placeCards(ids, pageIndex, null);
+      if (activeBinderIdRef.current === targetBinderId) placeCards(ids, pageIndex, null);
     } else if (payload?.kind === 'pool') placeCards(payload.ids, pageIndex, null);
     else if (payload?.kind === 'remote-batch') {
       const ids = await importFetchedCards(payload.cards);
-      placeCards(ids, pageIndex, null);
+      if (activeBinderIdRef.current === targetBinderId) placeCards(ids, pageIndex, null);
     } else if (payload?.kind === 'remote') {
       const ids = await importFetchedCard(payload.card, payload.url);
-      placeCards(ids, pageIndex, null);
+      if (activeBinderIdRef.current === targetBinderId) placeCards(ids, pageIndex, null);
     } else if (payload?.kind === 'slot') moveSlotCard(payload, pageIndex, null);
   }, [getPayload, uploadAndRegisterFiles, importFetchedCards, importFetchedCard, placeCards, moveSlotCard, resetDrag]);
 
@@ -3512,21 +3906,13 @@ export default function CardBinder() {
       delete next[cardId];
       return next;
     });
-    if (storageMode === 'indexeddb') idbDeleteMany([cardId]).catch(() => notify('The upload was removed, but image storage cleanup failed.', 'warn'));
+    if (storageMode === 'indexeddb') idbDeleteBinderAssets(activeBinderIdRef.current, [cardId]).catch(() => notify('The upload was removed, but image storage cleanup failed.', 'warn'));
 
-    try {
-      const payload = { version: SCHEMA_VERSION, savedAt: Date.now(), currentPage, settings, pool: nextPool, pages: nextPages, cardPrices: sanitizePriceMap(cardPrices) };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-      setSaveStatus('saved');
-    } catch {
-      setSaveStatus('error');
-      notify('The upload was removed, but the local save could not be updated.', 'error');
-    }
     setTimeout(() => {
       if (activeTab === 'michi') scrollToNextUnplacedCard('[role="listbox"][aria-label*="Custom"]', 'data-local-card');
     }, 60);
     notify(`${target.name || 'Uploaded card'} permanently deleted.`, 'info');
-  }, [pool, storageMode, currentPage, settings, cardPrices, clearHistory, notify, activeTab, scrollToNextUnplacedCard]);
+  }, [pool, storageMode, clearHistory, notify, activeTab, scrollToNextUnplacedCard]);
 
   const handleClearAllUploads = useCallback(() => {
     const ids = customUploadedCards.map((item) => item.id);
@@ -3558,18 +3944,10 @@ export default function CardBinder() {
       });
       return next;
     });
-    if (storageMode === 'indexeddb') idbDeleteMany(ids).catch(() => notify('Uploads were cleared, but image storage cleanup failed.', 'warn'));
+    if (storageMode === 'indexeddb') idbDeleteBinderAssets(activeBinderIdRef.current, ids).catch(() => notify('Uploads were cleared, but image storage cleanup failed.', 'warn'));
 
-    try {
-      const payload = { version: SCHEMA_VERSION, savedAt: Date.now(), currentPage, settings, pool: nextPool, pages: nextPages, cardPrices: sanitizePriceMap(cardPrices) };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-      setSaveStatus('saved');
-    } catch {
-      setSaveStatus('error');
-      notify('Uploads were cleared, but the local save could not be updated.', 'error');
-    }
     notify(`${plural(ids.length, 'upload')} permanently deleted.`, 'info');
-  }, [customUploadedCards, pool, storageMode, currentPage, settings, cardPrices, clearHistory, notify]);
+  }, [customUploadedCards, pool, storageMode, clearHistory, notify]);
 
   const deleteImages = useCallback(async (ids) => {
     if (!ids.length) return;
@@ -3592,7 +3970,7 @@ export default function CardBinder() {
       });
       return next;
     });
-    if (storageMode === 'indexeddb') idbDeleteMany(ids).catch(() => notify('Images were removed, but storage cleanup failed.', 'warn'));
+    if (storageMode === 'indexeddb') idbDeleteBinderAssets(activeBinderIdRef.current, ids).catch(() => notify('Images were removed, but storage cleanup failed.', 'warn'));
     notify(`${plural(ids.length, 'card')} deleted.`, 'info');
   }, [visible, pool, storageMode, clearHistory, notify]);
 
@@ -3641,29 +4019,60 @@ export default function CardBinder() {
   }, [commitEditing, notify]);
 
   const resetBinder = useCallback(async () => {
-    if (!window.confirm('Reset the entire binder? This deletes every page and image from this device.')) return;
+    if (!window.confirm('Reset this binder? This deletes every page and image in the active workspace only.')) return;
+    const targetBinderId = activeBinderIdRef.current;
     commitEditing();
-    if (storageMode === 'indexeddb') await idbClear().catch(() => {});
-    localStorage.removeItem(STORAGE_KEY);
+    if (storageMode === 'indexeddb') {
+      const activePoolIds = new Set(pool.map((item) => item.id));
+      await idbGetAll()
+        .then((records) => idbDeleteMany(records
+          .filter((record) => record.binderId === targetBinderId || (!record.binderId && activePoolIds.has(record.id)))
+          .map((record) => record.id)))
+        .catch(() => {});
+    }
+    if (activeBinderIdRef.current !== targetBinderId) {
+      const currentActiveId = activeBinderIdRef.current;
+      const liveWorkspace = workspaceStateRef.current;
+      const nextBinders = bindersRef.current.map((binder) => {
+        if (binder.id === currentActiveId && liveWorkspace) return serializeBinderWorkspace(binder, liveWorkspace);
+        if (binder.id === targetBinderId) return sanitizeBinderRecord({ ...binder, ...emptyBinderData(), cardSet: '', updatedAt: new Date().toISOString() });
+        return binder;
+      });
+      try {
+        persistBinderRepository(nextBinders, currentActiveId);
+        bindersRef.current = nextBinders;
+        setBinders(nextBinders);
+        notify('Inactive binder reset.', 'info');
+      } catch {
+        notify('The binder images were cleared, but its reset state could not be saved.', 'error');
+      }
+      return;
+    }
     objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
     objectUrlsRef.current.clear();
+    sessionIdsRef.current.clear();
     const nextPages = normalizePhysicalPages(emptyPages());
     pagesRef.current = nextPages;
     currentPageRef.current = 0;
     previousPageIndexRef.current = 0;
     layoutIdRef.current = DEFAULT_LAYOUT;
+    cardPricesRef.current = {};
     setPages(nextPages);
     clearHistory();
     setPool([]);
     setImages({});
+    setCardPrices({});
+    setSelectedSet('');
+    setSearchQuery('');
+    setFetchedCards([]);
     setSelectedCardIds([]);
     setSelBox(null);
     setSelectionPageId(null);
     setSettings(sanitizeSettings());
     setCurrentPage(0);
     setOpenPanel(null);
-    notify('Binder reset.', 'info');
-  }, [commitEditing, storageMode, clearHistory, notify]);
+    notify('Active binder reset.', 'info');
+  }, [commitEditing, storageMode, pool, clearHistory, notify]);
 
   const addPage = useCallback(() => {
     commitEditing();
@@ -4341,6 +4750,7 @@ export default function CardBinder() {
     </div>
   );
 
+  const activeBinder = binders.find((binder) => binder.id === activeBinderId) || null;
   const toastTones = {
     info: 'border-zinc-700 bg-[#18181B] text-zinc-100',
     success: 'border-emerald-400/25 bg-emerald-950 text-emerald-100',
@@ -4350,7 +4760,7 @@ export default function CardBinder() {
 
   return (
     <>
-      <div className="app-shell flex flex-col bg-[#0B0B0C] text-zinc-200">
+      <div className="app-shell relative z-0 flex flex-col bg-[#0B0B0C] text-zinc-200" inert={isBinderWizardOpen ? true : undefined} aria-hidden={isBinderWizardOpen ? 'true' : undefined}>
         <AppBar
           isLeftSidebarOpen={isLeftSidebarOpen}
           setIsLeftSidebarOpen={setIsLeftSidebarOpen}
@@ -4362,7 +4772,39 @@ export default function CardBinder() {
           onToggleCurrency={() => setCurrencyDisplay((value) => value === 'SGD' ? 'USD' : 'SGD')}
           portfolioValueLabel={portfolioValueLabel}
         />
-        <div data-main-layout className="flex h-[calc(100vh-48px)] w-full overflow-hidden bg-neutral-950">
+        <nav data-binder-tab-strip aria-label="Binder workspaces" className="no-print relative z-40 flex h-10 shrink-0 items-end overflow-x-auto border-b border-white/[0.06] bg-neutral-950 px-3 scrollbar-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="flex min-w-max items-end gap-1">
+            {binders.map((binder) => {
+              const isActive = binder.id === activeBinderId;
+              return (
+                <button
+                  key={binder.id}
+                  type="button"
+                  onClick={() => setActiveBinderId(binder.id)}
+                  aria-current={isActive ? 'page' : undefined}
+                  className={`group relative flex h-9 min-w-36 max-w-56 items-center gap-2 rounded-t-lg border px-3 text-left transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-red-500 ${isActive ? 'border-white/[0.08] border-b-neutral-900 bg-neutral-900 text-neutral-100' : 'border-transparent bg-transparent text-neutral-500 hover:border-white/[0.04] hover:bg-neutral-900/50 hover:text-neutral-300'}`}
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[11px] font-semibold tracking-tight">{binder.name}</span>
+                    <span className="block font-mono text-[8px] font-bold uppercase tracking-widest text-neutral-600 group-hover:text-neutral-500">{getLayout(binder.settings.layout).id}</span>
+                  </span>
+                  {isActive && isFolderLinked && <FolderOpen aria-hidden="true" size={13} strokeWidth={1.7} className="shrink-0 text-zinc-400" />}
+                  {isActive && <span aria-hidden="true" className="absolute inset-x-2 -bottom-px h-px bg-red-500" />}
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              onClick={openNewBinderModal}
+              aria-label="Create a new binder"
+              title="Create a new binder"
+              className="mb-1 grid size-8 shrink-0 place-items-center rounded-md border border-dashed border-white/[0.09] text-neutral-500 transition-all hover:border-red-500/40 hover:bg-red-950/30 hover:text-red-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+            >
+              <Plus size={14} strokeWidth={1.8} />
+            </button>
+          </div>
+        </nav>
+        <div data-main-layout className="flex h-[calc(100vh-88px)] w-full overflow-hidden bg-neutral-950">
           <CardPool
             isOpen={isLeftSidebarOpen}
             customUploadedCards={customUploadedCards}
@@ -4553,6 +4995,73 @@ export default function CardBinder() {
           {toasts.map((toast) => <div key={toast.id} role="status" className={`animate-toast pointer-events-auto flex max-w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-[12px] shadow-2xl shadow-black/40 ${toastTones[toast.tone] || toastTones.info}`}><span className="leading-relaxed">{toast.message}</span>{toast.action && <button type="button" onClick={() => { setToasts((value) => value.filter((item) => item.id !== toast.id)); toast.action.onClick(); }} className="shrink-0 rounded-md bg-white/10 px-2 py-1 font-semibold text-white hover:bg-white/20">{toast.action.label}</button>}<button type="button" title="Dismiss" aria-label="Dismiss notification" onClick={() => setToasts((value) => value.filter((item) => item.id !== toast.id))} className="grid size-6 shrink-0 place-items-center rounded-md text-current hover:bg-white/10"><Icon name="x" /></button></div>)}
         </div>
       </div>
+      {isBinderWizardOpen && (
+        <div className="fixed inset-0 z-50 bg-neutral-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
+          <section role="dialog" aria-modal="true" aria-labelledby="binder-wizard-title" className="w-full max-w-md overflow-hidden rounded-2xl border border-white/[0.09] bg-neutral-900 shadow-[0_28px_90px_rgba(0,0,0,0.7)]">
+            <form onSubmit={handleCreateBinder} className="p-5">
+              <header className="mb-5 flex items-start justify-between gap-4">
+                <div>
+                  <p className="mb-1 font-mono text-[9px] font-bold uppercase tracking-[0.22em] text-red-400">Workspace activation</p>
+                  <h2 id="binder-wizard-title" className="text-xl font-semibold tracking-tight text-white">Create your binder</h2>
+                  <p className="mt-1 text-xs leading-relaxed text-neutral-400">Name your collection and configure its private canvas.</p>
+                </div>
+                {binders.length > 0 && (
+                  <button type="button" onClick={() => setIsBinderWizardOpen(false)} aria-label="Close binder creator" className="grid size-8 shrink-0 place-items-center rounded-lg text-neutral-500 transition-colors hover:bg-white/[0.05] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><X size={15} /></button>
+                )}
+              </header>
+
+              <div className="space-y-4">
+                <label className="block">
+                  <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-neutral-400">Binder title</span>
+                  <input name="binderName" type="text" required autoFocus maxLength={80} placeholder="My Collection Binder" className="h-9 w-full rounded-lg border border-white/[0.08] bg-neutral-950 px-3 text-xs text-white outline-none transition-colors placeholder:text-neutral-700 focus:border-red-500/60 focus:ring-2 focus:ring-red-500/15" />
+                </label>
+
+                <fieldset>
+                  <legend className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-neutral-400">Pocket grid</legend>
+                  <div className="grid grid-cols-3 gap-2">
+                    {GRID_LAYOUTS.map((grid) => (
+                      <label key={grid.id} className="cursor-pointer">
+                        <input className="peer sr-only" type="radio" name="gridType" value={grid.id} defaultChecked={grid.id === DEFAULT_LAYOUT} />
+                        <span className="flex h-14 flex-col items-center justify-center rounded-lg border border-white/[0.07] bg-neutral-950/70 text-neutral-500 transition-all hover:border-white/[0.14] hover:text-neutral-300 peer-checked:border-red-500/60 peer-checked:bg-red-950/30 peer-checked:text-red-200 peer-focus-visible:ring-2 peer-focus-visible:ring-red-500">
+                          <strong className="font-mono text-xs">{grid.id}</strong>
+                          <span className="mt-0.5 text-[8px] font-bold uppercase tracking-wider">{grid.label}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="block">
+                    <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-neutral-400">Page count</span>
+                    <input name="pages" type="number" min="1" max="100" defaultValue="20" required className="h-9 w-full rounded-lg border border-white/[0.08] bg-neutral-950 px-3 font-mono text-xs text-white outline-none transition-colors focus:border-red-500/60 focus:ring-2 focus:ring-red-500/15" />
+                  </label>
+                  <label className="block min-w-0">
+                    <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-neutral-400">Card set</span>
+                    <select name="cardSet" defaultValue="" className="h-9 w-full rounded-lg border border-white/[0.08] bg-neutral-950 px-2.5 text-xs text-white outline-none transition-colors focus:border-red-500/60 focus:ring-2 focus:ring-red-500/15">
+                      <option value="">Manual / Custom</option>
+                      {setsList.map((set) => <option key={set.id} value={set.id}>{set.name}</option>)}
+                    </select>
+                  </label>
+                </div>
+
+                <div className="rounded-xl border border-white/[0.06] bg-neutral-950/55 p-3">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-semibold text-neutral-300">Restore a JSON backup</p>
+                      <p className="mt-0.5 text-[9px] leading-relaxed text-neutral-600">Import a saved binder instead of starting blank.</p>
+                    </div>
+                    <button type="button" onClick={() => document.getElementById('wizard-backup-picker')?.click()} className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-white/[0.08] bg-neutral-800 px-2.5 text-[10px] font-semibold text-neutral-300 transition-colors hover:bg-neutral-700 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Upload size={12} /> Restore</button>
+                    <input id="wizard-backup-picker" type="file" accept="application/json,.json" className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (file) handleWizardJsonImport(file); }} />
+                  </div>
+                </div>
+              </div>
+
+              <button type="submit" className="mt-5 flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-red-600 px-4 text-xs font-bold text-white shadow-lg shadow-red-950/30 transition-all hover:bg-red-500 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-900">Launch Workspace Canvas <ChevronRight size={14} /></button>
+            </form>
+          </section>
+        </div>
+      )}
       <div className="portrait-guard"><Icon name="rotate" className="text-red-400" /><h2 className="text-xl font-semibold text-white">Rotate to landscape</h2><p className="max-w-sm text-sm text-zinc-400">MichiBinder is designed as a desktop, landscape workspace.</p></div>
       {printTree}
     </>

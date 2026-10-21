@@ -2,20 +2,20 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.21.1
+## Current state — v4.22.0
 
 - **Ledger date:** 2026-10-22
-- **Application state entering this feature pass:** commit `54cf232` / v4.21.0
-- **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
+- **Application state entering this feature pass:** commit `2e8ff86` / v4.21.1
+- **Product:** a private, desktop-first, multi-binder trading-card layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
-- **Primary source:** `src/CardBinder.jsx`, approximately 3,450 lines containing the data model, persistence, catalogue integration, interactions, print tree, and most UI components
+- **Primary source:** `src/CardBinder.jsx`, approximately 4,900 lines containing the data model, persistence, catalogue integration, interactions, print tree, and most UI components
 - **Supporting source:** `src/index.css` for Tailwind import, print media, page-turn depth, sleeve materials, portrait guard, and animations
-- **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
+- **Persistence:** a versioned multi-binder repository in `localStorage`; binder-scoped image blobs and the global local-directory permission handle in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets and the public open ExchangeRate-API USD feed; custom assets remain entirely local with no upload, proxy, scraper, manifest, or remote-sync request path; no MichiBinder backend, account, telemetry, or required environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** native directory handles are now cached in a dedicated IndexedDB store, restored for one-click resync, and explicitly disconnectable without deleting rendered workspace assets
-- **Last verified behavior:** production build, cached-handle storage, recursive resync after a disk deletion/addition, immediate red No Folder Picked state, token removal, pool preservation, fixed panel/header footprints, synchronized v4.21.1 title pill, and zero browser errors
+- **Last functional change:** independent binder workspaces now activate through a locked creation/restore wizard and switch through a horizontal browser-tab strip without cross-mutating layout, pool, pages, pricing, or image records
+- **Last verified behavior:** production build; fresh creation; JSON restore; legacy single-binder and unscoped-image migration; active canvas/sidebar/toolbar/timeline switching; binder-scoped upload hydration and reset; reload persistence; directory mount/resync/unlink preservation at three landscape viewports; fixed top-band geometry; synchronized v4.22.0 title pill; and zero browser errors
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## Strict SemVer policy and audit
@@ -34,7 +34,7 @@ The 2026-10-21 full-ledger audit confirmed the three post-inception major bounda
 2. **v3.0.0:** the toolbar/tray composition was dismantled and rebuilt as the four-area workspace with contextual bottom navigation.
 3. **v4.0.0:** top-heavy configuration controls were removed and replaced by the standalone right utility rail plus cohesive bottom structural controller.
 
-The audit also confirmed that presentation-only releases remain patches; capability releases such as TCGdex integration, source workspaces, valuation, upload deletion, print slicing, and first-unplaced tracking remain minors; and later fixes that complete those existing contracts remain patches. Specifically, v4.8.2 restored the Custom metric removed during v4.8.1 consolidation, while v4.11.1–v4.11.7 corrected lifecycle and print-slicing gaps in capabilities introduced by v4.11.0 and earlier print releases. Persistent per-tab scroll memory is a new stateful interaction and therefore begins v4.12.0 rather than v4.11.8; continuously measurable inactive-panel background scrolling is likewise a new cross-tab capability and begins v4.15.0; premium layout-aware prompt compilation and copy workflows begin v4.16.0, while their preview-format and prompt-copy corrections remain the v4.16.1 patch; remote public-asset ingestion begins v4.17.0, its replacement with bulk Imgur album deconstruction and concurrent streaming begins v4.18.0, the CORS-safe public-page scraper correction remains the v4.18.1 patch, cloud-first ImgBB upload interception begins v4.19.0, cross-device downstream ImgBB profile rehydration begins v4.20.0, the GridRip boundary-instruction correction remains the v4.20.1 patch, the cloud-control/header presentation correction remains the v4.20.2 patch, the downstream root-profile parser correction remains the v4.20.3 patch, the JSONP profile-loader correction remains the v4.20.4 patch, the device-ledger rehydration correction remains the v4.20.5 patch, the public-manifest registry correction remains the v4.20.6 patch, and the authoritative clipboard-reconciliation correction remains the v4.20.7 patch. Browser-native authoritative directory mounting replaces the retired online custom-asset architecture as a new ingestion capability and therefore begins v4.21.0; cached-handle unlinking completes that capability as the v4.21.1 patch.
+The audit also confirmed that presentation-only releases remain patches; capability releases such as TCGdex integration, source workspaces, valuation, upload deletion, print slicing, and first-unplaced tracking remain minors; and later fixes that complete those existing contracts remain patches. Specifically, v4.8.2 restored the Custom metric removed during v4.8.1 consolidation, while v4.11.1–v4.11.7 corrected lifecycle and print-slicing gaps in capabilities introduced by v4.11.0 and earlier print releases. Persistent per-tab scroll memory is a new stateful interaction and therefore begins v4.12.0 rather than v4.11.8; continuously measurable inactive-panel background scrolling is likewise a new cross-tab capability and begins v4.15.0; premium layout-aware prompt compilation and copy workflows begin v4.16.0, while their preview-format and prompt-copy corrections remain the v4.16.1 patch; remote public-asset ingestion begins v4.17.0, its replacement with bulk Imgur album deconstruction and concurrent streaming begins v4.18.0, the CORS-safe public-page scraper correction remains the v4.18.1 patch, cloud-first ImgBB upload interception begins v4.19.0, cross-device downstream ImgBB profile rehydration begins v4.20.0, the GridRip boundary-instruction correction remains the v4.20.1 patch, the cloud-control/header presentation correction remains the v4.20.2 patch, the downstream root-profile parser correction remains the v4.20.3 patch, the JSONP profile-loader correction remains the v4.20.4 patch, the device-ledger rehydration correction remains the v4.20.5 patch, the public-manifest registry correction remains the v4.20.6 patch, and the authoritative clipboard-reconciliation correction remains the v4.20.7 patch. Browser-native authoritative directory mounting replaces the retired online custom-asset architecture as a new ingestion capability and therefore begins v4.21.0; cached-handle unlinking completes that capability as the v4.21.1 patch. Independent multi-binder workspace creation, switching, restoration, and persistence form a new stateful lifecycle capability and therefore begin v4.22.0.
 
 Historical entries are ordered from oldest to newest. Commit links, rather than nonexistent retrospective Git tags, are the immutable references.
 
@@ -1448,6 +1448,32 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Verified immediate unlink state, cached-token deletion, fallback-input reset, unchanged localStorage pool IDs, rendered-asset survival after unlink and reload, zero panel/action/header width shifts, zero online cloud requests, and zero unexpected browser errors.
 - Advanced package, lockfile, and title-pill metadata to v4.21.1.
 
+## [v4.22.0] — 2026-10-22
+
+### Added
+
+- Added a centralized versioned binder repository with independent binder IDs, names, selected card sets, settings, page/sheet trees, pool metadata, raw-USD prices, active pages, and creation/update timestamps.
+- Added the locked blurred workspace-activation wizard for a fresh repository and explicit creation, including binder title, 2×2/3×3/4×3 grid selection, bounded 1–100 page count, manual-or-TCGdex set selection, JSON backup restoration, and the **Launch Workspace Canvas** action.
+- Added the horizontal browser-tab workspace strip above the primary viewport, including active/inactive binder states, binder name and grid metadata, the active local-folder indicator, native horizontal overflow, and the terminal Lucide Plus trigger.
+- Added atomic active-workspace switching so the canvas, source sidebar, toolbar, valuation, bottom timeline, selection, crop editor, history, and catalogue filter rehydrate from one binder without remounting either source-tab tree.
+- Added JSON restoration through `#wizard-backup-picker`; repository-shaped backups restore the selected/first binder and legacy single-binder snapshots restore directly into a new uniquely identified workspace.
+
+### Migrated
+
+- Migrated valid `digital-card-binder:v1` snapshots non-destructively into a named **My Collection Binder** record under `digital-card-binder:repository:v1`, retaining physical sheets, settings, pool data, placements, crops, prices, and the active page.
+- Upgraded IndexedDB to schema v3 and namespaced every new image record by binder and asset ID while retaining canonical asset IDs inside records; legacy unscoped records referenced by the migrated binder are adopted into its namespace and removed only after the scoped copy succeeds.
+- Kept the native directory permission token in its dedicated global store so folder authorization and Sync/Disconnect state survive binder changes, while directory reconciliation and binary deletion target only the active binder's pool.
+- Replaced legacy direct snapshot writes and global image-store reset with debounced active-record repository commits and binder-scoped cleanup.
+
+### Verified
+
+- Verified fresh zero-repository activation, two independently configured workspaces, 2×2 and 4×3 canvas/toolbar/timeline switching, isolated sidebar uploads, scoped IndexedDB keys, active-ID persistence, reload hydration, terminal Plus creation, JSON restoration, and zero top-band layout shift at 1440×900.
+- Verified a 24 MiB in-flight upload remains owned by its initiating binder when the user switches workspaces before IndexedDB completion; the destination binder's pool and binary namespace remain untouched.
+- Verified legacy single-binder metadata migration plus legacy unscoped-blob adoption, with placements and layout preserved and the old localStorage key retired after successful hydration.
+- Verified active-only reset leaves a second binder's metadata and image blob intact.
+- Re-ran native directory handle caching, recursive synchronization, unlink token deletion, asset preservation, fixed panel/header footprints, and zero-error checks at 1600×1000, 1366×768, and 1200×700.
+- Rebuilt the production bundle and advanced package, lockfile, and title-pill metadata to v4.22.0 without changing runtime dependencies.
+
 ---
 
 ## Current architecture and engineering rationale
@@ -1514,8 +1540,8 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 
 ### Timeline, rail, and viewport boundaries
 
-- The header is 48px tall and owns identity, sidebar toggle, save state, and the centralized Zen Mode toggle.
-- The source sidebar consumes width when open; the right-side main tree receives the remainder.
+- The header is 48px tall and owns identity, sidebar toggle, save state, and the centralized Zen Mode toggle. A separate 40px horizontally scrollable binder-tab band sits immediately beneath it, leaving the primary workspace at `100vh - 88px` without changing canvas, 3D, or pointer-tilt equations.
+- The source sidebar consumes width when open; the right-side main tree receives the remainder. Binder switching is intentionally absent from the sidebar and lives only in the top tab band.
 - The preview surface is one flex row containing the scrollable stage and detached rail. The stage stops at the rail's left edge, including the rail padding zone; the surface permits overflow so rail dialogs can overlay lower workspace bands while the main workspace remains the outer clip boundary.
 - The rail has no full-height edge divider and no `self-start`; its outer box is vertically centered against the **live preview surface**, not the complete main column. Collapsing the timeline changes preview height, so the rail's vertical center moves.
 - The rail begins with Print / PDF, Print setup, then Grid selection. Print scope is exposed as two stateless command blocks that immediately select and launch their compilation; Print setup uses `FileSliders`; Card size uses `RulerDimensionLine` and owns both its preset selector and horizontal 80–125% scale controls.
@@ -1528,13 +1554,13 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 
 ### Persistence and history
 
-- `localStorage` key: `digital-card-binder:v1`.
-- Persisted schema: version `5`. Data claiming a newer schema falls back to a clean binder rather than being partially interpreted.
-- Schema v5 stores a sanitized canonical-ID-to-raw-USD `cardPrices` map and preserves `tcgdexId` on generated local pool assets.
-- IndexedDB: database `digital-card-binder`, store `images`, version `1`.
-- IndexedDB is preferred for blobs and carries canonical TCGdex IDs alongside remote card blobs. Exact-filename custom replacement overwrites the existing keyed record; fallback records replace the same pool entry with a new data URL and canonical metadata.
-- Object URLs are tracked and revoked during reconciliation, replacement, deletion, reset, and unmount paths.
-- Undo/Redo is a 30-entry **canvas** history containing pages, active page, and layout. It intentionally excludes pool deletion/import, catalogue state, print scope, and most settings.
+- Active repository key: `digital-card-binder:repository:v1`. It stores repository version `1`, save time, active binder ID, and sanitized binder records. The retired `digital-card-binder:v1` key is read only for backward migration and removed after repository persistence succeeds.
+- Each binder owns its name, selected card set, timestamps, active page, schema-v5 settings/pool/page/price payload, and stable binder ID. Data claiming a newer repository version is not partially interpreted.
+- Schema v5 binder payloads store a sanitized canonical-ID-to-raw-USD `cardPrices` map and preserve `tcgdexId` on generated local pool assets.
+- IndexedDB: database `digital-card-binder`, `images` and `directory-handles` stores, version `3`. Image keys use `{binderId}::{assetId}` and records retain separate `binderId`/`assetId` fields; the directory token remains global under `active-directory`.
+- IndexedDB is preferred for blobs and carries canonical TCGdex IDs alongside remote card blobs. Legacy unscoped image rows are adopted only when referenced by the active migrated binder. Exact-filename custom replacement overwrites only that binder's scoped record; fallback records replace the same active pool entry with a new data URL and canonical metadata.
+- Object URLs are tracked and revoked during reconciliation, replacement, deletion, reset, binder switching, and unmount paths. Active reset deletes only records owned by that binder.
+- Undo/Redo is a 30-entry **canvas** history containing pages, active page, and layout. It intentionally excludes pool deletion/import, catalogue state, print scope, and most settings, and is cleared rather than shared during binder activation.
 - Save status is brief and asynchronous inside a fixed 142px footprint: `Saving...` appears only during persistence work, failure remains visible as `Save failed`, disconnected settled state is red `No Folder Picked`, and linked settled state is zinc `Local Hub Sync Active` with a steady neutral indicator.
 
 ### TCGdex contract
@@ -1567,7 +1593,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 ## Known issues, limitations, and visual quirks
 
 1. **No committed automated test suite or CI.** Validation has been `npm run build` plus external Chromium harnesses, so regressions are not automatically blocked.
-2. **No export/import or cloud backup.** Clearing site data, losing a profile, or changing devices loses local work.
+2. **No built-in export command or cloud backup.** The activation wizard can restore compatible JSON snapshots, but image blobs are recoverable only when embedded as data URLs; clearing site data, losing a profile, or changing devices can still lose local work.
 3. **Desktop landscape is the product boundary.** A portrait guard exists; geometry was validated down to 1200×700, not as a small-screen editor.
 4. **Cross-browser confidence is incomplete.** Recent testing used Chromium. Safari/Firefox print scaling, PWA install behavior, vertical range input, and native drag/drop have not received equivalent automated coverage.
 5. **Market data is an online dependency.** TCGdex search/detail data and CDN-only fallback art are unavailable offline until cached locally; exchange failure is non-blocking because SGD conversion retains the 1.35 fallback.
@@ -1596,12 +1622,12 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 ## Unfinished work and intentional boundaries
 
 - A repository-owned unit/integration/browser test system remains unbuilt. Highest-value coverage is physical-sheet normalization, binder grouping, merge sanitation, placement overflow, persistence migration, custom print compaction, page-turn plans, and timeline reveal.
-- Export/import backup remains unimplemented.
+- A built-in JSON export command remains unimplemented; the startup/creation wizard now provides JSON import for compatible binder or repository snapshots.
 - Cross-browser print calibration and installed-PWA lifecycle testing remain manual.
 - README's workspace/control description has not yet been brought in line with the latest rail menus.
 - Historical SemVer labels are not Git tags or GitHub Releases. Commit links remain the release evidence.
 - There is no MichiBinder account, collaboration, telemetry, backend, environment-secret layer, or online custom-asset synchronization. Browsers supporting `showDirectoryPicker` can retain the selected handle locally in IndexedDB, but may require renewed read permission after restart; unsupported browsers fall back to choosing the directory for each refresh.
-- The v4.21.1 local directory unlinking and folder-change hotfix is complete; no active functional workspace task remains open.
+- The v4.22.0 multi-binder lifecycle release is complete; no active functional workspace task remains open.
 
 ## Incoming engineer hand-off brief
 
@@ -1609,6 +1635,7 @@ The current application is stable because several boundaries agree with one anot
 
 - **Treat sheets as the structural unit.** A page face is not independently owned. Add, duplicate, delete, navigation, covers, and print identity all depend on front/back pairing.
 - **Treat the spine as a geometry contract.** The spread is two equal frame widths plus `gap-4`, under 1200px perspective. The page-turn origin sits on that center axis; decorative depth must not move it.
+- **Treat binder activation as an atomic snapshot boundary.** Commit the outgoing workspace from live state before hydrating the incoming record; `bindersRef` and `activeBinderIdRef` prevent delayed native callbacks and directory reconciliation from writing into a previous binder.
 - **Treat refs as part of the state engine.** Native drag/pointer/timer callbacks depend on synchronous refs because React state can be one render behind during burst input.
 - **Treat the preview, controller, and timeline as separate vertical bands.** The rail belongs inside the preview flex row; the status row is absolutely inside preview; the controller and timeline are siblings below it. Moving the rail outside that row reintroduces width mismatch and timeline gaps.
 - **Treat collapsed timeline dimensions literally.** Closed means zero height, padding, and border. Any residual box prevents the preview from consuming released height and shifts rail centering.
