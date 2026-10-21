@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.16.0
+## Current state — v4.16.1
 
 - **Ledger date:** 2026-10-21
-- **Application state entering this feature pass:** commit `07d0954` / v4.15.1
+- **Application state entering this feature pass:** commit `c87a529` / v4.16.0
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,8 +14,8 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets plus the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, required secret, or environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** premium full-length InPaint/Restyle prompt dictionaries plus layout-aware 2×2, 3×3, and 4×3 GridRip prompt compilation and copy workflows
-- **Last verified behavior:** production build, exact 2,743-/390-character premium prompts, dynamic 1,424-character GridRip output across three layouts, five exact Clipboard API payloads and matching success toasts, synchronized v4.16.0 title pill, and zero browser errors
+- **Last functional change:** uniform monospace, pre-wrapped 160px preview ceilings across all three AI prompt containers plus removal of the unwanted InPaint pose suffix
+- **Last verified behavior:** production build, exact shared preview class/computed-style parity, exact 2,694-character cleaned InPaint prompt, five exact Clipboard API payloads and matching success toasts, synchronized v4.16.1 title pill, and zero browser errors
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## Strict SemVer policy and audit
@@ -34,7 +34,7 @@ The 2026-10-21 full-ledger audit confirmed the three post-inception major bounda
 2. **v3.0.0:** the toolbar/tray composition was dismantled and rebuilt as the four-area workspace with contextual bottom navigation.
 3. **v4.0.0:** top-heavy configuration controls were removed and replaced by the standalone right utility rail plus cohesive bottom structural controller.
 
-The audit also confirmed that presentation-only releases remain patches; capability releases such as TCGdex integration, source workspaces, valuation, upload deletion, print slicing, and first-unplaced tracking remain minors; and later fixes that complete those existing contracts remain patches. Specifically, v4.8.2 restored the Custom metric removed during v4.8.1 consolidation, while v4.11.1–v4.11.7 corrected lifecycle and print-slicing gaps in capabilities introduced by v4.11.0 and earlier print releases. Persistent per-tab scroll memory is a new stateful interaction and therefore begins v4.12.0 rather than v4.11.8; continuously measurable inactive-panel background scrolling is likewise a new cross-tab capability and begins v4.15.0; premium layout-aware prompt compilation and copy workflows begin v4.16.0.
+The audit also confirmed that presentation-only releases remain patches; capability releases such as TCGdex integration, source workspaces, valuation, upload deletion, print slicing, and first-unplaced tracking remain minors; and later fixes that complete those existing contracts remain patches. Specifically, v4.8.2 restored the Custom metric removed during v4.8.1 consolidation, while v4.11.1–v4.11.7 corrected lifecycle and print-slicing gaps in capabilities introduced by v4.11.0 and earlier print releases. Persistent per-tab scroll memory is a new stateful interaction and therefore begins v4.12.0 rather than v4.11.8; continuously measurable inactive-panel background scrolling is likewise a new cross-tab capability and begins v4.15.0; premium layout-aware prompt compilation and copy workflows begin v4.16.0, while their preview-format and prompt-copy corrections remain the v4.16.1 patch.
 
 Historical entries are ordered from oldest to newest. Commit links, rather than nonexistent retrospective Git tags, are the immutable references.
 
@@ -1187,6 +1187,19 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Verified five Clipboard API writes in source order, all corresponding success toasts, removal of the superseded short InPaint template, the unchanged centered 400px AI popover contract, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.16.0.
 
+## [v4.16.1] — 2026-10-21
+
+### Changed
+
+- Standardized the InPaint, Restyle, and GridRip preview containers on the same left-aligned monospace typography, preserved whitespace, normal tracking, and 160px overflow ceiling.
+- Removed the parenthetical power-pole direction from the end of the InPaint environment-interaction instruction so the prompt concludes at “narratively intentional.”
+
+### Verified
+
+- Verified all three previews expose the exact shared class contract and compute to a 160px maximum height, pre-wrapped whitespace, and left-aligned text.
+- Reverified exact displayed and copied prompt content, live 3×3 → 2×2 → 4×3 GridRip transitions, five Clipboard API writes, success toasts, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
+- Advanced package and lockfile metadata to v4.16.1.
+
 ---
 
 ## Current architecture and engineering rationale
@@ -1258,7 +1271,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - The preview surface is one flex row containing the scrollable stage and detached rail. The stage stops at the rail's left edge, including the rail padding zone; the surface permits overflow so rail dialogs can overlay lower workspace bands while the main workspace remains the outer clip boundary.
 - The rail has no full-height edge divider and no `self-start`; its outer box is vertically centered against the **live preview surface**, not the complete main column. Collapsing the timeline changes preview height, so the rail's vertical center moves.
 - The rail begins with Print / PDF, Print setup, then Grid selection. Print scope is exposed as two stateless command blocks that immediately select and launch their compilation; Print setup uses `FileSliders`; Card size uses `RulerDimensionLine` and owns both its preset selector and horizontal 80–125% scale controls.
-- Keyboard shortcuts are followed by AI Prompt Generator, whose premium global InPaint and Restyle dictionaries and live layout-aware GridRip compiler copy exact full-text payloads through the Clipboard API and report the result through standard toasts.
+- Keyboard shortcuts are followed by AI Prompt Generator, whose premium global InPaint and Restyle dictionaries and live layout-aware GridRip compiler render in parity-formatted, monospace, pre-wrapped previews with 160px scroll ceilings, copy exact full-text payloads through the Clipboard API, and report the result through standard toasts.
 - Every rail dialog is absolutely anchored at `right-full mr-3 top-1/2 -translate-y-1/2` relative to its trigger and animates symmetrically from the right. Panels use a uniform 400px width, cap at 80vh, hide scrollbar chrome, and scroll internally when their content is longer.
 - Database/Custom/Density is absolutely anchored to the preview bottom edge. It uses the self-hosted Inter sans stack and is not part of the timeline or bottom controller flow.
 - The bottom controller owns Undo/Redo, Merge/Unmerge/reset/clear, spread navigation, Add, Duplicate, Delete, and timeline toggle. One-pixel dividers separate its History, Slot Structure, and Spread Navigation pockets.
@@ -1340,7 +1353,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - README's workspace/control description has not yet been brought in line with the latest rail menus.
 - Historical SemVer labels are not Git tags or GitHub Releases. Commit links remain the release evidence.
 - There is no account, cloud sync, collaboration, telemetry, backend, or environment-secret layer. Those are deliberate scope boundaries, not half-built modules.
-- The v4.16.0 premium prompt-generator release is complete; no active functional workspace task remains open.
+- The v4.16.1 prompt-preview formatting and text-cleanup release is complete; no active functional workspace task remains open.
 
 ## Incoming engineer hand-off brief
 

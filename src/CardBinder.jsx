@@ -114,7 +114,7 @@ Perform a regional inpainting and multi-subject composition into @Image1 using t
 
 8. POSE & ENVIRONMENT INTERACTION:
 - Both subjects must retain their core recognizable facial features and identities from their references, but they should be drawn in a new dynamic pose or orientation.
-- Have the characters actively interact with the environment (e.g., peeking out from behind an asset, leaning against a wall, or looking toward the main scene action) to make their presence look narratively intentional. (both subject balancing on separate power poles)`;
+- Have the characters actively interact with the environment (e.g., peeking out from behind an asset, leaning against a wall, or looking toward the main scene action) to make their presence look narratively intentional.`;
 const RESTYLE_PROMPT_CONTENT = "Change the artistic style of the two brown plushies to perfectly match the style, color tone, and atmosphere of the rest of the image. Maintain the core shapes, positions, and facial expressions of the plushies so they remain recognizable, but transform their textures, shading, and appearance to blend seamlessly into the background. Leave the surrounding environment completely untouched.";
 const SGD_RATE_ENDPOINT = 'https://open.er-api.com/v6/latest/USD';
 const EUR_PER_USD_FALLBACK = 0.92;
@@ -982,7 +982,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.16.0</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.16.1</span>
         </div>
         <SaveStatus status={saveStatus} />
       </div>
@@ -1179,21 +1179,21 @@ function RightControlRail({
                       <span className="text-[9px] font-bold tracking-widest text-neutral-500 uppercase font-sans">InPaint Prompt</span>
                       <button type="button" onClick={() => { navigator.clipboard.writeText(INPAINT_PROMPT_CONTENT); notify('InPaint Prompt copied!', 'success'); }} className="h-6 px-2 inline-flex items-center gap-1 rounded bg-neutral-900 border border-white/[0.04] text-[10px] font-medium text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors focus:outline-none"><Icon name="copy" size={12} /><span>Copy</span></button>
                     </div>
-                    <div className="rounded-lg border border-white/[0.04] bg-neutral-950 p-2 font-sans text-[10px] leading-relaxed text-neutral-400 max-h-20 overflow-y-auto select-all cursor-text">{INPAINT_PROMPT_CONTENT}</div>
+                    <div className="rounded-lg border border-white/[0.04] bg-neutral-950 p-2 text-left font-mono text-[10px] leading-relaxed text-neutral-400 max-h-40 overflow-y-auto select-all cursor-text whitespace-pre-wrap tracking-normal">{INPAINT_PROMPT_CONTENT}</div>
                   </div>
                   <div className="flex flex-col gap-1.5 border-t border-white/[0.04] pt-3">
                     <div className="flex items-center justify-between">
                       <span className="text-[9px] font-bold tracking-widest text-neutral-500 uppercase font-sans">Restyle Prompt</span>
                       <button type="button" onClick={() => { navigator.clipboard.writeText(RESTYLE_PROMPT_CONTENT); notify('Restyle Prompt copied!', 'success'); }} className="h-6 px-2 inline-flex items-center gap-1 rounded bg-neutral-900 border border-white/[0.04] text-[10px] font-medium text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors focus:outline-none"><Icon name="copy" size={12} /><span>Copy</span></button>
                     </div>
-                    <div className="rounded-lg border border-white/[0.04] bg-neutral-950 p-2 font-sans text-[10px] leading-relaxed text-neutral-400 max-h-20 overflow-y-auto select-all cursor-text">{RESTYLE_PROMPT_CONTENT}</div>
+                    <div className="rounded-lg border border-white/[0.04] bg-neutral-950 p-2 text-left font-mono text-[10px] leading-relaxed text-neutral-400 max-h-40 overflow-y-auto select-all cursor-text whitespace-pre-wrap tracking-normal">{RESTYLE_PROMPT_CONTENT}</div>
                   </div>
                   <div className="flex flex-col gap-1.5 border-t border-white/[0.04] pt-3">
                     <div className="flex items-center justify-between">
                       <span className="text-[9px] font-bold tracking-widest text-neutral-500 uppercase font-sans">GridRip Prompt ({settings.layout})</span>
                       <button type="button" onClick={() => { navigator.clipboard.writeText(getGridRipPromptText()); notify(`GridRip Prompt (${settings.layout}) copied!`, 'success'); }} className="h-6 px-2 inline-flex items-center gap-1 rounded bg-neutral-900 border border-white/[0.04] text-[10px] font-medium text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors focus:outline-none"><Icon name="copy" size={12} /><span>Copy</span></button>
                     </div>
-                    <div className="rounded-lg border border-white/[0.04] bg-neutral-950 p-2 font-sans text-[10px] leading-relaxed text-neutral-400 max-h-20 overflow-y-auto select-all cursor-text">{getGridRipPromptText()}</div>
+                    <div className="rounded-lg border border-white/[0.04] bg-neutral-950 p-2 text-left font-mono text-[10px] leading-relaxed text-neutral-400 max-h-40 overflow-y-auto select-all cursor-text whitespace-pre-wrap tracking-normal">{getGridRipPromptText()}</div>
                   </div>
                 </div>
               </RailPopover>
