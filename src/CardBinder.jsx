@@ -120,7 +120,9 @@ const SGD_RATE_ENDPOINT = 'https://open.er-api.com/v6/latest/USD';
 const EUR_PER_USD_FALLBACK = 0.92;
 const IDB_NAME = 'digital-card-binder';
 const IDB_STORE = 'images';
-const IDB_VERSION = 1;
+const IDB_HANDLE_STORE = 'directory-handles';
+const IDB_DIRECTORY_HANDLE_KEY = 'active-directory';
+const IDB_VERSION = 2;
 const HISTORY_LIMIT = 30;
 const SHEET_PAD = { top: 0.3, right: 0.3, bottom: 0.3, left: 0.62 };
 const THUMB_BOX = { w: 40, h: 40 * 1.414, pad: 3 };
@@ -689,6 +691,7 @@ function getDB() {
       const request = indexedDB.open(IDB_NAME, IDB_VERSION);
       request.onupgradeneeded = () => {
         if (!request.result.objectStoreNames.contains(IDB_STORE)) request.result.createObjectStore(IDB_STORE, { keyPath: 'id' });
+        if (!request.result.objectStoreNames.contains(IDB_HANDLE_STORE)) request.result.createObjectStore(IDB_HANDLE_STORE, { keyPath: 'id' });
       };
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error || new Error('Could not open IndexedDB'));
@@ -722,6 +725,35 @@ const idbGetAll = async () => {
 const idbPutMany = (records) => idbRun('readwrite', (store) => records.forEach((record) => store.put(record)));
 const idbDeleteMany = (ids) => idbRun('readwrite', (store) => ids.forEach((id) => store.delete(id)));
 const idbClear = () => idbRun('readwrite', (store) => store.clear());
+const idbGetDirectoryHandle = async () => {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(IDB_HANDLE_STORE, 'readonly');
+    const request = transaction.objectStore(IDB_HANDLE_STORE).get(IDB_DIRECTORY_HANDLE_KEY);
+    request.onsuccess = () => resolve(request.result?.handle || null);
+    request.onerror = () => reject(request.error || new Error('Could not read directory handle'));
+  });
+};
+const idbPutDirectoryHandle = async (handle) => {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(IDB_HANDLE_STORE, 'readwrite');
+    transaction.objectStore(IDB_HANDLE_STORE).put({ id: IDB_DIRECTORY_HANDLE_KEY, handle });
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error || new Error('Could not store directory handle'));
+    transaction.onabort = () => reject(transaction.error || new Error('Directory handle storage was aborted'));
+  });
+};
+const idbDeleteDirectoryHandle = async () => {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(IDB_HANDLE_STORE, 'readwrite');
+    transaction.objectStore(IDB_HANDLE_STORE).delete(IDB_DIRECTORY_HANDLE_KEY);
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error || new Error('Could not delete directory handle'));
+    transaction.onabort = () => reject(transaction.error || new Error('Directory handle deletion was aborted'));
+  });
+};
 
 const ICONS = {
   alert: AlertTriangle,
@@ -944,25 +976,26 @@ function SheetGrid({ page, card, gap, unit, dims, animate = false, renderSlot, g
   );
 }
 
-function SaveStatus({ status }) {
+function SaveStatus({ status, isFolderLinked }) {
   const saving = status === 'saving';
   const failed = status === 'error';
-  const label = failed ? 'Save failed' : saving ? 'Saving...' : 'Local Hub Sync Active';
+  const disconnected = !saving && !failed && !isFolderLinked;
+  const label = failed ? 'Save failed' : saving ? 'Saving...' : disconnected ? 'No Folder Picked' : 'Local Hub Sync Active';
   return (
     <div
       data-engine-badge
-      className={`shrink-0 text-xs flex items-center gap-1.5 ${failed ? 'font-medium text-red-300' : saving ? 'text-neutral-200 font-medium animate-pulse' : 'text-zinc-400 font-medium'}`}
+      className={`min-w-[142px] shrink-0 text-xs flex items-center gap-1.5 ${failed ? 'font-medium text-red-300' : saving ? 'text-neutral-200 font-medium animate-pulse' : disconnected ? 'text-red-400 font-medium' : 'text-zinc-400 font-medium'}`}
       aria-live="polite"
       aria-label={`Local storage: ${label}`}
-      title="Local persistence status"
+      title={disconnected ? 'No local folder connected' : 'Local persistence status'}
     >
-      <span className={`size-1.5 rounded-full ${failed ? 'bg-red-400' : saving ? 'bg-amber-400' : 'bg-neutral-500'} shadow-[0_0_8px_currentColor]`} />
+      <span className={`size-1.5 rounded-full ${failed ? 'bg-red-400' : saving ? 'bg-amber-400' : disconnected ? 'bg-red-500' : 'bg-neutral-500'} shadow-[0_0_8px_currentColor]`} />
       <span>{label}</span>
     </div>
   );
 }
 
-function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, onToggleZenMode, saveStatus, currencyDisplay, onToggleCurrency, portfolioValueLabel }) {
+function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, onToggleZenMode, saveStatus, isFolderLinked, currencyDisplay, onToggleCurrency, portfolioValueLabel }) {
   const isZenMode = !isLeftSidebarOpen && !showBottomTimeline;
   const zenModeTitle = isZenMode ? 'Exit Focus Mode' : 'Enter Focus Mode';
 
@@ -982,9 +1015,9 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.21.0</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.21.1</span>
         </div>
-        <SaveStatus status={saveStatus} />
+        <SaveStatus status={saveStatus} isFolderLinked={isFolderLinked} />
       </div>
 
       <div className="flex shrink-0 items-center justify-end gap-2">
@@ -1345,6 +1378,10 @@ function CardPool({
   inputRef,
   uploadAndRegisterFiles,
   syncPoolFromLocalDirectory,
+  isFolderLinked,
+  handleDirectoryConnect,
+  handleDirectorySync,
+  unlinkDirectoryHandle,
   onClearAllUploads,
   onClearAllBinderCards,
   handleRemoveCustomCard,
@@ -1482,7 +1519,18 @@ function CardPool({
           <div className="mt-3 flex flex-col gap-2 rounded-lg border border-white/[0.04] bg-neutral-950 p-2.5 shadow-inner">
             <div className="flex items-center justify-between"><div className="flex flex-col"><span className="text-[10px] font-semibold text-neutral-200">Asset Folder Connection</span><span className="text-[8px] font-medium text-neutral-500 font-mono tracking-wide uppercase">Native Disk Directory</span></div></div>
             <input type="file" webkitdirectory="" directory="" multiple className="hidden" id="hub-directory-picker" onChange={(e) => { const files = Array.from(e.target.files || []); if(files.length) { syncPoolFromLocalDirectory(files); } e.target.value = ''; }} />
-            <button type="button" onClick={() => document.getElementById('hub-directory-picker')?.click()} className="w-full h-8 flex items-center justify-center rounded-md bg-neutral-800 text-zinc-200 border border-white/[0.04] font-semibold text-xs transition-all hover:bg-neutral-700 active:scale-[0.98]">Mount Local Hub Folder</button>
+            <div className="flex flex-col gap-1.5 w-full" data-folder-link-actions>
+              {isFolderLinked ? (
+                <button type="button" onClick={handleDirectorySync} className="w-full h-8 flex items-center justify-center rounded-md bg-neutral-800 text-zinc-200 border border-white/[0.04] font-semibold text-xs transition-all hover:bg-neutral-700 active:scale-[0.98]">Sync</button>
+              ) : (
+                <button type="button" onClick={handleDirectoryConnect} className="w-full h-8 flex items-center justify-center rounded-md bg-neutral-800 text-zinc-200 border border-white/[0.04] font-semibold text-xs transition-all hover:bg-neutral-700 active:scale-[0.98]">Mount Local Hub Folder</button>
+              )}
+              {isFolderLinked ? (
+                <button type="button" onClick={unlinkDirectoryHandle} className="w-full text-center text-[9px] font-bold tracking-widest text-neutral-500 hover:text-red-400 uppercase font-sans mt-0.5 transition-colors cursor-pointer">Disconnect Folder</button>
+              ) : (
+                <span aria-hidden="true" className="invisible w-full select-none text-center text-[9px] font-bold tracking-widest uppercase font-sans mt-0.5">Disconnect Folder</span>
+              )}
+            </div>
           </div>
 
           <div className="mt-3 mb-2 flex items-center justify-between border-b border-white/[0.04] px-1 py-1.5 select-none">
@@ -1750,6 +1798,8 @@ export default function CardBinder() {
   const [selectionAnchorId, setSelectionAnchorId] = useState(null);
   const [saveStatus, setSaveStatus] = useState('saved');
   const [storageMode, setStorageMode] = useState('indexeddb');
+  const [directoryHandle, setDirectoryHandle] = useState(null);
+  const [isFolderLinked, setIsFolderLinked] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [toasts, setToasts] = useState([]);
   const [openPanel, setOpenPanel] = useState(null);
@@ -1811,6 +1861,29 @@ export default function CardBinder() {
   const layoutIdRef = useRef(settings.layout);
   const pastRef = useRef([]);
   const futureRef = useRef([]);
+
+  useEffect(() => {
+    let live = true;
+    idbGetDirectoryHandle().then(async (handle) => {
+      if (!live || handle?.kind !== 'directory') return;
+      let permission = 'prompt';
+      try {
+        permission = typeof handle.queryPermission === 'function'
+          ? await handle.queryPermission({ mode: 'read' })
+          : 'granted';
+      } catch {
+        permission = 'prompt';
+      }
+      if (!live) return;
+      if (permission === 'denied') {
+        await idbDeleteDirectoryHandle().catch(() => {});
+        return;
+      }
+      setDirectoryHandle(handle);
+      setIsFolderLinked(true);
+    }).catch(() => {});
+    return () => { live = false; };
+  }, []);
 
   const scrollTimelineLeft = useCallback(() => {
     if (timelineScrollRef.current) timelineScrollRef.current.scrollBy({ left: -400, behavior: 'smooth' });
@@ -2531,6 +2604,86 @@ export default function CardBinder() {
       return [];
     }
   }, [pool, addFiles, notify]);
+
+  const collectDirectoryHandleFiles = useCallback(async (rootHandle) => {
+    const files = [];
+    const traverse = async (directory) => {
+      for await (const entry of directory.values()) {
+        if (entry.kind === 'file') files.push(await entry.getFile());
+        else if (entry.kind === 'directory') await traverse(entry);
+      }
+    };
+    await traverse(rootHandle);
+    return files.sort((left, right) => left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: 'base' }));
+  }, []);
+
+  const ensureDirectoryReadPermission = useCallback(async (handle) => {
+    if (!handle || handle.kind !== 'directory') return false;
+    if (typeof handle.queryPermission !== 'function') return true;
+    let permission = await handle.queryPermission({ mode: 'read' });
+    if (permission === 'prompt' && typeof handle.requestPermission === 'function') {
+      permission = await handle.requestPermission({ mode: 'read' });
+    }
+    return permission === 'granted';
+  }, []);
+
+  const handleDirectorySync = useCallback(async () => {
+    if (!directoryHandle) {
+      setIsFolderLinked(false);
+      notify('Choose a local asset folder before syncing.', 'warn');
+      return [];
+    }
+    try {
+      const permitted = await ensureDirectoryReadPermission(directoryHandle);
+      if (!permitted) {
+        notify('Folder access is required to synchronize local assets.', 'error');
+        return [];
+      }
+      const files = await collectDirectoryHandleFiles(directoryHandle);
+      return await syncPoolFromLocalDirectory(files);
+    } catch (error) {
+      console.error('Directory handle traversal failed:', error);
+      notify('Workspace folder synchronization failed. Reconnect the folder and try again.', 'error');
+      return [];
+    }
+  }, [directoryHandle, ensureDirectoryReadPermission, collectDirectoryHandleFiles, syncPoolFromLocalDirectory, notify]);
+
+  const handleDirectoryConnect = useCallback(async () => {
+    if (typeof window.showDirectoryPicker !== 'function') {
+      document.getElementById('hub-directory-picker')?.click();
+      return [];
+    }
+    try {
+      const handle = await window.showDirectoryPicker({ mode: 'read' });
+      const permitted = await ensureDirectoryReadPermission(handle);
+      if (!permitted) throw new Error('Directory read permission was not granted.');
+      await idbPutDirectoryHandle(handle);
+      setDirectoryHandle(handle);
+      setIsFolderLinked(true);
+      const files = await collectDirectoryHandleFiles(handle);
+      return await syncPoolFromLocalDirectory(files);
+    } catch (error) {
+      if (error?.name === 'AbortError') return [];
+      console.error('Directory connection failed:', error);
+      notify('Could not connect the selected folder.', 'error');
+      return [];
+    }
+  }, [ensureDirectoryReadPermission, collectDirectoryHandleFiles, syncPoolFromLocalDirectory, notify]);
+
+  const unlinkDirectoryHandle = useCallback(async () => {
+    setDirectoryHandle(null);
+    setIsFolderLinked(false);
+    setSaveStatus('saved');
+    const picker = document.getElementById('hub-directory-picker');
+    if (picker) picker.value = '';
+    try {
+      await idbDeleteDirectoryHandle();
+      notify('Folder disconnected. Workspace assets were preserved.', 'info');
+    } catch (error) {
+      console.error('Directory handle unlink failed:', error);
+      notify('Folder disconnected locally, but its cached permission token could not be removed.', 'error');
+    }
+  }, [notify]);
 
   const importFetchedCard = useCallback(async (item, highResImageUrl, options = {}) => {
     hydrateCardPrice(item.id, item);
@@ -4204,6 +4357,7 @@ export default function CardBinder() {
           showBottomTimeline={showBottomTimeline}
           onToggleZenMode={handleToggleZenMode}
           saveStatus={saveStatus}
+          isFolderLinked={isFolderLinked}
           currencyDisplay={currencyDisplay}
           onToggleCurrency={() => setCurrencyDisplay((value) => value === 'SGD' ? 'USD' : 'SGD')}
           portfolioValueLabel={portfolioValueLabel}
@@ -4219,6 +4373,10 @@ export default function CardBinder() {
             inputRef={inputRef}
             uploadAndRegisterFiles={uploadAndRegisterFiles}
             syncPoolFromLocalDirectory={syncPoolFromLocalDirectory}
+            isFolderLinked={isFolderLinked}
+            handleDirectoryConnect={handleDirectoryConnect}
+            handleDirectorySync={handleDirectorySync}
+            unlinkDirectoryHandle={unlinkDirectoryHandle}
             onClearAllUploads={handleClearAllUploads}
             onClearAllBinderCards={handleClearAllBinderCards}
             handleRemoveCustomCard={handleRemoveCustomCard}
