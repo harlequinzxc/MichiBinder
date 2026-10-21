@@ -158,50 +158,21 @@ const uid = (prefix = 'id') => `${prefix}-${Date.now().toString(36)}-${Math.rand
 const keyOf = (row, col) => `${row}-${col}`;
 const isEditableTarget = (element) => Boolean(element?.matches?.('input, textarea, select, [contenteditable="true"]'));
 const hasFiles = (dataTransfer) => Array.from(dataTransfer?.types || []).includes('Files');
-const fetchImgurAlbumImages = async (albumUrlString) => {
+const IMGBB_API_KEY = "93093067ffc886a48e1cd4eb98070ab1";
+const uploadImageToImgBB = async (fileObject) => {
   try {
-    const url = new URL(albumUrlString.trim());
-
-    if (/\.(?:png|jpg|jpeg|webp|gif)$/i.test(url.pathname)) {
-      return [url.href];
-    }
-
-    const hashMatch = url.pathname.match(/\/(?:a|gallery|t\/[^/]+)\/([a-zA-Z0-9]+)/) || url.pathname.match(/^\/([a-zA-Z0-9]{5,7})$/);
-    if (!hashMatch) return [];
-    const albumHash = hashMatch[1];
-
-    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(`https://imgur.com/a/${albumHash}`)}`;
-    const response = await fetch(proxyUrl);
-    if (!response.ok) return [];
-
+    const formData = new FormData();
+    formData.append('key', IMGBB_API_KEY);
+    formData.append('image', fileObject);
+    const response = await fetch('https://api.imgbb.com/1/upload', {
+      method: 'POST',
+      body: formData,
+    });
+    if (!response.ok) return null;
     const json = await response.json();
-    const htmlString = json.contents;
-    if (!htmlString) return [];
-
-    const mediaRegex = /"hash":"([a-zA-Z0-9]+)"\s*,\s*"ext":"(\.[a-zA-Z0-9]+)"/g;
-    const directUrls = [];
-    let match;
-
-    while ((match = mediaRegex.exec(htmlString)) !== null) {
-      const fileHash = match[1];
-      const extension = match[2];
-      if (fileHash !== albumHash) {
-        directUrls.push(`https://i.imgur.com/${fileHash}${extension}`);
-      }
-    }
-
-    const uniqueUrls = [...new Set(directUrls)];
-    if (uniqueUrls.length === 0) {
-      const metaOgImageMatch = htmlString.match(/property="og:image"\s+content="([^"]+)"/) || htmlString.match(/content="([^"]+)"\s+property="og:image"/);
-      if (metaOgImageMatch && !metaOgImageMatch[1].includes('imgur-logo')) {
-        return [metaOgImageMatch[1].replace(/\?.*$/, '')];
-      }
-    }
-
-    return uniqueUrls;
-  } catch (error) {
-    console.error('Founder Scraper Engine operational fault:', error);
-    return [];
+    return json?.data?.display_url || json?.data?.url || null;
+  } catch {
+    return null;
   }
 };
 const tcgdexImageBase = (image) => {
@@ -1028,7 +999,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.18.1</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.19.0</span>
         </div>
         <SaveStatus status={saveStatus} />
       </div>
@@ -1389,8 +1360,7 @@ function CardPool({
   placedTcgdexIds,
   images,
   inputRef,
-  onFiles,
-  addFilesFromAlbum,
+  uploadAndRegisterFiles,
   onClearAllUploads,
   onClearAllBinderCards,
   handleRemoveCustomCard,
@@ -1438,7 +1408,7 @@ function CardPool({
     onLoadMore();
   };
   const handleLocalUploadEvent = (event) => {
-    onFiles(event.target.files);
+    uploadAndRegisterFiles(event.target.files);
     event.target.value = '';
   };
   const chooseTab = (tab) => {
@@ -1525,12 +1495,9 @@ function CardPool({
             </span>
           </div>
 
-          <div className="mt-3 flex flex-col gap-1.5 rounded-lg border border-white/[0.04] bg-neutral-950 p-2">
-            <span className="text-[9px] font-bold tracking-widest text-neutral-500 uppercase font-sans">Stream Imgur Album Link</span>
-            <form className="flex min-w-0 items-center gap-1.5" onSubmit={(e) => { e.preventDefault(); const val = e.currentTarget.elements.albumUrl.value; if(val.trim()){ addFilesFromAlbum(val); e.currentTarget.reset(); } }}>
-              <input type="url" name="albumUrl" aria-label="Imgur album URL" placeholder="Paste Imgur album or direct image URL…" className="h-8 min-w-0 flex-1 bg-neutral-900 border border-white/[0.06] rounded-md px-2.5 text-xs font-medium text-neutral-200 placeholder-neutral-600 focus:outline-none focus:ring-1 focus:ring-red-500/50" />
-              <button type="submit" className="h-8 px-3 rounded-md bg-neutral-800 text-zinc-300 font-semibold text-xs border border-white/[0.04] hover:bg-neutral-700 hover:text-white transition-all active:scale-[0.95]">Fetch</button>
-            </form>
+          <div className="mt-3 flex items-center justify-between rounded-lg border border-white/[0.04] bg-neutral-950 p-2.5 shadow-inner">
+            <div className="flex flex-col"><span className="text-[10px] font-semibold text-neutral-200">Persistent Cloud Backup</span><span className="text-[8px] font-medium text-neutral-500 font-mono tracking-wide uppercase">Active via ImgBB CDN</span></div>
+            <div className="flex items-center gap-1.5 text-[9px] font-bold text-emerald-400 font-sans tracking-wide uppercase"><span className="size-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_currentColor] animate-pulse" />Live</div>
           </div>
 
           <div className="mt-3 mb-2 flex items-center justify-between border-b border-white/[0.04] px-1 py-1.5 select-none">
@@ -2484,50 +2451,39 @@ export default function CardBinder() {
     return entries.map((entry) => entry.id);
   }, [customUploadedCards, notify, pool.length, scrollToNextUnplacedCard, storageMode]);
 
-  const addFilesFromAlbum = useCallback(async (urlString) => {
+  const uploadAndRegisterFiles = useCallback(async (fileList) => {
+    const files = Array.from(fileList || []);
     setSaveStatus('saving');
-    notify('Scanning album files…', 'info');
+    notify('Uploading assets to cloud vault…', 'info');
     try {
-      const urls = await fetchImgurAlbumImages(urlString);
-      if (!urls.length) {
+      const processedCloudAssetFiles = (await Promise.all(files.map(async (file, index) => {
+        if (!file?.type?.startsWith('image/')) return null;
+        const cloudUrl = await uploadImageToImgBB(file);
+        if (!cloudUrl) return null;
+        const syntheticFile = new File(
+          [file],
+          file.name || `cloud-asset-${index + 1}.png`,
+          { type: file.type, lastModified: file.lastModified || Date.now() },
+        );
+        return Object.assign(syntheticFile, { src: cloudUrl, id: uid('cloud') });
+      }))).filter(Boolean);
+
+      if (!processedCloudAssetFiles.length) {
         setSaveStatus('error');
-        notify('No public images found in this link.', 'error');
+        notify('Cloud synchronization failed. Verify the selected images and try again.', 'error');
         return [];
       }
-
-      notify(`Streaming ${urls.length} remote cloud assets…`, 'info');
-      const syntheticFiles = (await Promise.all(urls.map(async (assetUrl, index) => {
-        try {
-          const response = await fetch(assetUrl);
-          if (!response.ok) throw new Error(`Imgur asset request failed with status ${response.status}.`);
-          const blob = await response.blob();
-          const responseUrl = new URL(response.url || assetUrl);
-          const terminalSegment = responseUrl.pathname.split('/').filter(Boolean).pop() || `imgur-asset-${index + 1}`;
-          let fileName;
-          try {
-            fileName = safeFileName(decodeURIComponent(terminalSegment));
-          } catch {
-            fileName = safeFileName(terminalSegment);
-          }
-          if (!/\.(?:png|jpe?g|webp)$/i.test(fileName)) {
-            const extension = blob.type === 'image/jpeg' ? '.jpg' : blob.type === 'image/webp' ? '.webp' : '.png';
-            fileName += extension;
-          }
-          return new File([blob], fileName, { type: blob.type });
-        } catch (error) {
-          console.error(`Imgur asset stream failed for ${assetUrl}:`, error);
-          return null;
-        }
-      }))).filter((file) => file?.type?.startsWith('image/'));
-
-      if (!syntheticFiles.length) throw new Error('No valid Imgur image streams completed.');
-      const addedIds = await addFiles(syntheticFiles);
-      if (!addedIds.length) setSaveStatus('error');
+      const addedIds = await addFiles(processedCloudAssetFiles);
+      if (!addedIds.length) {
+        setSaveStatus('error');
+        return [];
+      }
+      notify('Cloud synchronization complete.', 'success');
       return addedIds;
     } catch (error) {
-      console.error('Imgur album fetch failed:', error);
+      console.error('ImgBB cloud synchronization failed:', error);
       setSaveStatus('error');
-      notify('Album fetch failed. Verify the album is completely public and permits cross-origin lookups.', 'error');
+      notify('Cloud synchronization failed. Verify the selected images and try again.', 'error');
       return [];
     }
   }, [addFiles, notify]);
@@ -3047,7 +3003,7 @@ export default function CardBinder() {
     if (combineMode || editingRef.current) return;
     activateCanvasPage(pageIndex);
     if (carriesFiles) {
-      const ids = await addFiles(files);
+      const ids = await uploadAndRegisterFiles(files);
       placeCards(ids, pageIndex, slot.key);
     } else if (payload?.kind === 'pool') placeCards(payload.ids, pageIndex, slot.key);
     else if (payload?.kind === 'remote-batch') {
@@ -3057,7 +3013,7 @@ export default function CardBinder() {
       const ids = await importFetchedCard(payload.card, payload.url);
       placeCards(ids, pageIndex, slot.key);
     } else if (payload?.kind === 'slot') moveSlotCard(payload, pageIndex, slot.key);
-  }, [combineMode, getPayload, activateCanvasPage, addFiles, importFetchedCards, importFetchedCard, placeCards, moveSlotCard, resetDrag]);
+  }, [combineMode, getPayload, activateCanvasPage, uploadAndRegisterFiles, importFetchedCards, importFetchedCard, placeCards, moveSlotCard, resetDrag]);
 
   const handleStageDrop = useCallback(async (event) => {
     event.preventDefault();
@@ -3067,7 +3023,7 @@ export default function CardBinder() {
     resetDrag(event);
     if (combineMode || editingRef.current) return;
     if (carriesFiles) {
-      const ids = await addFiles(files);
+      const ids = await uploadAndRegisterFiles(files);
       placeCards(ids, currentPageRef.current, null);
     } else if (payload?.kind === 'pool') placeCards(payload.ids, currentPageRef.current, null);
     else if (payload?.kind === 'remote-batch') {
@@ -3077,7 +3033,7 @@ export default function CardBinder() {
       const ids = await importFetchedCard(payload.card, payload.url);
       placeCards(ids, currentPageRef.current, null);
     }
-  }, [combineMode, getPayload, addFiles, importFetchedCards, importFetchedCard, placeCards, resetDrag]);
+  }, [combineMode, getPayload, uploadAndRegisterFiles, importFetchedCards, importFetchedCard, placeCards, resetDrag]);
 
   const handleSidebarDrop = useCallback(async (event) => {
     event.preventDefault();
@@ -3085,14 +3041,14 @@ export default function CardBinder() {
     const carriesFiles = hasFiles(event.dataTransfer);
     const files = Array.from(event.dataTransfer.files || []);
     resetDrag(event);
-    if (carriesFiles) await addFiles(files);
+    if (carriesFiles) await uploadAndRegisterFiles(files);
     else if (payload?.kind === 'remote-batch') await importFetchedCards(payload.cards);
     else if (payload?.kind === 'remote') await importFetchedCard(payload.card, payload.url);
     else if (payload?.kind === 'slot') {
       removeSlotCard(payload.pageId, payload.key);
       notify('Card removed from the binder.', 'info');
     }
-  }, [getPayload, addFiles, importFetchedCards, importFetchedCard, removeSlotCard, notify, resetDrag]);
+  }, [getPayload, uploadAndRegisterFiles, importFetchedCards, importFetchedCard, removeSlotCard, notify, resetDrag]);
 
   const handleThumbDrop = useCallback(async (event, pageIndex) => {
     event.preventDefault();
@@ -3102,7 +3058,7 @@ export default function CardBinder() {
     const files = Array.from(event.dataTransfer.files || []);
     resetDrag(event);
     if (carriesFiles) {
-      const ids = await addFiles(files);
+      const ids = await uploadAndRegisterFiles(files);
       placeCards(ids, pageIndex, null);
     } else if (payload?.kind === 'pool') placeCards(payload.ids, pageIndex, null);
     else if (payload?.kind === 'remote-batch') {
@@ -3112,7 +3068,7 @@ export default function CardBinder() {
       const ids = await importFetchedCard(payload.card, payload.url);
       placeCards(ids, pageIndex, null);
     } else if (payload?.kind === 'slot') moveSlotCard(payload, pageIndex, null);
-  }, [getPayload, addFiles, importFetchedCards, importFetchedCard, placeCards, moveSlotCard, resetDrag]);
+  }, [getPayload, uploadAndRegisterFiles, importFetchedCards, importFetchedCard, placeCards, moveSlotCard, resetDrag]);
 
   const performMerge = useCallback((box, pageIndex = currentPageRef.current) => {
     if (!box || box.rs * box.cs <= 1) return;
@@ -4217,8 +4173,7 @@ export default function CardBinder() {
             placedTcgdexIds={placedTcgdexIds}
             images={images}
             inputRef={inputRef}
-            onFiles={addFiles}
-            addFilesFromAlbum={addFilesFromAlbum}
+            uploadAndRegisterFiles={uploadAndRegisterFiles}
             onClearAllUploads={handleClearAllUploads}
             onClearAllBinderCards={handleClearAllBinderCards}
             handleRemoveCustomCard={handleRemoveCustomCard}
