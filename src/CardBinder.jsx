@@ -112,14 +112,6 @@ const round2 = (value) => Math.round(value * 100) / 100;
 const fmtMm = (inches) => (inches * 25.4).toFixed(1);
 const fmtPct = (factor) => (factor >= 0.9999 ? '100%' : `${Math.floor(factor * 1000) / 10}%`);
 const plural = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`;
-const scrollToNextUnplacedCard = (containerSelector, itemAttribute) => {
-  requestAnimationFrame(() => {
-    const container = document.querySelector(containerSelector);
-    if (!container) return;
-    const nextTarget = container.querySelector(`[${itemAttribute}]:not([data-placed])`);
-    if (nextTarget) nextTarget.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  });
-};
 const uid = (prefix = 'id') => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
 const keyOf = (row, col) => `${row}-${col}`;
 const isEditableTarget = (element) => Boolean(element?.matches?.('input, textarea, select, [contenteditable="true"]'));
@@ -1294,6 +1286,7 @@ function CardPool({
   onLoadMore,
   onFetchedCardDragStart,
   onFetchedCardAdd,
+  scrollToNextUnplacedCard,
 }) {
   const searchActive = Boolean(searchQuery.trim() || selectedSet);
   const customCards = customUploadedCards.map((item) => ({ ...item, localUrlDataString: images[item.id] || item.src || '' }));
@@ -1641,6 +1634,19 @@ export default function CardBinder() {
   const [editing, setEditing] = useState(null);
   const [stageSize, setStageSize] = useState({ w: 1000, h: 620 });
 
+  const scrollToNextUnplacedCard = useCallback((containerSelector, itemAttribute) => {
+    // Allow React to commit dynamic catalogue frames before querying the painted layout.
+    setTimeout(() => {
+      const container = document.querySelector(containerSelector);
+      if (!container) return;
+
+      const nextTarget = container.querySelector(`[${itemAttribute}]:not([data-placed])`);
+      if (nextTarget) {
+        nextTarget.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 120);
+  }, []);
+
   const stageRef = useRef(null);
   const timelineScrollRef = useRef(null);
   const timelineRevealPageIdRef = useRef(null);
@@ -1984,7 +1990,7 @@ export default function CardBinder() {
     } finally {
       if (searchAbortRef.current === controller) setIsLoading(false);
     }
-  }, []);
+  }, [scrollToNextUnplacedCard]);
 
   const submitCardSearch = useCallback(() => {
     window.clearTimeout(searchDebounceRef.current);
@@ -3930,6 +3936,7 @@ export default function CardBinder() {
             onLoadMore={loadMoreCards}
             onFetchedCardDragStart={startFetchedCardDrag}
             onFetchedCardAdd={addFetchedCardToPage}
+            scrollToNextUnplacedCard={scrollToNextUnplacedCard}
           />
           <main data-dynamic-workspace data-zen-mode={isZenMode} className="relative flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-neutral-950">
             <div data-preview-surface className="relative flex min-h-0 w-full flex-1 items-center overflow-hidden">
