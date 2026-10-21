@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.9.3
+## Current state — v4.9.4
 
 - **Ledger date:** 2026-10-21
-- **Application state entering this feature pass:** commit `1585646` / v4.9.2
+- **Application state entering this feature pass:** commit `455ced7` / v4.9.3
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,8 +14,8 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets plus the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, required secret, or environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** top-left Lucide Trash overlay for Michi upload cards
-- **Last verified behavior:** production build plus three-viewport top-left geometry, standard Trash identity/size, hover visibility, cancel/confirm cleanup, persistence, telemetry, and zero-browser-error checks
+- **Last functional change:** normalized print slot grid-column/grid-row shorthands with explicit starts and dynamic spans
+- **Last verified behavior:** production build plus three-viewport print checks for 2×1, 2×2, and 3×3 spans, covered-pocket omission, exact track geometry, contained imagery, and zero browser errors
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## SemVer reconstruction
@@ -824,6 +824,20 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 
 - Verified exact control classes, top-left geometry inside the card border, standard `lucide-trash` identity, 12×12px icon dimensions, zero-to-full hover opacity, immediate natural ordering, cancel/confirm removal, two-page assignment/crop cleanup, persistence, updated telemetry, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.9.3.
+
+## [v4.9.4] — 2026-10-21
+
+### Fixed
+
+- Normalized each print slot wrapper onto CSS `gridColumn` and `gridRow` shorthands driven by its active column/row spans.
+- Retained explicit one-based grid starts in those shorthands so non-origin merged cards cannot auto-flow into earlier holes or displace later pockets.
+- Continued omitting every covered pocket through the canonical merged-slot generator rather than rendering hidden duplicate cells beneath 2×1, 2×2, or full-sheet spans.
+
+### Verified
+
+- Verified exact `1 / span 2`, `2 / span 2`, and `1 / span 3` print shorthands for 2×1, 2×2, and 3×3 cards, alongside explicit normal-pocket placement.
+- Verified a page containing 2×1 and 2×2 merges renders only five canonical slot wrappers, a 3×3 page renders only one, physical bounds match each span, custom 100×50mm tracks remain 2:1, print images remain contained, and no browser errors occur at 1600×1000, 1366×768, and 1200×700.
+- Advanced package and lockfile metadata to v4.9.4.
 
 ---
 

@@ -3778,10 +3778,8 @@ export default function CardBinder() {
             dims={dims}
             getSlotProps={(slot) => ({
               style: {
-                gridColumnStart: slot.colStart || 'auto',
-                gridColumnEnd: slot.colSpan ? `span ${slot.colSpan}` : 'auto',
-                gridRowStart: slot.rowStart || 'auto',
-                gridRowEnd: slot.rowSpan ? `span ${slot.rowSpan}` : 'auto',
+                gridColumn: `${slot.colStart || 'auto'} / ${slot.colSpan ? `span ${slot.colSpan}` : 'span 1'}`,
+                gridRow: `${slot.rowStart || 'auto'} / ${slot.rowSpan ? `span ${slot.rowSpan}` : 'span 1'}`,
               },
             })}
             renderSlot={(slot) => {
