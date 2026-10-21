@@ -1232,6 +1232,7 @@ function CardPool({
   onFiles,
   onClearAllUploads,
   onClearAllBinderCards,
+  handleRemoveCustomCard,
   onPoolClick,
   onPoolDoubleClick,
   onPoolDragStart,
@@ -1347,7 +1348,7 @@ function CardPool({
               const placed = placedIds.has(localCard.id);
               return (
                 <div
-                  key={localCard.id}
+                  key={`${localCard.id}-${customUploadedCards.length}-${localCard.name}`}
                   data-local-card={localCard.id}
                   data-placed={placed ? '' : undefined}
                   role="option"
@@ -1363,6 +1364,7 @@ function CardPool({
                   onDragEnd={onDragEnd}
                   className="relative group/local aspect-[245/337] cursor-grab active:cursor-grabbing rounded-md overflow-hidden bg-neutral-900 border border-white/[0.03] opacity-80 hover:opacity-100 shadow-sm hover:shadow-lg transition-all duration-150"
                 >
+                  <button type="button" onClick={(e) => handleRemoveCustomCard(localCard.id, e)} className="absolute top-1.5 right-1.5 z-50 flex h-6 w-6 items-center justify-center rounded-md border border-white/10 bg-neutral-950/80 text-neutral-400 hover:text-red-400 opacity-0 group-hover/local:opacity-100 transition-all duration-200 focus:outline-none backdrop-blur-sm" title="Delete Uploaded Card"><Trash2 size={12} /></button>
                   {localCard.localUrlDataString ? <img src={localCard.localUrlDataString} className={`w-full h-full object-cover bg-neutral-950 pointer-events-none transition-all duration-200 ${placed ? 'opacity-45 grayscale group-hover/local:opacity-75' : ''}`} alt="Uploaded Card" /> : <span className="absolute inset-0 grid place-items-center text-neutral-600"><Icon name="image" /></span>}
                   <span className="absolute top-1 right-1 rounded border border-white/[0.08] bg-neutral-950/80 px-1 py-0.5 text-[9px] uppercase tracking-widest font-semibold text-neutral-500 shadow-sm backdrop-blur-sm">LOCAL</span>
                   <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent px-1.5 pb-1 pt-5 text-xs font-medium text-neutral-200 opacity-0 transition-opacity group-hover/local:opacity-100 group-focus-visible/local:opacity-100"><span className="block truncate">{localCard.name || 'Custom Art'}</span></span>
@@ -2955,6 +2957,54 @@ export default function CardBinder() {
     notify('All database cards cleared from binder sheets. Custom uploads were preserved.', 'info');
   }, [pool, applyCanvasChange, notify]);
 
+  const handleRemoveCustomCard = useCallback((cardId, e) => {
+    e.stopPropagation();
+    const target = pool.find((item) => item.id === cardId && item.source !== 'tcgdex');
+    if (!target) return;
+    if (!window.confirm('Permanently delete this card from your uploads and remove it from all placed binder slots?')) return;
+
+    const nextPool = pool.filter((item) => item.id !== cardId);
+    const nextPages = pagesRef.current.map((page) => {
+      const slots = Object.fromEntries(Object.entries(page.slots || {}).filter(([, assetId]) => assetId !== cardId));
+      if (Object.keys(slots).length === Object.keys(page.slots || {}).length) return page;
+      const crops = Object.fromEntries(Object.entries(page.crops || {}).filter(([key, crop]) => slots[key] === crop.img));
+      return { ...page, slots, crops };
+    });
+
+    setSaveStatus('saving');
+    setPool(nextPool);
+    pagesRef.current = nextPages;
+    setPages(nextPages);
+    clearHistory();
+    setSelectedCardIds((value) => value.filter((id) => id !== cardId));
+    setSelectionAnchorId((value) => value === cardId ? null : value);
+    setSelBox(null);
+    setSelectionPageId(null);
+    if (editingRef.current?.imgId === cardId) {
+      editingRef.current = null;
+      setEditing(null);
+    }
+    sessionIdsRef.current.delete(cardId);
+    setImages((value) => {
+      const next = { ...value };
+      const url = next[cardId];
+      if (url?.startsWith('blob:')) { URL.revokeObjectURL(url); objectUrlsRef.current.delete(url); }
+      delete next[cardId];
+      return next;
+    });
+    if (storageMode === 'indexeddb') idbDeleteMany([cardId]).catch(() => notify('The upload was removed, but image storage cleanup failed.', 'warn'));
+
+    try {
+      const payload = { version: SCHEMA_VERSION, savedAt: Date.now(), currentPage, settings, pool: nextPool, pages: nextPages, cardPrices: sanitizePriceMap(cardPrices) };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      setSaveStatus('saved');
+    } catch {
+      setSaveStatus('error');
+      notify('The upload was removed, but the local save could not be updated.', 'error');
+    }
+    notify(`${target.name || 'Uploaded card'} permanently deleted.`, 'info');
+  }, [pool, storageMode, currentPage, settings, cardPrices, clearHistory, notify]);
+
   const handleClearAllUploads = useCallback(() => {
     const ids = customUploadedCards.map((item) => item.id);
     if (!ids.length) return;
@@ -3759,6 +3809,7 @@ export default function CardBinder() {
             onFiles={addFiles}
             onClearAllUploads={handleClearAllUploads}
             onClearAllBinderCards={handleClearAllBinderCards}
+            handleRemoveCustomCard={handleRemoveCustomCard}
             onPoolClick={onPoolClick}
             onPoolDoubleClick={(id) => placeCards([id], currentPage, null)}
             onPoolDragStart={startPoolDrag}
