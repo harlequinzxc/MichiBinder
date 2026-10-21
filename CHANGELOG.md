@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.6.4
+## Current state — v4.6.5
 
 - **Ledger date:** 2026-10-20
-- **Application state entering this feature pass:** commit `3f8da41` / v4.6.3
+- **Application state entering this feature pass:** commit `bba6afa` / v4.6.4
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,8 +14,8 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets plus the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, required secret, or environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** the currency converter now follows the same complete-pricing visibility gate as Total Value
-- **Last verified behavior:** production build plus positive-price and unavailable-price valuation visibility checks across three desktop viewports
+- **Last functional change:** the preview canvas is vertically contained and custom assets now match TCGdex card geometry
+- **Last verified behavior:** production build plus three-viewport canvas containment, document sizing, custom-grid ratio, image-fit, and scrollbar checks
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## SemVer reconstruction
@@ -640,6 +640,16 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Preserved converter access and currency switching whenever the portfolio has a complete positive valuation.
 - Verified complete-price and provider-null visibility behavior at 1600×1000, 1366×768, and 1200×700 with zero browser errors.
 - Advanced package and lockfile metadata to v4.6.4.
+
+## [v4.6.5] — 2026-10-20
+
+### Fixed
+
+- Locked the preview surface and its canvas stage to hidden overflow beneath the already-contained `data-dynamic-workspace` shell, eliminating native workspace scrollbars caused by nested micro-overflow.
+- Retained the identical two-column, `gap-3`, padded scroll capsule for both Cards and Michi tabs while preserving native scrolling inside the asset lists.
+- Changed custom-upload cards from the approximate `2.5/3.5` frame to the exact TCGdex `245/337` aspect ratio and standardized their images on `object-contain` presentation.
+- Verified hidden overflow on the workspace, preview surface, and canvas stage; exact viewport-sized document bounds; twelve-card custom-grid rendering; exact card ratio; contained image fit; hidden asset-list scrollbars; and zero browser errors at 1600×1000, 1366×768, and 1200×700.
+- Advanced package and lockfile metadata to v4.6.5.
 
 ---
 

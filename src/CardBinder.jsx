@@ -1351,9 +1351,9 @@ function CardPool({
                   onKeyDown={(event) => { if (event.key === 'Enter') onPoolDoubleClick(localCard.id); }}
                   onDragStart={(event) => onPoolDragStart(event, localCard.id)}
                   onDragEnd={onDragEnd}
-                  className={`relative group/local aspect-[2.5/3.5] cursor-grab active:cursor-grabbing rounded-md overflow-hidden bg-neutral-900 outline-none transition-all duration-150 focus-visible:ring-2 focus-visible:ring-red-500 ${selectionIndex >= 0 ? 'ring-2 ring-red-500 scale-[0.98] brightness-110 shadow-lg' : 'border border-white/[0.03] opacity-80 hover:opacity-100 shadow-sm hover:shadow-lg hover:border-white/[0.15]'}`}
+                  className={`relative group/local aspect-[245/337] cursor-grab active:cursor-grabbing rounded-md overflow-hidden bg-neutral-900 outline-none transition-all duration-150 focus-visible:ring-2 focus-visible:ring-red-500 ${selectionIndex >= 0 ? 'ring-2 ring-red-500 scale-[0.98] brightness-110 shadow-lg' : 'border border-white/[0.03] opacity-80 hover:opacity-100 shadow-sm hover:shadow-lg hover:border-white/[0.15]'}`}
                 >
-                  {localCard.localUrlDataString ? <img src={localCard.localUrlDataString} className={`w-full h-full object-cover bg-neutral-950 pointer-events-none ${placed ? 'opacity-45 grayscale group-hover/local:opacity-75' : ''}`} alt="Uploaded Card" /> : <span className="absolute inset-0 grid place-items-center text-neutral-600"><Icon name="image" /></span>}
+                  {localCard.localUrlDataString ? <img src={localCard.localUrlDataString} className={`w-full h-full object-contain bg-neutral-950 pointer-events-none ${placed ? 'opacity-45 grayscale group-hover/local:opacity-75' : ''}`} alt="Uploaded Card" /> : <span className="absolute inset-0 grid place-items-center text-neutral-600"><Icon name="image" /></span>}
                   <span className="absolute top-1 right-1 rounded border border-white/[0.08] bg-neutral-950/80 px-1 py-0.5 text-[9px] uppercase tracking-widest font-semibold text-neutral-500 shadow-sm backdrop-blur-sm">LOCAL</span>
                   <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent px-1.5 pb-1 pt-5 text-xs font-medium text-neutral-200 opacity-0 transition-opacity group-hover/local:opacity-100 group-focus-visible/local:opacity-100"><span className="block truncate">{localCard.name || 'Custom Art'}</span></span>
                   {selectionIndex >= 0 && <span className="animate-scaleIn absolute top-1 left-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-mono font-bold text-white shadow-md">{selectionIndex + 1}</span>}
@@ -3674,10 +3674,10 @@ export default function CardBinder() {
             onFetchedCardAdd={addFetchedCardToPage}
           />
           <main data-dynamic-workspace data-zen-mode={isZenMode} className="relative flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-neutral-950">
-            <div data-preview-surface className="relative flex min-h-0 w-full flex-1 items-center overflow-visible">
+            <div data-preview-surface className="relative flex min-h-0 w-full flex-1 items-center overflow-hidden">
               <div
                 ref={stageRef}
-                className="relative flex h-full min-w-0 flex-1 items-center justify-center overflow-auto bg-neutral-950 bg-[radial-gradient(ellipse_at_center,rgba(82,82,91,0.18),transparent_65%)] p-6"
+                className="relative flex h-full min-w-0 flex-1 items-center justify-center overflow-hidden bg-neutral-950 bg-[radial-gradient(ellipse_at_center,rgba(82,82,91,0.18),transparent_65%)] p-6"
               onPointerMove={moveMarquee}
               onPointerDown={(event) => { if (event.target === event.currentTarget && combineMode) { setSelBox(null); setSelectionPageId(null); } }}
               onDragEnter={(event) => { if (!combineMode && (['pool', 'remote', 'remote-batch'].includes(dragRef.current?.kind) || hasFiles(event.dataTransfer))) event.preventDefault(); }}
