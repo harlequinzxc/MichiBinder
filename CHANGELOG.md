@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.11.1
+## Current state — v4.11.2
 
 - **Ledger date:** 2026-10-21
-- **Application state entering this feature pass:** commit `640959c` / v4.11.0
+- **Application state entering this feature pass:** commit `2afba3c` / v4.11.1
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,8 +14,8 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets plus the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, required secret, or environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** top-aligned first-unplaced scrolling on result hydration plus the requested v1.4.1 header badge
-- **Last verified behavior:** production build plus three-viewport query/set hydration, tab/placement targeting, smooth start alignment, exact version badge typography, and zero-browser-error checks
+- **Last functional change:** dimension-aware Uploads-only print compaction for merged custom-card instances
+- **Last verified behavior:** production build plus three-viewport Uploads-only 1×1/2×1/2×2/3×3 metadata, ordering, paired-page, database-exclusion, standard print-slice, and zero-browser-error checks
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## SemVer reconstruction
@@ -922,6 +922,20 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Reverified Cards/Michi tab switches, Michi placement advancement, imported TCGdex placement advancement, exact `v1.4.1` badge copy/classes, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.11.1.
 
+## [v4.11.2] — 2026-10-21
+
+### Fixed
+
+- Reworked Uploads-only print compaction to collect canonical custom-card anchors through the merge-aware slot generator instead of flattening raw assignments into dimensionless identities.
+- Preserved each compacted instance's saved column span, row span, and non-centered crop data while retaining sequential temporary-page packing and physical front/back page identities.
+- Added compatibility-safe per-slot print metadata and resolved print background sizing/offset denominators from that metadata, with existing canonical slot dimensions as the standard-print fallback.
+
+### Verified
+
+- Verified 1×1, 2×1, 2×2, and 3×3 custom-card dimensions survive Uploads-only compaction in source order across paired temporary print pages, while database cards remain excluded.
+- Reverified two nine-cell pages with 9/3 compacted custom instances, canonical standard-scope 2×1/2×2/3×3 slice matrices, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
+- Advanced package and lockfile metadata to v4.11.2.
+
 ---
 
 ## Current architecture and engineering rationale
@@ -1023,8 +1037,8 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Measurements enter the UI in millimetres and are converted to inches (`1 / 25.4`) for CSS print math.
 - Print-fit uses a 0.125-inch safe margin and supports A4, Letter, A3, and Tabloid.
 - `all` scope preserves binder page placement, valid cards, crops, and optional empty-page skipping.
-- `custom` scope is **implemented**, not unfinished. `compactCustomPrintPages` gathers private upload instances, orders them by source page/slot, strips merges, repacks sequentially at current grid capacity, auto-paginates overflow, carries non-centered crops, and builds temporary front/back sheet identities for printing.
-- The custom compiler does not mutate the live binder and intentionally does not preserve section names or merge geometry; it is a compact print-only projection.
+- `custom` scope is **implemented**, not unfinished. `compactCustomPrintPages` gathers canonical private-upload anchors through `getSlots`, orders them by source page/slot, captures column/row spans and non-centered crops, repacks instances sequentially at current grid capacity, auto-paginates overflow, and builds temporary front/back sheet identities for printing.
+- Temporary custom-slot metadata carries each source instance's dimensions into the print renderer; standard printing falls back to canonical merge-derived dimensions. The custom compiler does not mutate the live binder and intentionally does not preserve section names or the source page arrangement because it is a compact print-only projection.
 - Browser print settings remain outside application control. Correct output requires matching paper, margins None, scale 100%, and Background graphics enabled; browser “Fit to page” breaks physical size.
 
 ### PWA and deployment
@@ -1047,7 +1061,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 9. **README has small UI drift.** Its workspace table still assigns sizing/preview/print controls to the top utility bar; those controls now live in the right rail and Print / PDF menu.
 10. **Large smooth-scroll jumps are not instantaneous.** Headless Chromium sometimes needed several seconds to settle after many rapid additions; the final target remained correct.
 11. **Long rail dialogs scroll internally.** Print Setup and Keyboard Shortcuts cap at 40vh to preserve uniform trigger-relative anchoring; their lower content is not visible all at once on short landscape viewports.
-12. **Custom compact print is intentionally lossy.** It preserves private images/crops, not live page labels or merged frames. That is current behavior, not an unfinished pagination loop.
+12. **Custom compact print is intentionally arrangement-lossy.** It preserves private images, crops, and source dimensions through temporary metadata, but not live page labels or source-page placement. That is current behavior, not an unfinished pagination loop.
 
 ## Historical dead ends and pitfalls
 
@@ -1071,7 +1085,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - README's workspace/control description has not yet been brought in line with the latest rail menus.
 - Historical SemVer labels are not Git tags or GitHub Releases. Commit links remain the release evidence.
 - There is no account, cloud sync, collaboration, telemetry, backend, or environment-secret layer. Those are deliberate scope boundaries, not half-built modules.
-- No active functional workspace task was open when v4.2.3 was recorded.
+- No active functional workspace task was open when v4.11.2 was recorded.
 
 ## Incoming engineer hand-off brief
 

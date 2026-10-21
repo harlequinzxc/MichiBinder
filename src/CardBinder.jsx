@@ -503,14 +503,14 @@ const getCrop = (page, key, imageId) => {
 };
 
 function compactCustomPrintPages(pages, dims, customIds) {
-  const instances = pages.flatMap((page) => Object.entries(page.slots)
-    .filter(([, id]) => customIds.has(id))
-    .sort(([firstKey], [secondKey]) => {
-      const [firstRow, firstCol] = firstKey.split('-').map(Number);
-      const [secondRow, secondCol] = secondKey.split('-').map(Number);
-      return (firstRow * MAX_COLS + firstCol) - (secondRow * MAX_COLS + secondCol);
-    })
-    .map(([key, id]) => ({ id, crop: getCrop(page, key, id) })));
+  const instances = pages.flatMap((page) => getSlots(page, dims)
+    .filter((slot) => page.slots[slot.key] && customIds.has(page.slots[slot.key]))
+    .map((slot) => ({
+      id: page.slots[slot.key],
+      colSpan: slot.colSpan || 1,
+      rowSpan: slot.rowSpan || 1,
+      crop: getCrop(page, slot.key, page.slots[slot.key]),
+    })));
   if (!instances.length) return [];
 
   const pageCapacity = dims.rows * dims.cols;
@@ -525,12 +525,19 @@ function compactCustomPrintPages(pages, dims, customIds) {
     crops: {},
   }));
 
-  instances.forEach((instance, instanceIndex) => {
-    const pageIndex = Math.floor(instanceIndex / pageCapacity);
-    const pocketIndex = instanceIndex % pageCapacity;
-    const key = keyOf(Math.floor(pocketIndex / dims.cols), pocketIndex % dims.cols);
-    compiledPages[pageIndex].slots[key] = instance.id;
-    if (instance.crop.x !== 50 || instance.crop.y !== 50) compiledPages[pageIndex].crops[key] = { img: instance.id, ...instance.crop };
+  let instanceIndex = 0;
+  compiledPages.forEach((page) => {
+    for (let row = 0; row < dims.rows; row += 1) {
+      for (let col = 0; col < dims.cols; col += 1) {
+        if (instanceIndex >= instances.length) break;
+        const key = keyOf(row, col);
+        const instance = instances[instanceIndex];
+        page.slots[key] = instance.id;
+        page.slots[`${key}-meta`] = { colSpan: instance.colSpan, rowSpan: instance.rowSpan };
+        if (instance.crop.x !== 50 || instance.crop.y !== 50) page.crops[key] = { img: instance.id, ...instance.crop };
+        instanceIndex += 1;
+      }
+    }
   });
 
   return compiledPages.filter((page) => Object.keys(page.slots).length);
@@ -3821,6 +3828,9 @@ export default function CardBinder() {
             {getPrintCells(page, { rows: 3, cols: 3 }).map((slot) => {
               const id = page.slots[slot.key];
               const cardImageURL = images[id] || pool.find((item) => item.id === id)?.src;
+              const customMeta = page.slots[`${slot.key}-meta`];
+              const colSpan = customMeta ? customMeta.colSpan : (slot.colSpan || 1);
+              const rowSpan = customMeta ? customMeta.rowSpan : (slot.rowSpan || 1);
               return (
                 <div
                   key={slot.printKey}
@@ -3837,14 +3847,14 @@ export default function CardBinder() {
                       className="w-full h-full printable-card-slice"
                       style={{
                         backgroundImage: `url(${cardImageURL})`,
-                        backgroundSize: `${(slot.colSpan || 1) * 100}% ${(slot.rowSpan || 1) * 100}%`,
+                        backgroundSize: `${colSpan * 100}% ${rowSpan * 100}%`,
                         backgroundPosition: `${
-                          (slot.colSpan || 1) > 1
-                            ? ((slot.currentColOffset || 0) / ((slot.colSpan || 1) - 1)) * 100
+                          colSpan > 1
+                            ? ((slot.currentColOffset || 0) / (colSpan - 1)) * 100
                             : 0
                         }% ${
-                          (slot.rowSpan || 1) > 1
-                            ? ((slot.currentRowOffset || 0) / ((slot.rowSpan || 1) - 1)) * 100
+                          rowSpan > 1
+                            ? ((slot.currentRowOffset || 0) / (rowSpan - 1)) * 100
                             : 0
                         }%`,
                         backgroundRepeat: 'no-repeat',
