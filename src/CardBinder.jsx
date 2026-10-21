@@ -573,6 +573,7 @@ function loadPersisted() {
         name: String(item.name || 'Card image'),
         source: item.source === 'tcgdex' ? 'tcgdex' : 'upload',
         ...(typeof item.src === 'string' ? { src: item.src } : {}),
+        ...(typeof item.createdAt === 'string' ? { createdAt: item.createdAt } : {}),
         ...(tcgdexId ? { tcgdexId } : {}),
       };
     }) : [];
@@ -1228,6 +1229,7 @@ function CardPool({
   images,
   inputRef,
   onFiles,
+  onClearAllUploads,
   onPoolClick,
   onPoolDoubleClick,
   onPoolDragStart,
@@ -1328,11 +1330,14 @@ function CardPool({
 
           <div className="mt-3 mb-2 flex items-center justify-between border-b border-white/[0.04] px-1 py-1.5 select-none">
             <span className="text-[9px] uppercase tracking-widest font-semibold text-neutral-500">Your Uploads</span>
-            <span className="text-[10px] font-sans font-medium text-neutral-400">{customUploadedCards.length} assets</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-sans font-medium text-neutral-400">{customUploadedCards.length} assets</span>
+              <button type="button" onClick={onClearAllUploads} className="text-[10px] font-medium text-neutral-500 hover:text-red-400 transition-colors uppercase tracking-wider focus:outline-none">Clear All</button>
+            </div>
           </div>
 
           <div role="listbox" aria-label="Custom uploaded cards" aria-multiselectable="true" className="scroll-area grid grid-cols-2 gap-3 p-2 overflow-y-auto max-h-[calc(100vh-220px)] scrollbar-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden group rounded-md border border-white/[0.04]" onClick={(event) => { if (event.target === event.currentTarget) onClearSelection(); }}>
-            {customCards.map((localCard) => {
+            {[...customCards].sort((a, b) => new Date(a.createdAt || a.id) - new Date(b.createdAt || b.id)).map((localCard, _index, orderedCards) => {
               const selectionIndex = selectedCardIds.indexOf(localCard.id);
               const placed = placedIds.has(localCard.id);
               return (
@@ -1346,14 +1351,14 @@ function CardPool({
                   tabIndex={0}
                   draggable="true"
                   title={`${localCard.name || 'Custom Art'} · drag to a binder slot`}
-                  onClick={(event) => onPoolClick(event, localCard.id, customCards)}
+                  onClick={(event) => onPoolClick(event, localCard.id, orderedCards)}
                   onDoubleClick={() => onPoolDoubleClick(localCard.id)}
                   onKeyDown={(event) => { if (event.key === 'Enter') onPoolDoubleClick(localCard.id); }}
                   onDragStart={(event) => onPoolDragStart(event, localCard.id)}
                   onDragEnd={onDragEnd}
                   className="relative group/local aspect-[245/337] cursor-grab active:cursor-grabbing rounded-md overflow-hidden bg-neutral-900 border border-white/[0.03] opacity-80 hover:opacity-100 shadow-sm hover:shadow-lg transition-all duration-150"
                 >
-                  {localCard.localUrlDataString ? <img src={localCard.localUrlDataString} className="w-full h-full object-cover bg-neutral-950 pointer-events-none" alt="Uploaded Card" /> : <span className="absolute inset-0 grid place-items-center text-neutral-600"><Icon name="image" /></span>}
+                  {localCard.localUrlDataString ? <img src={localCard.localUrlDataString} className={`w-full h-full object-cover bg-neutral-950 pointer-events-none transition-all duration-200 ${placed ? 'opacity-45 grayscale group-hover/local:opacity-75' : ''}`} alt="Uploaded Card" /> : <span className="absolute inset-0 grid place-items-center text-neutral-600"><Icon name="image" /></span>}
                   <span className="absolute top-1 right-1 rounded border border-white/[0.08] bg-neutral-950/80 px-1 py-0.5 text-[9px] uppercase tracking-widest font-semibold text-neutral-500 shadow-sm backdrop-blur-sm">LOCAL</span>
                   <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent px-1.5 pb-1 pt-5 text-xs font-medium text-neutral-200 opacity-0 transition-opacity group-hover/local:opacity-100 group-focus-visible/local:opacity-100"><span className="block truncate">{localCard.name || 'Custom Art'}</span></span>
                   {selectionIndex >= 0 && <span className="animate-scaleIn absolute top-1 left-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-mono font-bold text-white shadow-md">{selectionIndex + 1}</span>}
@@ -1970,6 +1975,7 @@ export default function CardBinder() {
               id: record.id,
               name: record.name || 'Card image',
               source: record.source === 'tcgdex' ? 'tcgdex' : 'upload',
+              ...(record.added ? { createdAt: new Date(record.added).toISOString() } : {}),
               ...(tcgdexId ? { tcgdexId } : {}),
             };
           });
@@ -2063,6 +2069,7 @@ export default function CardBinder() {
       file,
       source,
       added: added + index,
+      createdAt: new Date(added + index).toISOString(),
       ...(tcgdexId ? { tcgdexId } : {}),
     }));
     entries.forEach((entry) => sessionIdsRef.current.add(entry.id));
@@ -2088,6 +2095,7 @@ export default function CardBinder() {
           id: entry.id,
           name: entry.name,
           source: entry.source,
+          createdAt: entry.createdAt,
           ...(entry.tcgdexId ? { tcgdexId: entry.tcgdexId } : {}),
         }))]);
         if (!persistedRef.current) {
@@ -2104,6 +2112,7 @@ export default function CardBinder() {
             name: entry.name,
             source: entry.source,
             src: urls[index],
+            createdAt: entry.createdAt,
             ...(entry.tcgdexId ? { tcgdexId: entry.tcgdexId } : {}),
           }))]);
           notify('IndexedDB is unavailable. Images will use browser storage instead.', 'warn');
@@ -2121,6 +2130,7 @@ export default function CardBinder() {
           name: entry.name,
           source: entry.source,
           src: urls[index],
+          createdAt: entry.createdAt,
           ...(entry.tcgdexId ? { tcgdexId: entry.tcgdexId } : {}),
         }))]);
       } catch {
@@ -2890,6 +2900,49 @@ export default function CardBinder() {
     return () => ['dragover', 'drop', 'dragstart', 'dragend', 'pointermove', 'pointerup', 'pointercancel'].forEach((name) => window.removeEventListener(name, safety));
   }, [resetDrag, moveMarquee, finishMarquee]);
 
+  const handleClearAllUploads = useCallback(() => {
+    const ids = customUploadedCards.map((item) => item.id);
+    if (!ids.length) return;
+    if (!window.confirm('Are you sure you want to permanently delete all uploaded cards from the list and binder?')) return;
+    const removedIds = new Set(ids);
+    const nextPool = pool.filter((item) => !removedIds.has(item.id));
+    const validIds = new Set(nextPool.map((item) => item.id));
+    const nextPages = pruneMissingImages(pagesRef.current, validIds);
+
+    setSaveStatus('saving');
+    setPool(nextPool);
+    pagesRef.current = nextPages;
+    setPages(nextPages);
+    clearHistory();
+    setSelectedCardIds([]);
+    setSelectionAnchorId(null);
+    setSelBox(null);
+    setSelectionPageId(null);
+    editingRef.current = null;
+    setEditing(null);
+    ids.forEach((id) => sessionIdsRef.current.delete(id));
+    setImages((value) => {
+      const next = { ...value };
+      ids.forEach((id) => {
+        const url = next[id];
+        if (url?.startsWith('blob:')) { URL.revokeObjectURL(url); objectUrlsRef.current.delete(url); }
+        delete next[id];
+      });
+      return next;
+    });
+    if (storageMode === 'indexeddb') idbDeleteMany(ids).catch(() => notify('Uploads were cleared, but image storage cleanup failed.', 'warn'));
+
+    try {
+      const payload = { version: SCHEMA_VERSION, savedAt: Date.now(), currentPage, settings, pool: nextPool, pages: nextPages, cardPrices: sanitizePriceMap(cardPrices) };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      setSaveStatus('saved');
+    } catch {
+      setSaveStatus('error');
+      notify('Uploads were cleared, but the local save could not be updated.', 'error');
+    }
+    notify(`${plural(ids.length, 'upload')} permanently deleted.`, 'info');
+  }, [customUploadedCards, pool, storageMode, currentPage, settings, cardPrices, clearHistory, notify]);
+
   const deleteImages = useCallback(async (ids) => {
     if (!ids.length) return;
     const placedCount = visible.filter((assignment) => ids.includes(assignment.id)).length;
@@ -3646,6 +3699,7 @@ export default function CardBinder() {
             images={images}
             inputRef={inputRef}
             onFiles={addFiles}
+            onClearAllUploads={handleClearAllUploads}
             onPoolClick={onPoolClick}
             onPoolDoubleClick={(id) => placeCards([id], currentPage, null)}
             onPoolDragStart={startPoolDrag}
