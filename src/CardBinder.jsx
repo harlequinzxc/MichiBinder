@@ -940,7 +940,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.14.1</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.15.0</span>
         </div>
         <SaveStatus status={saveStatus} />
       </div>
@@ -1423,7 +1423,12 @@ function CardPool({
         </div>
       </nav>
 
-      <div data-card-pool-panel="michi" className={`${activeTab === 'michi' ? 'block' : 'hidden'} flex min-h-0 flex-1 flex-col px-4 pb-4`}>
+      <div
+        data-card-pool-panel="michi"
+        aria-hidden={activeTab !== 'michi'}
+        inert={activeTab === 'michi' ? undefined : true}
+        className={`flex min-h-0 flex-1 flex-col px-4 pb-4 transition-opacity duration-150 ${activeTab === 'michi' ? 'opacity-100 relative' : 'opacity-0 absolute inset-0 pointer-events-none select-none'}`}
+      >
         <section aria-label="Michi custom assets" className="flex min-h-0 flex-1 flex-col">
           <div data-local-upload className={`relative w-full cursor-pointer select-none rounded-lg border border-dashed border-neutral-800 bg-neutral-950/40 px-4 py-6 text-center transition-all hover:border-neutral-700 hover:bg-neutral-950/80 group ${sidebarDropActive && !slotDropActive ? '!border-red-600 !bg-red-950/30' : ''}`}>
             <input
@@ -1496,7 +1501,12 @@ function CardPool({
         </section>
       </div>
 
-      <div data-card-pool-panel="cards" className={`${activeTab === 'cards' ? 'block' : 'hidden'} flex min-h-0 flex-1 flex-col`}>
+      <div
+        data-card-pool-panel="cards"
+        aria-hidden={activeTab !== 'cards'}
+        inert={activeTab === 'cards' ? undefined : true}
+        className={`flex min-h-0 flex-1 flex-col transition-opacity duration-150 ${activeTab === 'cards' ? 'opacity-100 relative' : 'opacity-0 absolute inset-0 pointer-events-none select-none'}`}
+      >
           <div className="px-4 pb-3">
             <form
               role="search"
@@ -2081,9 +2091,6 @@ export default function CardBinder() {
     setTimeout(() => {
       const container = document.querySelector(containerSelector);
       if (!container) return;
-
-      // Safely abort when a rapid tab transition hides this mounted catalogue.
-      if (container.offsetWidth === 0 && container.offsetHeight === 0) return;
 
       const nextTarget = container.querySelector(`[${itemAttribute}]:not([data-placed])`);
 

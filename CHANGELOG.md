@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.14.1
+## Current state — v4.15.0
 
 - **Ledger date:** 2026-10-21
-- **Application state entering this feature pass:** commit `bba3e8a` / v4.14.0
+- **Application state entering this feature pass:** commit `1ad4607` / v4.14.1
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,8 +14,8 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets plus the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, required secret, or environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** top-centered reposition guidance, direct print-scope commands, and universal 400px bottom-anchored rail popovers with 60vh ceilings
-- **Last verified behavior:** production build, exact 8px reposition offset and centered text, direct one-/two-card print commands, absent passive radio/primary print controls, four 400px bottom anchors across timeline states, synchronized v4.14.1 title pill, and zero browser errors
+- **Last functional change:** continuously measurable opacity-layered Cards/Michi panels that permit uninterrupted background first-unplaced scrolling across tab transitions
+- **Last verified behavior:** production build, three-viewport nonzero inactive-panel geometry, rapid-transition and fully inactive background scroll calls, hidden upload targeting, exact 520px/360px memory restoration, inert accessibility isolation, synchronized v4.15.0 title pill, and zero browser errors
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## Strict SemVer policy and audit
@@ -34,7 +34,7 @@ The 2026-10-21 full-ledger audit confirmed the three post-inception major bounda
 2. **v3.0.0:** the toolbar/tray composition was dismantled and rebuilt as the four-area workspace with contextual bottom navigation.
 3. **v4.0.0:** top-heavy configuration controls were removed and replaced by the standalone right utility rail plus cohesive bottom structural controller.
 
-The audit also confirmed that presentation-only releases remain patches; capability releases such as TCGdex integration, source workspaces, valuation, upload deletion, print slicing, and first-unplaced tracking remain minors; and later fixes that complete those existing contracts remain patches. Specifically, v4.8.2 restored the Custom metric removed during v4.8.1 consolidation, while v4.11.1–v4.11.7 corrected lifecycle and print-slicing gaps in capabilities introduced by v4.11.0 and earlier print releases. Persistent per-tab scroll memory is a new stateful interaction and therefore begins v4.12.0 rather than v4.11.8.
+The audit also confirmed that presentation-only releases remain patches; capability releases such as TCGdex integration, source workspaces, valuation, upload deletion, print slicing, and first-unplaced tracking remain minors; and later fixes that complete those existing contracts remain patches. Specifically, v4.8.2 restored the Custom metric removed during v4.8.1 consolidation, while v4.11.1–v4.11.7 corrected lifecycle and print-slicing gaps in capabilities introduced by v4.11.0 and earlier print releases. Persistent per-tab scroll memory is a new stateful interaction and therefore begins v4.12.0 rather than v4.11.8; continuously measurable inactive-panel background scrolling is likewise a new cross-tab capability and begins v4.15.0.
 
 Historical entries are ordered from oldest to newest. Commit links, rather than nonexistent retrospective Git tags, are the immutable references.
 
@@ -1134,6 +1134,26 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Verified Print / PDF, Card size, and AI Generation Tools resolve to 400px widths, exact 60vh ceilings, and zero bottom-anchor drift with the timeline both expanded and collapsed at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.14.1.
 
+## [v4.15.0] — 2026-10-21
+
+### Added
+
+- Added uninterrupted background first-unplaced scrolling across Cards/Michi transitions: delayed container-local coordinate passes now continue whether their source panel is active, fading, or fully transparent.
+- Added 150ms cross-fade transitions between the two permanently mounted catalogue layers while preserving native inner scrolling and DOM identity.
+
+### Changed
+
+- Replaced inactive `hidden` display removal with the requested `opacity-0 absolute inset-0 pointer-events-none select-none` layer treatment; active panels use `opacity-100 relative` and remain the sole flex participant.
+- Removed the zero-size early return from `scrollToNextUnplacedCard`, allowing hidden-source hydration, upload, removal, and lookahead callbacks to complete against measurable panel geometry.
+- Added `aria-hidden` and `inert` to inactive opacity layers so invisible search, upload, and card controls remain excluded from keyboard focus and the accessibility tree without sacrificing layout measurements.
+
+### Verified
+
+- Verified both active and inactive panel wrappers retain nonzero dimensions at all three target viewports, with exact requested active/inactive classes and accessibility isolation.
+- Verified a rapid Michi-to-Cards reversal still completes the fading Michi `custom-1` pass, while visible Cards targets `tcg-1`; a fresh upload then targets its first alphanumeric Michi row while that panel is fully opacity-zero.
+- Verified native Cards/Michi offsets restore to 520px and 360px after repeated swaps, synchronized `v4.15.0` title styling remains unchanged, and browser errors remain empty at 1600×1000, 1366×768, and 1200×700.
+- Advanced package and lockfile metadata to v4.15.0.
+
 ---
 
 ## Current architecture and engineering rationale
@@ -1191,7 +1211,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 ### Sidebar source and typography system
 
 - Cards and Michi share `selectedCardIds` but keep independent source semantics. Their active tabs use a neutral slate surface; inactive tabs remain muted until hover.
-- Cards and Michi panel trees remain mounted under display-toggled wrappers, retaining their search/upload controls and native scroll nodes. Each tab restores a positive remembered offset; a zero-memory first activation targets the first unplaced item, while hydration, uploads, and binder/catalogue data changes retain their own targeting triggers. Delayed target callbacks abort when the mounted container resolves to 0×0 under the inactive panel's `hidden` class.
+- Cards and Michi panel trees remain mounted under opacity-layered wrappers, retaining their search/upload controls, measurable geometry, and native scroll nodes. The active layer is relative and fully opaque; the inactive layer is absolute, transparent, pointer-inert, `aria-hidden`, and DOM-inert. Positive remembered offsets restore directly, while zero-memory activation, hydration, uploads, and binder/catalogue data changes can continue first-unplaced targeting in either measurable layer.
 - Cards and Michi use the same high-contrast selected ring, scale, brightness, tinted shadow, and translucent frame mask. Their numbered badges occupy the top-right layer; Michi's destructive upload control remains isolated at top-left and its source label shifts beneath a selected badge.
 - Local uploads are keyed by exact filename for replacement: a collision retains the custom asset ID, updates its binary/source URL, preserves every slot assignment, and remounts the corresponding inventory row through its dynamic image-source-length key.
 - Sidebar typography follows three semantic tiers: 12px medium actions/options, 11px secondary descriptions, and 9px uppercase semibold system context. TCGdex and upload counters are deliberate 10px text-only readout exceptions.
@@ -1287,7 +1307,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - README's workspace/control description has not yet been brought in line with the latest rail menus.
 - Historical SemVer labels are not Git tags or GitHub Releases. Commit links remain the release evidence.
 - There is no account, cloud sync, collaboration, telemetry, backend, or environment-secret layer. Those are deliberate scope boundaries, not half-built modules.
-- No active functional workspace task was open when v4.14.1 was recorded.
+- No active functional workspace task was open when v4.15.0 was recorded.
 
 ## Incoming engineer hand-off brief
 
