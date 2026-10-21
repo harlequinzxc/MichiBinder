@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.8.2
+## Current state — v4.8.3
 
 - **Ledger date:** 2026-10-21
-- **Application state entering this feature pass:** commit `f8cdecc` / v4.8.1
+- **Application state entering this feature pass:** commit `24cb551` / v4.8.2
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,8 +14,8 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets plus the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, required secret, or environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** fully contained 0.85-scale timeline sheets and an all-page custom-card workspace metric
-- **Last verified behavior:** production build plus three-viewport timeline overflow, scale, bottom-row containment, miniature image fit, aggregate custom count, typography, accessibility label, and zero-browser-error checks
+- **Last functional change:** natural, case-insensitive alphanumeric name sorting for Michi uploads
+- **Last verified behavior:** production build plus three-viewport natural filename order, numeric ordering, original upload-name persistence, and zero-browser-error checks
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## SemVer reconstruction
@@ -755,6 +755,19 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 
 - Verified exact frame and scaler classes, computed visible overflow/flex centering and 0.85 scale, pointer isolation, nine contained miniature images, complete visibility of slots 7–9, exact contain-image classes, an all-page `CUSTOM 6 CARDS` test total, metric dividers/gradient typography, consolidated accessibility text, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.8.2.
+
+## [v4.8.3] — 2026-10-21
+
+### Changed
+
+- Replaced chronological Michi upload ordering with natural alphanumeric ordering by card/file name, using numeric comparison and case-insensitive base sensitivity.
+- Retained stable ID fallback behavior for legacy upload records without names; newly added files continue to persist their original `file.name` in IndexedDB-backed and local-storage-backed pool records.
+
+### Verified
+
+- Verified `Alpha.png`, `card 1.png`, `Card 2.png`, and `Card 10.png` render in natural filename order despite opposing creation timestamps.
+- Verified a newly uploaded `card 3.PNG` is inserted between Card 2 and Card 10, preserves its exact original filename in persistence, and produces zero browser errors at 1600×1000, 1366×768, and 1200×700.
+- Advanced package and lockfile metadata to v4.8.3.
 
 ---
 

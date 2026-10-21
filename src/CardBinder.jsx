@@ -1338,7 +1338,11 @@ function CardPool({
           </div>
 
           <div role="listbox" aria-label="Custom uploaded cards" aria-multiselectable="true" className="scroll-area grid grid-cols-2 gap-3 p-2 overflow-y-auto max-h-[calc(100vh-220px)] scrollbar-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden group rounded-md border border-white/[0.04]" onClick={(event) => { if (event.target === event.currentTarget) onClearSelection(); }}>
-            {[...customCards].sort((a, b) => new Date(a.createdAt || a.id) - new Date(b.createdAt || b.id)).map((localCard, _index, orderedCards) => {
+            {[...customCards].sort((a, b) => {
+              const nameA = String(a.name || a.id || '');
+              const nameB = String(b.name || b.id || '');
+              return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+            }).map((localCard, _index, orderedCards) => {
               const selectionIndex = selectedCardIds.indexOf(localCard.id);
               const placed = placedIds.has(localCard.id);
               return (
