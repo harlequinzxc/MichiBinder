@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.13.0
+## Current state — v4.13.1
 
 - **Ledger date:** 2026-10-21
-- **Application state entering this feature pass:** commit `d7b76bd` / v4.12.2
+- **Application state entering this feature pass:** commit `7e5c65e` / v4.13.0
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,8 +14,8 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets plus the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, required secret, or environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** immediate print-scope execution, unified 288px rail popovers, embedded horizontal card scaling, centered crop guidance, and a three-template AI prompt copy studio
-- **Last verified behavior:** production build, three-viewport centered reposition badge geometry, direct all/custom print calls, 288px rail panels, scale/change/reset flow, all three clipboard templates and success toasts, synchronized v4.13.0 title pill, and zero browser errors
+- **Last functional change:** visibility-guarded first-unplaced scrolling that safely ignores hidden mounted catalogues during rapid Cards/Michi transitions
+- **Last verified behavior:** production build, three-viewport rapid-switch cancellation for the hidden tab, retained active-tab targeting, zero-size hidden container confirmation, synchronized v4.13.1 title pill, and zero browser errors
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## Strict SemVer policy and audit
@@ -1082,6 +1082,20 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Reverified four-page dynamic custom output with all 32 slices, merged horizontal/2×2/3×3 print slicing, catalogue scroll memory, lookahead/removal targeting, fresh-upload alignment, and uniform catalogue selection frames.
 - Advanced package and lockfile metadata to v4.13.0.
 
+## [v4.13.1] — 2026-10-21
+
+### Fixed
+
+- Added a rendered-size guard to the delayed first-unplaced scroll engine so permanently mounted catalogue containers abort when their Tailwind-hidden panel resolves to zero width and height.
+- Prevented stale 150ms Cards/Michi scroll callbacks from calculating hidden geometry, invoking smooth scrolling, or requesting TCGdex lookahead after a rapid tab reversal.
+- Retained first-unplaced alignment and automatic catalogue pagination when the requested container remains visible.
+
+### Verified
+
+- Verified rapid Michi-to-Cards reversal suppresses the stale hidden Michi callback while the visible Cards catalogue still targets `tcg-1` exactly once.
+- Verified a settled Michi activation still targets `custom-1`, both inactive containers report 0×0 geometry, the synchronized `v4.13.1` title pill remains unchanged in style, and browser errors remain empty at 1600×1000, 1366×768, and 1200×700.
+- Advanced package and lockfile metadata to v4.13.1.
+
 ---
 
 ## Current architecture and engineering rationale
@@ -1139,7 +1153,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 ### Sidebar source and typography system
 
 - Cards and Michi share `selectedCardIds` but keep independent source semantics. Their active tabs use a neutral slate surface; inactive tabs remain muted until hover.
-- Cards and Michi panel trees remain mounted under display-toggled wrappers, retaining their search/upload controls and native scroll nodes. Each tab restores a positive remembered offset; a zero-memory first activation targets the first unplaced item, while hydration, uploads, and binder/catalogue data changes retain their own targeting triggers.
+- Cards and Michi panel trees remain mounted under display-toggled wrappers, retaining their search/upload controls and native scroll nodes. Each tab restores a positive remembered offset; a zero-memory first activation targets the first unplaced item, while hydration, uploads, and binder/catalogue data changes retain their own targeting triggers. Delayed target callbacks abort when the mounted container resolves to 0×0 under the inactive panel's `hidden` class.
 - Cards and Michi use the same high-contrast selected ring, scale, brightness, tinted shadow, and translucent frame mask. Their numbered badges occupy the top-right layer; Michi's destructive upload control remains isolated at top-left and its source label shifts beneath a selected badge.
 - Sidebar typography follows three semantic tiers: 12px medium actions/options, 11px secondary descriptions, and 9px uppercase semibold system context. TCGdex and upload counters are deliberate 10px text-only readout exceptions.
 - Search and Card set controls share a 36px height, neutral-950 surface, six-percent white border, six-pixel radius, 12px horizontal padding, six-pixel vertical padding, and 12px medium foreground. The set block sits 14px below search.
@@ -1234,7 +1248,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - README's workspace/control description has not yet been brought in line with the latest rail menus.
 - Historical SemVer labels are not Git tags or GitHub Releases. Commit links remain the release evidence.
 - There is no account, cloud sync, collaboration, telemetry, backend, or environment-secret layer. Those are deliberate scope boundaries, not half-built modules.
-- No active functional workspace task was open when v4.13.0 was recorded.
+- No active functional workspace task was open when v4.13.1 was recorded.
 
 ## Incoming engineer hand-off brief
 
