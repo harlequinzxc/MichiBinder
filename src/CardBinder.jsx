@@ -410,9 +410,10 @@ function getSlots(page, dims) {
     for (let col = 0; col < dims.cols; col += 1) {
       const covering = merges.find((merge) => boxHas(merge, row, col));
       if (covering && (covering.r !== row || covering.c !== col)) continue;
-      result.push(covering
+      const slot = covering
         ? { key: keyOf(row, col), r: row, c: col, rs: covering.rs, cs: covering.cs, mergeId: covering.id }
-        : { key: keyOf(row, col), r: row, c: col, rs: 1, cs: 1, mergeId: null });
+        : { key: keyOf(row, col), r: row, c: col, rs: 1, cs: 1, mergeId: null };
+      result.push({ ...slot, colStart: col + 1, colSpan: slot.cs, rowStart: row + 1, rowSpan: slot.rs });
     }
   }
   return result;
@@ -3767,12 +3768,27 @@ export default function CardBinder() {
       <style>{`@page { size: ${paper.w} ${paper.h}; margin: 0; }`}</style>
       {printPages.map((page) => (
         <section key={page.id} className="print-page">
-          <SheetGrid page={page} card={card} gap={settings.gap} unit={`${printFit.toFixed(4)}in`} dims={dims} renderSlot={(slot) => {
-            const id = page.slots[slot.key];
-            const src = images[id] || pool.find((item) => item.id === id)?.src;
-            const crop = id ? getCrop(page, slot.key, id) : { x: 50, y: 50 };
-            return <div className="size-full overflow-hidden bg-white" style={settings.cutGuides ? { outline: '0.2pt solid #9ca3af' } : undefined}>{src && <img src={src} alt="" className="size-full" style={{ objectFit: settings.fit, objectPosition: `${crop.x}% ${crop.y}%` }} />}</div>;
-          }} />
+          <SheetGrid
+            page={page}
+            card={card}
+            gap={settings.gap}
+            unit={`${printFit.toFixed(4)}in`}
+            dims={dims}
+            getSlotProps={(slot) => ({
+              style: {
+                gridColumnStart: slot.colStart || 'auto',
+                gridColumnEnd: slot.colSpan ? `span ${slot.colSpan}` : 'auto',
+                gridRowStart: slot.rowStart || 'auto',
+                gridRowEnd: slot.rowSpan ? `span ${slot.rowSpan}` : 'auto',
+              },
+            })}
+            renderSlot={(slot) => {
+              const id = page.slots[slot.key];
+              const src = images[id] || pool.find((item) => item.id === id)?.src;
+              const crop = id ? getCrop(page, slot.key, id) : { x: 50, y: 50 };
+              return <div className="size-full overflow-hidden bg-white" style={settings.cutGuides ? { outline: '0.2pt solid #9ca3af' } : undefined}>{src && <img src={src} alt="" className="w-full h-full object-contain printable-card-image print:max-w-full print:max-h-full" style={{ objectPosition: `${crop.x}% ${crop.y}%` }} />}</div>;
+            }}
+          />
         </section>
       ))}
     </div>
