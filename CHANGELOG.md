@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.9.5
+## Current state — v4.10.0
 
 - **Ledger date:** 2026-10-21
-- **Application state entering this feature pass:** commit `8b7a745` / v4.9.4
+- **Application state entering this feature pass:** commit `31d58b0` / v4.9.5
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,8 +14,8 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets plus the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, required secret, or environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** forced A4-ratio 3×3 print sheets with auto-flowing spans and full-cover print artwork
-- **Last verified behavior:** production build plus three-viewport exact print classes/styles, 2×1/2×2/3×3 spans, covered-pocket omission, sheet containment, cover imagery, PDF output, and zero browser errors
+- **Last functional change:** per-pocket print slicing for merged artwork across isolated 1×1 cells
+- **Last verified behavior:** production build plus three-viewport nine-cell print expansion, 2×1/2×2/3×3 background slices and offsets, equal pocket geometry, PDF output, and zero browser errors
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## SemVer reconstruction
@@ -853,6 +853,26 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Verified exact sheet, slot, and image classes; explicit `repeat(3, 1fr)` columns/rows; computed three-track output; A4 aspect; hidden overflow; and `object-cover` rendering.
 - Verified 2×1, 2×2, and 3×3 span strings, five canonical wrappers for a combined 2×1/2×2 page, one wrapper for a full 3×3 page, complete slot containment, valid PDF output, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.9.5.
+
+## [v4.10.0] — 2026-10-21
+
+### Added
+
+- Added a canonical print-cell expansion helper that unfolds each merge-aware slot into its complete set of physical 1×1 pocket cells and restores strict row-major paper order.
+- Added seamless background slicing for placed merged artwork: each physical cell renders the shared image at the full merged footprint size with column/row-relative percentage offsets.
+
+### Changed
+
+- Forced every print pocket wrapper to `grid-column: span 1` and `grid-row: span 1`, so 2×1, 2×2, 3×3, and other merged editor cards print as separate cuttable pocket pieces instead of one spanned paper block.
+- Replaced print `<img>` elements with exact `printable-card-slice` background layers using scaled background dimensions, deterministic 0/50/100% slice positions, and no-repeat rendering.
+- Retained the explicit 3×3 A4-ratio print sheet, nine equal pocket cells, cut-guide overlays, source-card trace attributes, and valid PDF generation.
+
+### Verified
+
+- Verified every tested print page renders nine ordered 1×1 wrappers with `span 1` column/row styles and equal geometry.
+- Verified 2×1 slices use 200%×100% backgrounds at 0%/100% horizontal offsets; 2×2 slices use 200%×200% backgrounds at all four corners; and 3×3 slices use 300%×300% backgrounds across the full 0%/50%/100% position matrix.
+- Verified normal cards remain 100%×100%, print output contains no legacy image elements, generated PDF output remains valid, and no browser errors occur at 1600×1000, 1366×768, and 1200×700.
+- Advanced package and lockfile metadata to v4.10.0.
 
 ---
 

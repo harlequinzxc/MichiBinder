@@ -419,6 +419,23 @@ function getSlots(page, dims) {
   return result;
 }
 
+function getPrintCells(page, dims) {
+  return getSlots(page, dims)
+    .flatMap((slot) => Array.from({ length: slot.rowSpan * slot.colSpan }, (_, index) => {
+      const currentRowOffset = Math.floor(index / slot.colSpan);
+      const currentColOffset = index % slot.colSpan;
+      return {
+        ...slot,
+        printKey: `${slot.key}-${currentRowOffset}-${currentColOffset}`,
+        printRow: slot.r + currentRowOffset,
+        printCol: slot.c + currentColOffset,
+        currentRowOffset,
+        currentColOffset,
+      };
+    }))
+    .sort((first, second) => (first.printRow * dims.cols + first.printCol) - (second.printRow * dims.cols + second.printCol));
+}
+
 function visibleAssignments(pages, dims) {
   return pages.flatMap((page, pageIndex) => getSlots(page, dims)
     .filter((slot) => page.slots[slot.key])
@@ -3778,21 +3795,33 @@ export default function CardBinder() {
               gridTemplateRows: 'repeat(3, 1fr)',
             }}
           >
-            {getSlots(page, { rows: 3, cols: 3 }).map((slot) => {
+            {getPrintCells(page, { rows: 3, cols: 3 }).map((slot) => {
               const id = page.slots[slot.key];
-              const src = images[id] || pool.find((item) => item.id === id)?.src;
-              const crop = id ? getCrop(page, slot.key, id) : { x: 50, y: 50 };
+              const cardImageURL = images[id] || pool.find((item) => item.id === id)?.src;
+              const bgX = slot.colSpan > 1 ? (slot.currentColOffset / (slot.colSpan - 1)) * 100 : 0;
+              const bgY = slot.rowSpan > 1 ? (slot.currentRowOffset / (slot.rowSpan - 1)) * 100 : 0;
               return (
                 <div
-                  key={slot.key}
-                  data-print-slot={slot.key}
+                  key={slot.printKey}
+                  data-print-slot={`${slot.printRow}-${slot.printCol}`}
+                  data-print-source-slot={slot.key}
                   className="w-full h-full relative overflow-hidden bg-neutral-100/50"
                   style={{
-                    gridColumn: `span ${slot.colSpan || 1}`,
-                    gridRow: `span ${slot.rowSpan || 1}`,
+                    gridColumn: 'span 1',
+                    gridRow: 'span 1',
                   }}
                 >
-                  {src && <img src={src} alt="" className="w-full h-full object-cover printable-card-image" style={{ objectPosition: `${crop.x}% ${crop.y}%` }} />}
+                  {cardImageURL && (
+                    <div
+                      className="w-full h-full printable-card-slice"
+                      style={{
+                        backgroundImage: `url(${cardImageURL})`,
+                        backgroundSize: `${slot.colSpan * 100}% ${slot.rowSpan * 100}%`,
+                        backgroundPosition: `${bgX}% ${bgY}%`,
+                        backgroundRepeat: 'no-repeat',
+                      }}
+                    />
+                  )}
                   {settings.cutGuides && <span aria-hidden="true" className="pointer-events-none absolute inset-0 z-10" style={{ outline: '0.2pt solid #9ca3af' }} />}
                 </div>
               );
