@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.15.0
+## Current state — v4.15.1
 
 - **Ledger date:** 2026-10-21
-- **Application state entering this feature pass:** commit `1ad4607` / v4.14.1
+- **Application state entering this feature pass:** commit `97f6098` / v4.15.0
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,8 +14,8 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets plus the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, required secret, or environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** continuously measurable opacity-layered Cards/Michi panels that permit uninterrupted background first-unplaced scrolling across tab transitions
-- **Last verified behavior:** production build, three-viewport nonzero inactive-panel geometry, rapid-transition and fully inactive background scroll calls, hidden upload targeting, exact 520px/360px memory restoration, inert accessibility isolation, synchronized v4.15.0 title pill, and zero browser errors
+- **Last functional change:** trigger-centered 400px rail popovers with 80vh internal overflow ceilings, hidden scrollbar chrome, and symmetric right-origin scaling
+- **Last verified behavior:** production build, exact shared popover class contract, zero trigger-center drift across Print / PDF, Card size, and AI tools in timeline states, 400px width, exact 80vh ceilings, synchronized v4.15.1 title pill, and zero browser errors
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## Strict SemVer policy and audit
@@ -1154,6 +1154,20 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Verified native Cards/Michi offsets restore to 520px and 360px after repeated swaps, synchronized `v4.15.0` title styling remains unchanged, and browser errors remain empty at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.15.0.
 
+## [v4.15.1] — 2026-10-21
+
+### Fixed
+
+- Replaced rigid top/bottom rail-popover anchoring with the requested trigger-relative `top-1/2 -translate-y-1/2` midpoint track and restored symmetric `origin-right` scaling.
+- Expanded the shared vertical ceiling from 60vh to 80vh, added `min-h-fit`, increased padding and panel gaps, and strengthened the popover shadow.
+- Hid internal scrollbar chrome through standard and WebKit-specific rules while retaining independent `overflow-y-auto` scrolling.
+
+### Verified
+
+- Verified Print / PDF, Card size, and AI Generation Tools all resolve to the exact shared class contract, 400px width, exact 80vh ceiling, hidden scrollbar treatment, and zero vertical center drift from their trigger wrappers.
+- Reverified direct Uploads Only and Include All print compilation, top-centered reposition guidance, synchronized `v4.15.1` title styling, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
+- Advanced package and lockfile metadata to v4.15.1.
+
 ---
 
 ## Current architecture and engineering rationale
@@ -1226,7 +1240,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - The rail has no full-height edge divider and no `self-start`; its outer box is vertically centered against the **live preview surface**, not the complete main column. Collapsing the timeline changes preview height, so the rail's vertical center moves.
 - The rail begins with Print / PDF, Print setup, then Grid selection. Print scope is exposed as two stateless command blocks that immediately select and launch their compilation; Print setup uses `FileSliders`; Card size uses `RulerDimensionLine` and owns both its preset selector and horizontal 80–125% scale controls.
 - Keyboard shortcuts are followed by AI Prompt Generator, whose InPaint, Restyle, and GridRip cards copy fixed templates through the Clipboard API and report the result through standard toasts.
-- Every rail dialog is absolutely anchored at `right-full mr-3 bottom-0` relative to its trigger and animates from the bottom-right. Panels use a uniform 400px width, cap at 60vh, and scroll internally when their content is longer.
+- Every rail dialog is absolutely anchored at `right-full mr-3 top-1/2 -translate-y-1/2` relative to its trigger and animates symmetrically from the right. Panels use a uniform 400px width, cap at 80vh, hide scrollbar chrome, and scroll internally when their content is longer.
 - Database/Custom/Density is absolutely anchored to the preview bottom edge. It uses the self-hosted Inter sans stack and is not part of the timeline or bottom controller flow.
 - The bottom controller owns Undo/Redo, Merge/Unmerge/reset/clear, spread navigation, Add, Duplicate, Delete, and timeline toggle. One-pixel dividers separate its History, Slot Structure, and Spread Navigation pockets.
 - The timeline is a sibling below the preview/controller inside the right-side main tree. Its 300ms elastic slide/fade transitions height, opacity, and padding; collapsed geometry still resolves to zero height, padding, and border so the preview reclaims the full band.
@@ -1282,7 +1296,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 8. **`CardBinder.jsx` is highly coupled.** Broad rewrites can cross persistence, printing, drag state, physical ownership, and layout geometry even when the request appears visual.
 9. **README has small UI drift.** Its workspace table still assigns sizing/preview/print controls to the top utility bar; those controls now live in the right rail and Print / PDF menu.
 10. **Large smooth-scroll jumps are not instantaneous.** Headless Chromium sometimes needed several seconds to settle after many rapid additions; the final target remained correct.
-11. **Long rail dialogs scroll internally.** Shared popovers cap at 60vh under the uniform bottom-relative anchor; lower content may still require internal scrolling on short landscape viewports.
+11. **Long rail dialogs scroll internally.** Shared popovers cap at 80vh under the uniform trigger-centered anchor; lower content may still require internal scrolling on short landscape viewports.
 12. **Custom compact print is intentionally arrangement-lossy.** It preserves private images, crops, and source dimensions through temporary metadata, but not live page labels or source-page placement. That is current behavior, not an unfinished pagination loop.
 
 ## Historical dead ends and pitfalls
@@ -1307,7 +1321,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - README's workspace/control description has not yet been brought in line with the latest rail menus.
 - Historical SemVer labels are not Git tags or GitHub Releases. Commit links remain the release evidence.
 - There is no account, cloud sync, collaboration, telemetry, backend, or environment-secret layer. Those are deliberate scope boundaries, not half-built modules.
-- No active functional workspace task was open when v4.15.0 was recorded.
+- No active functional workspace task was open when v4.15.1 was recorded.
 
 ## Incoming engineer hand-off brief
 
