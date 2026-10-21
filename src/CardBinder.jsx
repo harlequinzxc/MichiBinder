@@ -3798,8 +3798,6 @@ export default function CardBinder() {
             {getPrintCells(page, { rows: 3, cols: 3 }).map((slot) => {
               const id = page.slots[slot.key];
               const cardImageURL = images[id] || pool.find((item) => item.id === id)?.src;
-              const bgX = slot.colSpan > 1 ? (slot.currentColOffset / (slot.colSpan - 1)) * 100 : 0;
-              const bgY = slot.rowSpan > 1 ? (slot.currentRowOffset / (slot.rowSpan - 1)) * 100 : 0;
               return (
                 <div
                   key={slot.printKey}
@@ -3816,8 +3814,16 @@ export default function CardBinder() {
                       className="w-full h-full printable-card-slice"
                       style={{
                         backgroundImage: `url(${cardImageURL})`,
-                        backgroundSize: `${slot.colSpan * 100}% ${slot.rowSpan * 100}%`,
-                        backgroundPosition: `${bgX}% ${bgY}%`,
+                        backgroundSize: `${(slot.colSpan || 1) * 100}% ${(slot.rowSpan || 1) * 100}%`,
+                        backgroundPosition: `${
+                          (slot.colSpan || 1) > 1
+                            ? ((slot.currentColOffset || 0) / ((slot.colSpan || 1) - 1)) * 100
+                            : 0
+                        }% ${
+                          (slot.rowSpan || 1) > 1
+                            ? ((slot.currentRowOffset || 0) / ((slot.rowSpan || 1) - 1)) * 100
+                            : 0
+                        }%`,
                         backgroundRepeat: 'no-repeat',
                       }}
                     />

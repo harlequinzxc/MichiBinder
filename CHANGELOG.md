@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.10.0
+## Current state — v4.10.1
 
 - **Ledger date:** 2026-10-21
-- **Application state entering this feature pass:** commit `31d58b0` / v4.9.5
+- **Application state entering this feature pass:** commit `8dde27d` / v4.10.0
 - **Product:** a private, desktop-first trading-card binder layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,8 +14,8 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** binder metadata in `localStorage`; image blobs in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets plus the public open ExchangeRate-API USD feed; no MichiBinder backend, account, telemetry, required secret, or environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** per-pocket print slicing for merged artwork across isolated 1×1 cells
-- **Last verified behavior:** production build plus three-viewport nine-cell print expansion, 2×1/2×2/3×3 background slices and offsets, equal pocket geometry, PDF output, and zero browser errors
+- **Last functional change:** defensive inline print-slice sizing and offset calculations with 1×1 fallbacks
+- **Last verified behavior:** production build plus three-viewport nine-cell print expansion, fallback-safe 2×1/2×2/3×3 slice sizing and offsets, equal pocket geometry, PDF output, and zero browser errors
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## SemVer reconstruction
@@ -873,6 +873,18 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Verified 2×1 slices use 200%×100% backgrounds at 0%/100% horizontal offsets; 2×2 slices use 200%×200% backgrounds at all four corners; and 3×3 slices use 300%×300% backgrounds across the full 0%/50%/100% position matrix.
 - Verified normal cards remain 100%×100%, print output contains no legacy image elements, generated PDF output remains valid, and no browser errors occur at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.10.0.
+
+## [v4.10.1] — 2026-10-21
+
+### Fixed
+
+- Moved merged-card print background sizing and position calculations directly into each `printable-card-slice` style declaration using explicit 1×1 span and zero-offset fallbacks.
+- Protected print slicing from missing span or offset metadata while retaining the exact proportional formula for every physical pocket segment.
+
+### Verified
+
+- Reverified nine isolated 1×1 cells per page, 200%×100% 2×1 slices, all four 200%×200% 2×2 corners, the complete 300%×300% 3×3 0%/50%/100% matrix, equal pocket geometry, valid PDF output, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
+- Advanced package and lockfile metadata to v4.10.1.
 
 ---
 
