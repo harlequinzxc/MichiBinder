@@ -1151,7 +1151,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.22.4</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.22.5</span>
         </div>
         <SaveStatus isFolderLinked={isFolderLinked} />
       </div>
@@ -2290,6 +2290,8 @@ export default function CardBinder() {
     historyRestoreTimerRef.current = [];
     pastRef.current = [];
     futureRef.current = [];
+    const targetHandle = directoryHandlesRef.current[target.id];
+    setDirectoryHandles((current) => ({ ...current })); // Triggers full context broadcast
     setActiveBinderIdState(target.id);
     activeBinderIdRef.current = target.id;
   }, [setPages]);
