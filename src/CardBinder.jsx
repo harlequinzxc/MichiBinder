@@ -1107,7 +1107,7 @@ function SheetGrid({ page, card, gap, unit, dims, animate = false, renderSlot, g
 }
 
 function SaveStatus({ isFolderLinked }) {
-  const label = isFolderLinked ? 'Folder Connected' : 'No Folder Picked';
+  const label = isFolderLinked ? 'Folder Connected' : 'No Folder Connected';
   return (
     <div
       data-engine-badge
@@ -1124,7 +1124,7 @@ function SaveStatus({ isFolderLinked }) {
       ) : (
         <span className="text-zinc-500 font-medium text-xs flex items-center gap-1.5">
           <span className="size-1.5 rounded-full bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.6)] animate-pulse" />
-          No Folder Picked
+          No Folder Connected
         </span>
       )}
     </div>
@@ -1151,7 +1151,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.22.10</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.23.0</span>
         </div>
         <SaveStatus isFolderLinked={isFolderLinked} />
       </div>
@@ -1517,6 +1517,8 @@ function CardPool({
   currentDirectoryHandle,
   handleFolderAction,
   handleDisconnectFolder,
+  disconnectConfirm,
+  setDisconnectConfirm,
   onClearAllUploads,
   onClearAllBinderCards,
   handleRemoveCustomCard,
@@ -1651,15 +1653,32 @@ function CardPool({
             </span>
           </div>
 
-          <div className="mt-3 flex flex-col gap-2 rounded-lg border border-white/[0.04] bg-neutral-950 p-2.5 shadow-inner">
-            <div className="flex items-center justify-between"><div className="flex flex-col"><span className="text-xs font-semibold text-neutral-200">Cloud-Free Storage</span><span className="text-[9px] font-bold tracking-widest text-neutral-500 uppercase">CUSTOM CARD ART FOLDER</span></div></div>
+          <div className="mt-3 flex flex-col gap-2 rounded-lg border border-white/[0.04] bg-neutral-950 p-2.5 shadow-inner transition-all duration-200">
+            <div className="flex items-center justify-between">
+              <div className="flex flex-col">
+                <span className="text-xs font-semibold text-neutral-200">Custom Card Vault</span>
+              </div>
+            </div>
             <input type="file" webkitdirectory="" directory="" multiple className="hidden" id="hub-directory-picker" onChange={(event) => { const files = Array.from(event.target.files || []); event.target.value = ''; if (files.length) handleDirectoryPickerFiles(files); }} />
             <div className="flex flex-col gap-1.5 w-full" data-folder-link-actions>
-              <button type="button" onClick={handleFolderAction} className="w-full h-8 flex items-center justify-center rounded-md bg-neutral-800 text-zinc-200 border border-white/[0.04] font-semibold text-xs transition-all hover:bg-neutral-700 active:scale-[0.98]">{Boolean(currentDirectoryHandle) ? 'Sync' : 'Link Folder'}</button>
-              {Boolean(currentDirectoryHandle) ? (
-                <button type="button" onClick={handleDisconnectFolder} className="w-full text-center text-[9px] font-bold tracking-widest text-neutral-500 hover:text-red-400 uppercase font-sans mt-0.5 transition-colors cursor-pointer">Disconnect Folder</button>
-              ) : (
-                <span aria-hidden="true" className="invisible w-full select-none text-center text-[9px] font-bold tracking-widest uppercase font-sans mt-0.5">Disconnect Folder</span>
+              <button type="button" onClick={handleFolderAction} className="w-full h-8 flex items-center justify-center rounded-md bg-neutral-800 text-zinc-200 border border-white/[0.04] font-semibold text-xs transition-all hover:bg-neutral-700 active:scale-[0.98]">
+                {Boolean(currentDirectoryHandle) ? 'Reload Assets' : 'Connect Folder'}
+              </button>
+              {Boolean(currentDirectoryHandle) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (disconnectConfirm) {
+                      handleDisconnectFolder();
+                    } else {
+                      setDisconnectConfirm(true);
+                      setTimeout(() => setDisconnectConfirm(false), 3000);
+                    }
+                  }}
+                  className={`w-full text-center text-[10px] font-bold tracking-widest uppercase font-sans py-1.5 rounded-md border transition-all duration-200 ${disconnectConfirm ? 'bg-red-950/40 text-red-400 border-red-500/40 animate-pulse' : 'bg-transparent text-red-500/70 border-transparent hover:text-red-400 hover:bg-red-500/10'}`}
+                >
+                  {disconnectConfirm ? 'Click again to confirm' : 'Disconnect Folder'}
+                </button>
               )}
             </div>
           </div>
@@ -1890,6 +1909,36 @@ export default function CardBinder() {
   const [activeBinderIdState, setActiveBinderIdState] = useState(initialBinder?.id || '');
   const activeBinderId = activeBinderIdState;
   const [isBinderWizardOpen, setIsBinderWizardOpen] = useState(repositoryBoot.binders.length === 0);
+  const [disconnectConfirm, setDisconnectConfirm] = useState(false);
+  const [editingBinderId, setEditingBinderId] = useState(null);
+  const [binderRenameDraft, setDraftBinderRename] = useState('');
+
+  const shiftBinderTab = useCallback((binderId, direction) => {
+    setBinders((currentBinders) => {
+      const index = currentBinders.findIndex((b) => b.id === binderId);
+      if (index === -1) return currentBinders;
+      const targetIndex = index + direction;
+      if (targetIndex < 0 || targetIndex >= currentBinders.length) return currentBinders;
+      const next = [...currentBinders];
+      const temp = next[index];
+      next[index] = next[targetIndex];
+      next[targetIndex] = temp;
+      persistBinderRepository(next, activeBinderIdState);
+      return next;
+    });
+  }, [activeBinderIdState]);
+
+  const commitBinderRename = useCallback((binderId) => {
+    const trimmed = binderRenameDraft.trim();
+    if (!trimmed) { setEditingBinderId(null); return; }
+    setBinders((currentBinders) => {
+      const next = currentBinders.map((b) => b.id === binderId ? { ...b, name: trimmed, updatedAt: new Date().toISOString() } : b);
+      persistBinderRepository(next, activeBinderIdState);
+      return next;
+    });
+    setEditingBinderId(null);
+  }, [binderRenameDraft, activeBinderIdState]);
+
   useEffect(() => {
     document.title = "MichiBinder";
   }, []);
@@ -2238,6 +2287,7 @@ export default function CardBinder() {
     const target = sanitizeBinderRecord(binder);
     activeBinderIdRef.current = target.id; // Enforce immediate synchronous pointer alignment
     setActiveBinderIdState(target.id);     // Trigger reactive state re-render path
+    setDisconnectConfirm(false);
 
     const nextPages = normalizePhysicalPages(target.pages);
     objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
@@ -3185,6 +3235,7 @@ export default function CardBinder() {
     ));
     updateBinderDirectoryMetadata(targetBinderId, null);
     setSaveStatus('saved');
+    setDisconnectConfirm(false);
     const picker = document.getElementById('hub-directory-picker');
     if (picker) picker.value = '';
     try {
@@ -4914,25 +4965,68 @@ export default function CardBinder() {
           onToggleCurrency={() => setCurrencyDisplay((value) => value === 'SGD' ? 'USD' : 'SGD')}
           portfolioValueLabel={portfolioValueLabel}
         />
-        <nav data-binder-tab-strip aria-label="Binder workspaces" className="no-print relative z-40 flex h-10 shrink-0 items-end overflow-x-auto border-b border-white/[0.06] bg-neutral-950 px-3 scrollbar-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <div className="flex min-w-max items-end gap-1">
+        <nav data-binder-tab-strip aria-label="Binder workspaces" className="no-print relative z-40 flex h-10 shrink-0 items-center border-b border-white/[0.06] bg-neutral-950 px-4 select-none overflow-x-auto overflow-y-hidden scrollbar-none">
+          <div className="flex items-center gap-2 min-w-max h-full py-1">
             {binders.map((binder) => {
               const isActive = binder.id === activeBinderId;
               return (
-                <button
+                <div
                   key={binder.id}
-                  type="button"
-                  onClick={() => setActiveBinderId(binder.id)}
-                  aria-current={isActive ? 'page' : undefined}
-                  className={`group relative flex h-9 min-w-36 max-w-56 items-center gap-2 rounded-t-lg border px-3 text-left transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-red-500 ${isActive ? 'border-white/[0.08] border-b-neutral-900 bg-neutral-900 text-neutral-100' : 'border-transparent bg-transparent text-neutral-500 hover:border-white/[0.04] hover:bg-neutral-900/50 hover:text-neutral-300'}`}
+                  className={`group relative flex h-full items-center gap-1.5 rounded-t-lg border border-b-0 px-3 transition-all duration-150 ${isActive ? 'border-white/[0.08] bg-neutral-900 text-neutral-100' : 'border-transparent bg-transparent text-neutral-500 hover:bg-neutral-900/40 hover:text-neutral-300'}`}
                 >
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[11px] font-semibold tracking-tight">{binder.name}</span>
-                    <span className="block font-mono text-[8px] font-bold uppercase tracking-widest text-neutral-600 group-hover:text-neutral-500">{getLayout(binder.settings.layout).id}</span>
-                  </span>
-                  {isActive && isFolderLinked && <FolderOpen aria-hidden="true" size={13} strokeWidth={1.7} className="shrink-0 text-zinc-400" />}
-                  {isActive && <span aria-hidden="true" className="absolute inset-x-2 -bottom-px h-px bg-red-500" />}
-                </button>
+                  <div className="flex items-center opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150 gap-0.5 mr-1 shrink-0">
+                    <button type="button" title="Shift tab left" onClick={(e) => { e.stopPropagation(); shiftBinderTab(binder.id, -1); }} className="size-5 rounded bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center text-neutral-400 hover:text-white transition-colors"><ChevronLeft size={11} /></button>
+                    <button type="button" title="Shift tab right" onClick={(e) => { e.stopPropagation(); shiftBinderTab(binder.id, 1); }} className="size-5 rounded bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center text-neutral-400 hover:text-white transition-colors"><ChevronRight size={11} /></button>
+                  </div>
+
+                  <div
+                    className="flex flex-col justify-center min-w-[120px] max-w-[180px] cursor-pointer"
+                    role={editingBinderId === binder.id ? undefined : 'button'}
+                    tabIndex={editingBinderId === binder.id ? -1 : 0}
+                    aria-current={isActive ? 'page' : undefined}
+                    aria-label={`Open ${binder.name} workspace`}
+                    onClick={() => !isActive && setActiveBinderId(binder.id)}
+                    onKeyDown={(event) => {
+                      if (editingBinderId === binder.id) return;
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        if (!isActive) setActiveBinderId(binder.id);
+                      }
+                      if (event.key === 'F2') {
+                        event.preventDefault();
+                        setEditingBinderId(binder.id);
+                        setDraftBinderRename(binder.name);
+                      }
+                    }}
+                  >
+                    {editingBinderId === binder.id ? (
+                      <input
+                        type="text"
+                        value={binderRenameDraft}
+                        autoFocus
+                        maxLength={40}
+                        aria-label={`Rename ${binder.name} workspace`}
+                        onChange={(e) => setDraftBinderRename(e.target.value)}
+                        onBlur={() => commitBinderRename(binder.id)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') commitBinderRename(binder.id); if (e.key === 'Escape') setEditingBinderId(null); }}
+                        className="h-6 w-full bg-neutral-950 border border-red-500/40 rounded px-1.5 text-xs text-white font-semibold outline-none focus:ring-1 focus:ring-red-500/50"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    ) : (
+                      <span
+                        onDoubleClick={(e) => { e.stopPropagation(); setEditingBinderId(binder.id); setDraftBinderRename(binder.name); }}
+                        className="block truncate text-[11px] font-semibold tracking-tight leading-tight select-text"
+                        title="Double-click to rename workspace"
+                      >
+                        {binder.name}
+                      </span>
+                    )}
+                    <span className="block font-mono text-[8px] font-bold uppercase tracking-widest text-neutral-600 group-hover:text-neutral-500 mt-0.5 leading-none">{getLayout(binder.settings.layout).id}</span>
+                  </div>
+
+                  {isActive && isFolderLinked && <FolderOpen aria-hidden="true" size={12} className="shrink-0 text-zinc-400 ml-1" />}
+                  {isActive && <span aria-hidden="true" className="absolute inset-x-0 -bottom-[1px] h-[2px] bg-red-500" />}
+                </div>
               );
             })}
             <button
@@ -4940,9 +5034,9 @@ export default function CardBinder() {
               onClick={openNewBinderModal}
               aria-label="Create a new binder"
               title="Create a new binder"
-              className="mb-1 grid size-8 shrink-0 place-items-center rounded-md border border-dashed border-white/[0.09] text-neutral-500 transition-all hover:border-red-500/40 hover:bg-red-950/30 hover:text-red-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+              className="mb-1 grid size-7 shrink-0 place-items-center rounded-md border border-dashed border-white/[0.09] text-neutral-500 transition-all hover:border-red-500/40 hover:bg-red-950/30 hover:text-red-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
             >
-              <Plus size={14} strokeWidth={1.8} />
+              <Plus size={13} strokeWidth={2} />
             </button>
           </div>
         </nav>
@@ -4960,6 +5054,8 @@ export default function CardBinder() {
             currentDirectoryHandle={currentDirectoryHandle}
             handleFolderAction={handleFolderAction}
             handleDisconnectFolder={handleDisconnectFolder}
+            disconnectConfirm={disconnectConfirm}
+            setDisconnectConfirm={setDisconnectConfirm}
             onClearAllUploads={handleClearAllUploads}
             onClearAllBinderCards={handleClearAllBinderCards}
             handleRemoveCustomCard={handleRemoveCustomCard}
