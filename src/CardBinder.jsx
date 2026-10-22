@@ -1151,7 +1151,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.22.7</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.22.8</span>
         </div>
         <SaveStatus isFolderLinked={isFolderLinked} />
       </div>
@@ -2236,6 +2236,9 @@ export default function CardBinder() {
 
   const hydrateBinderWorkspace = useCallback((binder) => {
     const target = sanitizeBinderRecord(binder);
+    activeBinderIdRef.current = target.id; // Enforce immediate synchronous pointer alignment
+    setActiveBinderIdState(target.id);     // Trigger reactive state re-render path
+
     const nextPages = normalizePhysicalPages(target.pages);
     objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
     objectUrlsRef.current.clear();
@@ -2288,10 +2291,6 @@ export default function CardBinder() {
     historyRestoreTimerRef.current = [];
     pastRef.current = [];
     futureRef.current = [];
-    const targetHandle = directoryHandlesRef.current[target.id];
-    setDirectoryHandles((current) => ({ ...current })); // Triggers full context broadcast
-    setActiveBinderIdState(target.id);
-    activeBinderIdRef.current = target.id;
   }, [setPages]);
 
   const commitAndActivateBinder = useCallback((targetBinder, append = false) => {
@@ -2312,6 +2311,7 @@ export default function CardBinder() {
     } catch {
       notify('Binder repository could not be saved.', 'error');
     }
+    activeBinderIdRef.current = target.id; // Force alignment
     hydrateBinderWorkspace(target);
   }, [snapshotActiveBinder, hydrateBinderWorkspace, notify]);
 

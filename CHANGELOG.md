@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.22.7
+## Current state — v4.22.8
 
 - **Ledger date:** 2026-10-22
-- **Application state entering this feature pass:** commit `0de684c` / v4.22.6
+- **Application state entering this feature pass:** commit `10ee025` / v4.22.7
 - **Product:** a private, desktop-first, multi-binder trading-card layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,8 +14,8 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** a versioned multi-binder repository in `localStorage`; binder-scoped image blobs and binder-scoped native directory handles in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable
 - **Network boundary:** TCGdex REST/API assets and the public open ExchangeRate-API USD feed; custom assets remain entirely local with no upload, proxy, scraper, manifest, or remote-sync request path; no MichiBinder backend, account, telemetry, or required environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** the Michi sidebar now receives the active native directory handle itself and renders Link/Sync/Disconnect directly from `Boolean(currentDirectoryHandle)`, while AppBar retains the top-level computed health constant
-- **Last verified behavior:** production build; direct active-handle consumption in the sidebar and computed health consumption in AppBar; two binders linked to two different native directories; repeated linked/unlinked tab switching; immediate Link, Disconnect, permission-expiry, hydration, and re-activation rendering; scoped token storage/deletion; preserved assets; zero linked/unlinked layout shift; migration/reset/upload-race regressions; synchronized v4.22.7 title pill; and zero browser errors
+- **Last functional change:** workspace activation now aligns `activeBinderIdRef` and schedules `activeBinderIdState` immediately after target sanitation, before any workspace teardown or hydration work, and no longer forces a redundant directory-handle map clone
+- **Last verified behavior:** production build; frame-synchronous active-ID state/ref convergence; direct active-handle consumption in the sidebar and computed health consumption in AppBar; two binders linked to two different native directories; repeated linked/unlinked tab switching; immediate Link, Disconnect, permission-expiry, hydration, and re-activation rendering; scoped token storage/deletion; preserved assets; zero linked/unlinked layout shift; migration/reset/upload-race regressions; synchronized v4.22.8 title pill; and zero browser errors
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## Strict SemVer policy and audit
@@ -34,7 +34,7 @@ The 2026-10-21 full-ledger audit confirmed the three post-inception major bounda
 2. **v3.0.0:** the toolbar/tray composition was dismantled and rebuilt as the four-area workspace with contextual bottom navigation.
 3. **v4.0.0:** top-heavy configuration controls were removed and replaced by the standalone right utility rail plus cohesive bottom structural controller.
 
-The audit also confirmed that presentation-only releases remain patches; capability releases such as TCGdex integration, source workspaces, valuation, upload deletion, print slicing, and first-unplaced tracking remain minors; and later fixes that complete those existing contracts remain patches. Specifically, v4.8.2 restored the Custom metric removed during v4.8.1 consolidation, while v4.11.1–v4.11.7 corrected lifecycle and print-slicing gaps in capabilities introduced by v4.11.0 and earlier print releases. Persistent per-tab scroll memory is a new stateful interaction and therefore begins v4.12.0 rather than v4.11.8; continuously measurable inactive-panel background scrolling is likewise a new cross-tab capability and begins v4.15.0; premium layout-aware prompt compilation and copy workflows begin v4.16.0, while their preview-format and prompt-copy corrections remain the v4.16.1 patch; remote public-asset ingestion begins v4.17.0, its replacement with bulk Imgur album deconstruction and concurrent streaming begins v4.18.0, the CORS-safe public-page scraper correction remains the v4.18.1 patch, cloud-first ImgBB upload interception begins v4.19.0, cross-device downstream ImgBB profile rehydration begins v4.20.0, the GridRip boundary-instruction correction remains the v4.20.1 patch, the cloud-control/header presentation correction remains the v4.20.2 patch, the downstream root-profile parser correction remains the v4.20.3 patch, the JSONP profile-loader correction remains the v4.20.4 patch, the device-ledger rehydration correction remains the v4.20.5 patch, the public-manifest registry correction remains the v4.20.6 patch, and the authoritative clipboard-reconciliation correction remains the v4.20.7 patch. Browser-native authoritative directory mounting replaces the retired online custom-asset architecture as a new ingestion capability and therefore begins v4.21.0; cached-handle unlinking completes that capability as the v4.21.1 patch. Independent multi-binder workspace creation, switching, restoration, and persistence form a new stateful lifecycle capability and therefore begin v4.22.0; native-handle-derived folder truth and its associated health/copy correction remain the v4.22.1 patch, binder-scoped handle allocation and the requested human-copy cleanup complete that lifecycle as the v4.22.2 patch, the explicit reactive folder-state bridge is the v4.22.3 patch, its replacement with an authoritative memoized native-handle selector is the v4.22.4 patch, activation-time handle-context rebroadcasting is the v4.22.5 patch, simplifying folder health to a direct current-handle Boolean is the v4.22.6 patch, and binding the sidebar controls directly to that handle is the v4.22.7 patch.
+The audit also confirmed that presentation-only releases remain patches; capability releases such as TCGdex integration, source workspaces, valuation, upload deletion, print slicing, and first-unplaced tracking remain minors; and later fixes that complete those existing contracts remain patches. Specifically, v4.8.2 restored the Custom metric removed during v4.8.1 consolidation, while v4.11.1–v4.11.7 corrected lifecycle and print-slicing gaps in capabilities introduced by v4.11.0 and earlier print releases. Persistent per-tab scroll memory is a new stateful interaction and therefore begins v4.12.0 rather than v4.11.8; continuously measurable inactive-panel background scrolling is likewise a new cross-tab capability and begins v4.15.0; premium layout-aware prompt compilation and copy workflows begin v4.16.0, while their preview-format and prompt-copy corrections remain the v4.16.1 patch; remote public-asset ingestion begins v4.17.0, its replacement with bulk Imgur album deconstruction and concurrent streaming begins v4.18.0, the CORS-safe public-page scraper correction remains the v4.18.1 patch, cloud-first ImgBB upload interception begins v4.19.0, cross-device downstream ImgBB profile rehydration begins v4.20.0, the GridRip boundary-instruction correction remains the v4.20.1 patch, the cloud-control/header presentation correction remains the v4.20.2 patch, the downstream root-profile parser correction remains the v4.20.3 patch, the JSONP profile-loader correction remains the v4.20.4 patch, the device-ledger rehydration correction remains the v4.20.5 patch, the public-manifest registry correction remains the v4.20.6 patch, and the authoritative clipboard-reconciliation correction remains the v4.20.7 patch. Browser-native authoritative directory mounting replaces the retired online custom-asset architecture as a new ingestion capability and therefore begins v4.21.0; cached-handle unlinking completes that capability as the v4.21.1 patch. Independent multi-binder workspace creation, switching, restoration, and persistence form a new stateful lifecycle capability and therefore begin v4.22.0; native-handle-derived folder truth and its associated health/copy correction remain the v4.22.1 patch, binder-scoped handle allocation and the requested human-copy cleanup complete that lifecycle as the v4.22.2 patch, the explicit reactive folder-state bridge is the v4.22.3 patch, its replacement with an authoritative memoized native-handle selector is the v4.22.4 patch, activation-time handle-context rebroadcasting is the v4.22.5 patch, simplifying folder health to a direct current-handle Boolean is the v4.22.6 patch, binding the sidebar controls directly to that handle is the v4.22.7 patch, and synchronously aligning the active state/ref channel during workspace activation is the v4.22.8 patch.
 
 Historical entries are ordered from oldest to newest. Commit links, rather than nonexistent retrospective Git tags, are the immutable references.
 
@@ -1585,6 +1585,22 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Rechecked exact folder copy/classes, zero linked/unlinked layout shift, legacy migration, active-only reset isolation, and the 24 MiB upload-switch race with no page or console errors.
 - Rebuilt the production bundle and synchronized package, lockfile, and title-pill metadata at v4.22.7 without changing dependencies.
 
+## [v4.22.8] — 2026-10-22
+
+### Fixed
+
+- Moved `activeBinderIdRef.current = target.id` to the start of `hydrateBinderWorkspace`, immediately after sanitizing the target binder, before any workspace reset, state hydration, or asynchronous follow-up can observe the active workspace channel.
+- Scheduled `setActiveBinderIdState(target.id)` alongside that early ref assignment so render-time selectors and native callback handlers converge on the same binder during the activation batch.
+- Added the same synchronous ref alignment in `commitAndActivateBinder` immediately before hydration as a fallback boundary around repository persistence.
+- Removed the trailing duplicate active-ID assignments and the forced `setDirectoryHandles` map clone from workspace hydration, eliminating the redundant broadcast and its extra render work.
+
+### Verified
+
+- Linked two binders to separate native OPFS directories, repeatedly switched between them, and verified immediate AppBar status, sidebar Link/Sync/Disconnect, and active-tab glyph updates without cross-binder ID or handle leakage.
+- Verified denied permission and Disconnect purge only the initiating binder's token while preserving rendered custom assets and the unrelated binder's handle and pool.
+- Rechecked exact folder copy/classes, zero linked/unlinked layout shift, legacy migration, active-only reset isolation, and the 24 MiB upload-switch race with no page or console errors.
+- Rebuilt the production bundle and synchronized package, lockfile, and title-pill metadata at v4.22.8 without changing dependencies.
+
 ---
 
 ## Current architecture and engineering rationale
@@ -1626,7 +1642,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 ### React state versus synchronous interaction refs
 
 - React state drives rendering, while refs (`pagesRef`, `currentPageRef`, `directoryHandlesRef`, drag/edit/marquee refs, timer refs, and timeline reveal ref) are authoritative inside native events and timers.
-- `isFolderLinked` is a direct render-time Boolean of `currentDirectoryHandle` being a native directory; it has no setter, memo cache, or synchronization effect, and the header plus active tab consume it directly. The sidebar receives `currentDirectoryHandle` itself and renders its actions from that same handle. Workspace hydration republishes the current handle map with a fresh identity before activating the target binder so every handle-dependent consumer participates in that activation render.
+- `isFolderLinked` is a direct render-time Boolean of `currentDirectoryHandle` being a native directory; it has no setter, memo cache, or synchronization effect, and the header plus active tab consume it directly. The sidebar receives `currentDirectoryHandle` itself and renders its actions from that same handle. Workspace hydration aligns `activeBinderIdRef` and `activeBinderIdState` before all other target-state mutations; the active-ID render then selects the correct existing handle-map entry without cloning the map.
 - This state/ref split exists because multiple drag/drop, pointer, page-add, folder, or tab-switch events can occur before React commits a render. Reading a closed-over state array or handle map in those paths can place cards twice, insert against an old page count, clear the wrong drag payload, or briefly render another binder's folder state; `directoryHandlesRef` remains synchronized for native callbacks while React state owns rendering.
 - `applyCanvasChange` writes refs synchronously, then React state, then history. The order is intentional.
 - `selectedCardIds` is the shared source of truth for Cards and Michi; array order is placement order. Shift selection constructs contiguous source order, and Ctrl/Command preserves prior IDs.
@@ -1739,7 +1755,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - README's workspace/control description has not yet been brought in line with the latest rail menus.
 - Historical SemVer labels are not Git tags or GitHub Releases. Commit links remain the release evidence.
 - There is no MichiBinder account, collaboration, telemetry, backend, environment-secret layer, or online custom-asset synchronization. Browsers supporting `showDirectoryPicker` can retain one selected handle per binder locally in IndexedDB, but may require renewed read permission after restart; unsupported browsers fall back to choosing the directory for each refresh.
-- The v4.22.7 direct sidebar handle binding is complete; no active functional workspace task remains open.
+- The v4.22.8 synchronous active-binder state/ref alignment is complete; no active functional workspace task remains open.
 
 ## Incoming engineer hand-off brief
 
