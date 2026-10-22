@@ -472,23 +472,6 @@ function getSlots(page, dims) {
   return result;
 }
 
-function getPrintCells(page, dims) {
-  return getSlots(page, dims)
-    .flatMap((slot) => Array.from({ length: slot.rowSpan * slot.colSpan }, (_, index) => {
-      const currentRowOffset = Math.floor(index / slot.colSpan);
-      const currentColOffset = index % slot.colSpan;
-      return {
-        ...slot,
-        printKey: `${slot.key}-${currentRowOffset}-${currentColOffset}`,
-        printRow: slot.r + currentRowOffset,
-        printCol: slot.c + currentColOffset,
-        currentRowOffset,
-        currentColOffset,
-      };
-    }))
-    .sort((first, second) => (first.printRow * dims.cols + first.printCol) - (second.printRow * dims.cols + second.printCol));
-}
-
 function visibleAssignments(pages, dims) {
   return pages.flatMap((page, pageIndex) => getSlots(page, dims)
     .filter((slot) => page.slots[slot.key])
@@ -551,60 +534,78 @@ function compactCustomPrintPages(pages, dims, customIds) {
   const instances = pages.flatMap((page) =>
     getSlots(page, dims)
       .filter((slot) => page.slots[slot.key] && customIds.has(page.slots[slot.key]) && !page.hiddenSlotsFromPrint?.[slot.key])
-      .flatMap((slot) => {
-        const columns = Number(slot.colSpan) || 1;
-        const rows = Number(slot.rowSpan) || 1;
-        const totalSlices = rows * columns;
-
-        return Array.from({ length: totalSlices }, (_, sliceIndex) => ({
-          id: page.slots[slot.key],
-          colSpan: columns,
-          rowSpan: rows,
-          currentRowOffset: Math.floor(sliceIndex / columns),
-          currentColOffset: sliceIndex % columns,
-          crop: getCrop(page, slot.key, page.slots[slot.key]),
-        }));
-      })
+      .map((slot) => ({
+        id: page.slots[slot.key],
+        colSpan: Number(slot.colSpan) || 1,
+        rowSpan: Number(slot.rowSpan) || 1,
+        crop: getCrop(page, slot.key, page.slots[slot.key]),
+      }))
   );
 
   if (!instances.length) return [];
 
-  const packingRows = Math.min(dims.rows, 3);
-  const packingCols = Math.min(dims.cols, 3);
-  const pageCapacity = packingRows * packingCols;
-  const occupiedPageCount = Math.ceil(instances.length / pageCapacity);
-  const physicalPageCount = Math.ceil(occupiedPageCount / 2) * 2;
+  const packingRows = dims.rows;
+  const packingCols = dims.cols;
+  const compiledPages = [];
+  const occupancy = [];
+  const addCompiledPage = () => {
+    const pageIndex = compiledPages.length;
+    compiledPages.push({
+      id: `print-custom-page-${pageIndex + 1}`,
+      sheetId: `print-custom-sheet-${Math.floor(pageIndex / 2) + 1}`,
+      face: pageIndex % 2 === 0 ? 'front' : 'back',
+      merges: [],
+      slots: {},
+      crops: {},
+      metaData: {},
+    });
+    occupancy.push(Array.from({ length: packingRows }, () => Array(packingCols).fill(false)));
+  };
 
-  const compiledPages = Array.from({ length: physicalPageCount }, (_, pageIndex) => ({
-    id: `print-custom-page-${pageIndex + 1}`,
-    sheetId: `print-custom-sheet-${Math.floor(pageIndex / 2) + 1}`,
-    face: pageIndex % 2 === 0 ? 'front' : 'back',
-    merges: [],
-    slots: {},
-    crops: {},
-    metaData: {},
-  }));
-
-  let instanceIndex = 0;
-  compiledPages.forEach((page) => {
-    for (let row = 0; row < packingRows; row += 1) {
-      for (let col = 0; col < packingCols; col += 1) {
-        if (instanceIndex >= instances.length) break;
-        const key = keyOf(row, col);
-        const instance = instances[instanceIndex];
-
-        page.slots[key] = instance.id;
-        page.metaData[key] = {
-          colSpan: instance.colSpan,
-          rowSpan: instance.rowSpan,
-          currentColOffset: instance.currentColOffset,
-          currentRowOffset: instance.currentRowOffset,
-        };
-
-        if (instance.crop.x !== 50 || instance.crop.y !== 50) {
-          page.crops[key] = { img: instance.id, ...instance.crop };
+  const findOpenFrame = (rowSpan, colSpan) => {
+    for (let pageIndex = 0; pageIndex < compiledPages.length; pageIndex += 1) {
+      for (let row = 0; row <= packingRows - rowSpan; row += 1) {
+        for (let col = 0; col <= packingCols - colSpan; col += 1) {
+          let available = true;
+          for (let rowOffset = 0; rowOffset < rowSpan && available; rowOffset += 1) {
+            for (let colOffset = 0; colOffset < colSpan; colOffset += 1) {
+              if (occupancy[pageIndex][row + rowOffset][col + colOffset]) {
+                available = false;
+                break;
+              }
+            }
+          }
+          if (available) return { pageIndex, row, col };
         }
-        instanceIndex += 1;
+      }
+    }
+    return null;
+  };
+
+  addCompiledPage();
+  instances.forEach((instance) => {
+    const rowSpan = clamp(instance.rowSpan, 1, packingRows);
+    const colSpan = clamp(instance.colSpan, 1, packingCols);
+    let frame = findOpenFrame(rowSpan, colSpan);
+    if (!frame) {
+      addCompiledPage();
+      frame = findOpenFrame(rowSpan, colSpan);
+    }
+    if (!frame) return;
+
+    const page = compiledPages[frame.pageIndex];
+    const key = keyOf(frame.row, frame.col);
+    page.slots[key] = instance.id;
+    page.metaData[key] = { colSpan, rowSpan };
+    if (rowSpan * colSpan > 1) {
+      page.merges.push({ id: `print-custom-merge-${frame.pageIndex}-${key}`, r: frame.row, c: frame.col, rs: rowSpan, cs: colSpan });
+    }
+    if (instance.crop.x !== 50 || instance.crop.y !== 50) {
+      page.crops[key] = { img: instance.id, ...instance.crop };
+    }
+    for (let rowOffset = 0; rowOffset < rowSpan; rowOffset += 1) {
+      for (let colOffset = 0; colOffset < colSpan; colOffset += 1) {
+        occupancy[frame.pageIndex][frame.row + rowOffset][frame.col + colOffset] = true;
       }
     }
   });
@@ -1161,7 +1162,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.24.0</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.24.1</span>
         </div>
         <SaveStatus isFolderLinked={isFolderLinked} />
       </div>
@@ -4809,9 +4810,14 @@ export default function CardBinder() {
             data-page-print-toggle
             aria-pressed={isPagePrintHidden}
             onClick={() => togglePagePrintVisibility(page.id)}
-            className={`absolute bottom-full mb-1 left-2 z-50 h-5 px-2 rounded flex items-center gap-1.5 font-mono text-[9px] font-bold uppercase tracking-wider border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${isPagePrintHidden ? 'bg-amber-950 text-amber-400 border-amber-500/30' : 'bg-neutral-900/80 text-neutral-400 border-white/5 opacity-0 group-hover/canvas-container:opacity-100 group-focus-within/canvas-container:opacity-100 hover:text-white hover:bg-neutral-800'}`}
+            className={`absolute bottom-full mb-1 left-2 z-50 h-5 px-2 rounded flex items-center gap-1.5 font-mono text-[9px] font-bold uppercase tracking-wider border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 pointer-events-auto ${
+              isPagePrintHidden
+                ? 'bg-amber-950 text-amber-400 border-amber-500/30 opacity-100'
+                : 'bg-neutral-900/80 text-neutral-400 border-white/5 opacity-0 invisible group-hover/canvas-container:opacity-100 group-hover/canvas-container:visible hover:text-white hover:bg-neutral-800'
+            }`}
           >
-            {isPagePrintHidden ? 'Page Excluded' : 'Hide Page From Print'}
+            <Icon name={isPagePrintHidden ? 'eye' : 'eyeOff'} size={10} />
+            <span>{isPagePrintHidden ? 'Page Excluded' : 'Hide Page From Print'}</span>
           </button>
         )}
         {settings.view === 'binder' ? (
@@ -4970,56 +4976,65 @@ export default function CardBinder() {
   const printTree = (
     <div className="print-root" aria-hidden="true" style={{ '--paper-w': paper.w, '--paper-h': paper.h }}>
       <style>{`@page { size: ${paper.w} ${paper.h}; margin: 0; }`}</style>
-      {printPages.map((page) => (
-        <section key={page.id} className="print-page">
-          <div
-            data-print-sheet
-            className="grid grid-cols-3 gap-2 w-full aspect-[210/297] bg-white text-black p-4 overflow-hidden print:m-0"
-            style={{
-              gridTemplateColumns: 'repeat(3, 1fr)',
-              gridTemplateRows: 'repeat(3, 1fr)',
-            }}
-          >
-            {getPrintCells(page, { rows: 3, cols: 3 }).map((slot) => {
-              const id = page.slots[slot.key];
-              const cardImageURL = images[id] || pool.find((item) => item.id === id)?.src;
-              const customMeta = page.metaData?.[slot.key];
-              const colSpan = customMeta ? customMeta.colSpan : (slot.colSpan || 1);
-              const rowSpan = customMeta ? customMeta.rowSpan : (slot.rowSpan || 1);
-              const currentColOffset = customMeta ? customMeta.currentColOffset : (slot.currentColOffset || 0);
-              const currentRowOffset = customMeta ? customMeta.currentRowOffset : (slot.currentRowOffset || 0);
-              const bgX = colSpan > 1 ? (currentColOffset / (colSpan - 1)) * 100 : 0;
-              const bgY = rowSpan > 1 ? (currentRowOffset / (rowSpan - 1)) * 100 : 0;
+      {printPages.map((page) => {
+        const printSlots = getSlots(page, dims);
+        return (
+          <section key={page.id} className="print-page">
+            <div
+              data-print-sheet
+              className="sheet-grid w-full size-full bg-white text-black p-[0.3in] overflow-hidden print:m-0"
+              style={{
+                display: 'grid',
+                gridTemplateColumns: `repeat(${dims.cols}, 1fr)`,
+                gridTemplateRows: `repeat(${dims.rows}, 1fr)`,
+                gap: `${settings.gap}in`,
+                width: '100%',
+                height: '100%',
+              }}
+            >
+              {printSlots.map((slot) => {
+                const id = page.slots[slot.key];
+                const cardImageURL = images[id] || pool.find((item) => item.id === id)?.src;
+                const customMeta = page.metaData?.[slot.key];
+                const colSpan = customMeta ? customMeta.colSpan : (slot.cs || 1);
+                const rowSpan = customMeta ? customMeta.rowSpan : (slot.rs || 1);
+                const crop = id ? getCrop(page, slot.key, id) : { x: 50, y: 50 };
+                const focusPosition = `${crop.x}% ${crop.y}%`;
 
-              return (
-                <div
-                  key={slot.printKey}
-                  data-print-slot={`${slot.printRow}-${slot.printCol}`}
-                  data-print-source-slot={slot.key}
-                  className="w-full h-full relative overflow-hidden bg-neutral-100/50"
-                  style={{
-                    gridColumn: 'span 1',
-                    gridRow: 'span 1',
-                  }}
-                >
-                  {cardImageURL && (
-                    <div
-                      className="w-full h-full printable-card-slice"
-                      style={{
-                        backgroundImage: `url(${cardImageURL})`,
-                        backgroundSize: `${colSpan * 100}% ${rowSpan * 100}%`,
-                        backgroundPosition: `${bgX}% ${bgY}%`,
-                        backgroundRepeat: 'no-repeat',
-                      }}
-                    />
-                  )}
-                  {settings.cutGuides && <span aria-hidden="true" className="pointer-events-none absolute inset-0 z-10" style={{ outline: '0.2pt solid #9ca3af' }} />}
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      ))}
+                return (
+                  <div
+                    key={slot.key}
+                    data-print-slot={slot.key}
+                    data-print-source-slot={slot.key}
+                    className="relative overflow-hidden bg-neutral-100/50"
+                    style={{
+                      gridColumn: `${slot.c + 1} / span ${colSpan}`,
+                      gridRow: `${slot.r + 1} / span ${rowSpan}`,
+                      width: '100%',
+                      height: '100%',
+                    }}
+                  >
+                    {cardImageURL && (
+                      <div
+                        className="w-full h-full printable-card-slice"
+                        style={{
+                          backgroundImage: `url(${cardImageURL})`,
+                          backgroundSize: settings.fit === 'cover' ? 'cover' : 'contain',
+                          backgroundPosition: focusPosition,
+                          backgroundRepeat: 'no-repeat',
+                          width: '100%',
+                          height: '100%',
+                        }}
+                      />
+                    )}
+                    {settings.cutGuides && <span aria-hidden="true" className="pointer-events-none absolute inset-0 z-10" style={{ outline: '0.2pt solid #9ca3af' }} />}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        );
+      })}
     </div>
   );
 
