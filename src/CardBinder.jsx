@@ -10,6 +10,7 @@ import {
   Copy,
   Eraser,
   Eye,
+  EyeOff,
   File as FileIcon,
   FileSliders,
   FolderOpen,
@@ -289,6 +290,8 @@ const emptyPage = (sheetId = null, face = null) => ({
   merges: [],
   slots: {},
   crops: {},
+  hiddenFromPrint: false,
+  hiddenSlotsFromPrint: {},
   ...(sheetId && face ? { sheetId, face } : {}),
 });
 const emptySheet = () => {
@@ -363,6 +366,7 @@ const clonePages = (pages) => pages.map((page) => ({
   merges: (page.merges || []).map((merge) => ({ ...merge })),
   slots: { ...page.slots },
   crops: Object.fromEntries(Object.entries(page.crops || {}).map(([key, crop]) => [key, { ...crop }])),
+  hiddenSlotsFromPrint: { ...(page.hiddenSlotsFromPrint || {}) },
 }));
 const makeCanvasSnapshot = (pages, currentPage, layout) => ({ pages: clonePages(pages), currentPage, layout });
 const sameCanvasPages = (first, second) => JSON.stringify(first) === JSON.stringify(second);
@@ -546,7 +550,7 @@ const getCrop = (page, key, imageId) => {
 function compactCustomPrintPages(pages, dims, customIds) {
   const instances = pages.flatMap((page) =>
     getSlots(page, dims)
-      .filter((slot) => page.slots[slot.key] && customIds.has(page.slots[slot.key]))
+      .filter((slot) => page.slots[slot.key] && customIds.has(page.slots[slot.key]) && !page.hiddenSlotsFromPrint?.[slot.key])
       .flatMap((slot) => {
         const columns = Number(slot.colSpan) || 1;
         const rows = Number(slot.rowSpan) || 1;
@@ -646,12 +650,17 @@ function sanitizePage(value = {}) {
   Object.entries(value.crops || {}).forEach(([key, crop]) => {
     if (slots[key] && crop?.img === slots[key]) crops[key] = { img: crop.img, x: clamp(crop.x, 0, 100), y: clamp(crop.y, 0, 100) };
   });
+  const hiddenSlotsFromPrint = Object.fromEntries(Object.entries(value.hiddenSlotsFromPrint || {})
+    .filter(([key, hidden]) => anchors.has(key) && Boolean(hidden))
+    .map(([key]) => [key, true]));
   return {
     id: String(value.id || uid('page')),
     sectionName: typeof value.sectionName === 'string' ? value.sectionName.slice(0, 40) : '',
     merges,
     slots,
     crops,
+    hiddenFromPrint: Boolean(value.hiddenFromPrint),
+    hiddenSlotsFromPrint,
     ...(typeof value.sheetId === 'string' ? { sheetId: value.sheetId } : {}),
     ...(['front', 'back'].includes(value.face) ? { face: value.face } : {}),
   };
@@ -897,6 +906,7 @@ const ICONS = {
   copy: Copy,
   eraser: Eraser,
   eye: Eye,
+  eyeOff: EyeOff,
   file: FileIcon,
   fileSliders: FileSliders,
   grid: LayoutGrid,
@@ -1151,7 +1161,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.23.0</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.24.0</span>
         </div>
         <SaveStatus isFolderLinked={isFolderLinked} />
       </div>
@@ -1675,9 +1685,9 @@ function CardPool({
                       setTimeout(() => setDisconnectConfirm(false), 3000);
                     }
                   }}
-                  className={`w-full text-center text-[10px] font-bold tracking-widest uppercase font-sans py-1.5 rounded-md border transition-all duration-200 ${disconnectConfirm ? 'bg-red-950/40 text-red-400 border-red-500/40 animate-pulse' : 'bg-transparent text-red-500/70 border-transparent hover:text-red-400 hover:bg-red-500/10'}`}
+                  className={`w-full h-8 flex items-center justify-center rounded-md font-semibold text-xs border transition-all duration-200 uppercase tracking-normal ${disconnectConfirm ? 'bg-red-950 text-red-400 border-red-800 animate-pulse' : 'bg-transparent text-red-500/80 border-red-950/60 hover:text-red-400 hover:bg-red-500/10'}`}
                 >
-                  {disconnectConfirm ? 'Click again to confirm' : 'Disconnect Folder'}
+                  {disconnectConfirm ? 'Confirm Disconnect' : 'Disconnect Folder'}
                 </button>
               )}
             </div>
@@ -1912,21 +1922,31 @@ export default function CardBinder() {
   const [disconnectConfirm, setDisconnectConfirm] = useState(false);
   const [editingBinderId, setEditingBinderId] = useState(null);
   const [binderRenameDraft, setDraftBinderRename] = useState('');
+  const [draggedBinderId, setDraggedBinderId] = useState(null);
+  const binderDragTargetRef = useRef(null);
 
-  const shiftBinderTab = useCallback((binderId, direction) => {
+  const handleBinderTabDragStart = (event, binderId) => {
+    binderDragTargetRef.current = null;
+    setDraggedBinderId(binderId);
+    try { event.dataTransfer.setData('text/plain', binderId); } catch { /* The live drag state remains authoritative. */ }
+    event.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleBinderTabDragOver = (event, targetId) => {
+    event.preventDefault();
+    if (!draggedBinderId || draggedBinderId === targetId || binderDragTargetRef.current === targetId) return;
+    binderDragTargetRef.current = targetId;
     setBinders((currentBinders) => {
-      const index = currentBinders.findIndex((b) => b.id === binderId);
-      if (index === -1) return currentBinders;
-      const targetIndex = index + direction;
-      if (targetIndex < 0 || targetIndex >= currentBinders.length) return currentBinders;
+      const srcIndex = currentBinders.findIndex((b) => b.id === draggedBinderId);
+      const dstIndex = currentBinders.findIndex((b) => b.id === targetId);
+      if (srcIndex === -1 || dstIndex === -1) return currentBinders;
       const next = [...currentBinders];
-      const temp = next[index];
-      next[index] = next[targetIndex];
-      next[targetIndex] = temp;
+      const [movedTab] = next.splice(srcIndex, 1);
+      next.splice(dstIndex, 0, movedTab);
       persistBinderRepository(next, activeBinderIdState);
       return next;
     });
-  }, [activeBinderIdState]);
+  };
 
   const commitBinderRename = useCallback((binderId) => {
     const trimmed = binderRenameDraft.trim();
@@ -2205,10 +2225,21 @@ export default function CardBinder() {
     ? (currencyDisplay === 'SGD' ? `S$${(activeSpreadValueUSD * displayRate).toFixed(2)}` : `$${activeSpreadValueUSD.toFixed(2)}`)
     : null;
   const printPages = useMemo(() => {
-    if (printScope === 'custom') return compactCustomPrintPages(pages, dims, customUploadedIds);
-    return pages
+    // Whole-page print exclusions apply to both the complete and uploads-only compilers.
+    const filteredSheets = pages.filter((page) => !page.hiddenFromPrint);
+
+    if (printScope === 'custom') {
+      return compactCustomPrintPages(filteredSheets, dims, customUploadedIds);
+    }
+    return filteredSheets
       .map((page) => {
-        const slots = Object.fromEntries(Object.entries(page.slots).filter(([, id]) => allPoolIds.has(id)));
+        // Slot overrides are independent from page visibility and remain keyed to the source slot.
+        const slots = Object.fromEntries(
+          Object.entries(page.slots || {}).filter(([key, id]) => {
+            const isSlotHidden = page.hiddenSlotsFromPrint?.[key];
+            return allPoolIds.has(id) && !isSlotHidden;
+          })
+        );
         const crops = Object.fromEntries(Object.entries(page.crops || {}).filter(([key, crop]) => slots[key] === crop.img));
         return { ...page, slots, crops };
       })
@@ -3430,6 +3461,23 @@ export default function CardBinder() {
     return { pages: nextPages, changed: true };
   }, []);
 
+  const togglePagePrintVisibility = useCallback((pageId) => {
+    applyCanvasChange((allPages) => allPages.map((page) =>
+      page.id === pageId ? { ...page, hiddenFromPrint: !page.hiddenFromPrint } : page
+    ));
+    notify('Page print visibility updated.', 'success');
+  }, [applyCanvasChange, notify]);
+
+  const toggleSlotPrintVisibility = useCallback((pageId, slotKey) => {
+    applyCanvasChange((allPages) => allPages.map((page) => {
+      if (page.id !== pageId) return page;
+      const currentHidden = page.hiddenSlotsFromPrint || {};
+      const nextHidden = { ...currentHidden, [slotKey]: !currentHidden[slotKey] };
+      return { ...page, hiddenSlotsFromPrint: nextHidden };
+    }));
+    notify('Slot print visibility updated.', 'success');
+  }, [applyCanvasChange, notify]);
+
   const updateSectionName = useCallback((pageId, sectionName) => {
     applyCanvasChange((allPages) => allPages.map((page) => (
       page.id === pageId ? { ...page, sectionName } : page
@@ -4483,6 +4531,7 @@ export default function CardBinder() {
       : null;
     const labelVisible = (frameW * gridPpi) >= 72;
     const slotActionsAvailable = !combineMode && !dragInfo && !marqueeActive && !editing;
+    const isSlotPrintHidden = Boolean(page.hiddenSlotsFromPrint?.[slot.key]);
     const handleCardPointerMove = (event) => {
       if (isEditing) { movePan(event); return; }
       if (editing || combineMode || dragInfo || marqueeActive || event.buttons) return;
@@ -4514,6 +4563,21 @@ export default function CardBinder() {
     };
     const slotActions = slotActionsAvailable && (slot.mergeId || imgId) && (
       <div className="absolute right-1.5 top-1.5 z-40 flex gap-1 opacity-0 transition-opacity group-hover/slot:opacity-100 group-focus-within/slot:opacity-100">
+        {imgId && (
+          <button
+            type="button"
+            draggable={false}
+            data-slot-print-toggle
+            aria-label={isSlotPrintHidden ? 'Include card in print' : 'Exclude card from print'}
+            title={isSlotPrintHidden ? 'Include card in print' : 'Exclude card from print'}
+            onPointerDown={stopSlotAction}
+            onClick={(event) => activateSlotAction(event, () => toggleSlotPrintVisibility(page.id, slot.key))}
+            onDoubleClick={stopSlotAction}
+            className={`grid size-6 place-items-center rounded-md border backdrop-blur transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${isSlotPrintHidden ? 'bg-amber-950/90 text-amber-400 border-amber-500/40' : 'bg-black/70 text-zinc-400 border-white/10 hover:bg-amber-600 hover:text-white'}`}
+          >
+            <Icon name={isSlotPrintHidden ? 'eye' : 'eyeOff'} />
+          </button>
+        )}
         {slot.mergeId && (
           <button
             type="button"
@@ -4621,7 +4685,8 @@ export default function CardBinder() {
               const { naturalWidth: w, naturalHeight: h } = event.currentTarget;
               setImageDims((value) => value[imgId]?.w === w && value[imgId]?.h === h ? value : { ...value, [imgId]: { w, h } });
             }}
-            className="size-full"
+            data-print-hidden={isSlotPrintHidden ? '' : undefined}
+            className={`size-full transition-all duration-200 ${isSlotPrintHidden ? 'opacity-25 grayscale saturate-50 scale-[0.98]' : ''}`}
             style={{ objectFit: settings.fit, objectPosition: `${isEditing ? editing.x : crop.x}% ${isEditing ? editing.y : crop.y}%` }}
           /> : <span className="absolute inset-0 grid place-items-center bg-zinc-800 text-zinc-500"><Icon name="image" /></span>}
           </div>
@@ -4720,15 +4785,17 @@ export default function CardBinder() {
     if (!page) return null;
     const side = options.side || pageSide(pageIndex, pages.length);
     const showHelper = options.showHelper !== false;
+    const isPagePrintHidden = Boolean(page.hiddenFromPrint);
     return (
       <div
         key={options.renderKey || page.id}
         data-canvas={options.dataCanvas === false ? undefined : ''}
         data-page-index={pageIndex}
         data-page-side={side}
+        data-page-print-hidden={isPagePrintHidden ? '' : undefined}
         data-turn-face={options.turnFace}
         aria-hidden={options.ariaHidden}
-        className={`relative ${options.className || ''}`}
+        className={`relative group/canvas-container ${isPagePrintHidden ? 'brightness-[0.45] saturate-50' : ''} ${options.className || ''}`}
         style={{
           width: frameWidth,
           height: frameHeight,
@@ -4736,6 +4803,17 @@ export default function CardBinder() {
           ...(options.style || {}),
         }}
       >
+        {showHelper && (
+          <button
+            type="button"
+            data-page-print-toggle
+            aria-pressed={isPagePrintHidden}
+            onClick={() => togglePagePrintVisibility(page.id)}
+            className={`absolute bottom-full mb-1 left-2 z-50 h-5 px-2 rounded flex items-center gap-1.5 font-mono text-[9px] font-bold uppercase tracking-wider border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${isPagePrintHidden ? 'bg-amber-950 text-amber-400 border-amber-500/30' : 'bg-neutral-900/80 text-neutral-400 border-white/5 opacity-0 group-hover/canvas-container:opacity-100 group-focus-within/canvas-container:opacity-100 hover:text-white hover:bg-neutral-800'}`}
+          >
+            {isPagePrintHidden ? 'Page Excluded' : 'Hide Page From Print'}
+          </button>
+        )}
         {settings.view === 'binder' ? (
           <div
             className="sheet-frame relative flex size-full items-start justify-start overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-b from-neutral-800 to-neutral-800/90 shadow-[0_30px_70px_-15px_rgba(0,0,0,0.9),0_1px_0px_rgba(255,255,255,0.05)_inset]"
@@ -4965,29 +5043,47 @@ export default function CardBinder() {
           onToggleCurrency={() => setCurrencyDisplay((value) => value === 'SGD' ? 'USD' : 'SGD')}
           portfolioValueLabel={portfolioValueLabel}
         />
-        <nav data-binder-tab-strip aria-label="Binder workspaces" className="no-print relative z-40 flex h-10 shrink-0 items-center border-b border-white/[0.06] bg-neutral-950 px-4 select-none overflow-x-auto overflow-y-hidden scrollbar-none">
+        <nav data-binder-tab-strip aria-label="Binder workspaces" className="no-print relative z-40 flex h-11 shrink-0 items-center border-b border-white/[0.06] bg-neutral-950 px-4 select-none overflow-x-auto overflow-y-hidden scrollbar-none">
           <div className="flex items-center gap-2 min-w-max h-full py-1">
             {binders.map((binder) => {
               const isActive = binder.id === activeBinderId;
               return (
                 <div
                   key={binder.id}
-                  className={`group relative flex h-full items-center gap-1.5 rounded-t-lg border border-b-0 px-3 transition-all duration-150 ${isActive ? 'border-white/[0.08] bg-neutral-900 text-neutral-100' : 'border-transparent bg-transparent text-neutral-500 hover:bg-neutral-900/40 hover:text-neutral-300'}`}
+                  data-binder-tab={binder.id}
+                  data-dragging={draggedBinderId === binder.id ? '' : undefined}
+                  draggable={editingBinderId !== binder.id}
+                  onDragStart={(event) => handleBinderTabDragStart(event, binder.id)}
+                  onDragOver={(event) => handleBinderTabDragOver(event, binder.id)}
+                  onDragEnd={() => { binderDragTargetRef.current = null; setDraggedBinderId(null); }}
+                  className={`group relative flex h-full items-center gap-2 rounded-t-lg border border-b-0 px-4 transition-all duration-150 cursor-grab active:cursor-grabbing ${draggedBinderId === binder.id ? 'opacity-60' : ''} ${isActive ? 'border-white/[0.08] bg-neutral-900 text-neutral-100' : 'border-transparent bg-transparent text-neutral-500 hover:border-white/[0.04] hover:bg-neutral-900/40 hover:text-neutral-300'}`}
                 >
-                  <div className="flex items-center opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150 gap-0.5 mr-1 shrink-0">
-                    <button type="button" title="Shift tab left" onClick={(e) => { e.stopPropagation(); shiftBinderTab(binder.id, -1); }} className="size-5 rounded bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center text-neutral-400 hover:text-white transition-colors"><ChevronLeft size={11} /></button>
-                    <button type="button" title="Shift tab right" onClick={(e) => { e.stopPropagation(); shiftBinderTab(binder.id, 1); }} className="size-5 rounded bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center text-neutral-400 hover:text-white transition-colors"><ChevronRight size={11} /></button>
-                  </div>
-
                   <div
-                    className="flex flex-col justify-center min-w-[120px] max-w-[180px] cursor-pointer"
+                    className="flex flex-col justify-center min-w-[120px] max-w-[180px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-red-500"
                     role={editingBinderId === binder.id ? undefined : 'button'}
                     tabIndex={editingBinderId === binder.id ? -1 : 0}
                     aria-current={isActive ? 'page' : undefined}
                     aria-label={`Open ${binder.name} workspace`}
+                    aria-keyshortcuts="Alt+ArrowLeft Alt+ArrowRight F2"
                     onClick={() => !isActive && setActiveBinderId(binder.id)}
                     onKeyDown={(event) => {
                       if (editingBinderId === binder.id) return;
+                      if (event.altKey && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        const direction = event.key === 'ArrowLeft' ? -1 : 1;
+                        setBinders((currentBinders) => {
+                          const sourceIndex = currentBinders.findIndex((item) => item.id === binder.id);
+                          const targetIndex = sourceIndex + direction;
+                          if (sourceIndex === -1 || targetIndex < 0 || targetIndex >= currentBinders.length) return currentBinders;
+                          const next = [...currentBinders];
+                          const [movedTab] = next.splice(sourceIndex, 1);
+                          next.splice(targetIndex, 0, movedTab);
+                          persistBinderRepository(next, activeBinderIdState);
+                          return next;
+                        });
+                        return;
+                      }
                       if (event.key === 'Enter' || event.key === ' ') {
                         event.preventDefault();
                         if (!isActive) setActiveBinderId(binder.id);
@@ -5006,25 +5102,23 @@ export default function CardBinder() {
                         autoFocus
                         maxLength={40}
                         aria-label={`Rename ${binder.name} workspace`}
-                        onChange={(e) => setDraftBinderRename(e.target.value)}
+                        onChange={(event) => setDraftBinderRename(event.target.value)}
                         onBlur={() => commitBinderRename(binder.id)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') commitBinderRename(binder.id); if (e.key === 'Escape') setEditingBinderId(null); }}
+                        onKeyDown={(event) => { if (event.key === 'Enter') commitBinderRename(binder.id); if (event.key === 'Escape') setEditingBinderId(null); }}
                         className="h-6 w-full bg-neutral-950 border border-red-500/40 rounded px-1.5 text-xs text-white font-semibold outline-none focus:ring-1 focus:ring-red-500/50"
-                        onClick={(e) => e.stopPropagation()}
+                        onClick={(event) => event.stopPropagation()}
                       />
                     ) : (
                       <span
-                        onDoubleClick={(e) => { e.stopPropagation(); setEditingBinderId(binder.id); setDraftBinderRename(binder.name); }}
-                        className="block truncate text-[11px] font-semibold tracking-tight leading-tight select-text"
+                        onDoubleClick={(event) => { event.stopPropagation(); setEditingBinderId(binder.id); setDraftBinderRename(binder.name); }}
+                        className="block truncate text-xs font-semibold tracking-tight leading-normal"
                         title="Double-click to rename workspace"
                       >
                         {binder.name}
                       </span>
                     )}
-                    <span className="block font-mono text-[8px] font-bold uppercase tracking-widest text-neutral-600 group-hover:text-neutral-500 mt-0.5 leading-none">{getLayout(binder.settings.layout).id}</span>
                   </div>
-
-                  {isActive && isFolderLinked && <FolderOpen aria-hidden="true" size={12} className="shrink-0 text-zinc-400 ml-1" />}
+                  {isActive && isFolderLinked && <FolderOpen aria-hidden="true" size={12} className="shrink-0 text-zinc-400" />}
                   {isActive && <span aria-hidden="true" className="absolute inset-x-0 -bottom-[1px] h-[2px] bg-red-500" />}
                 </div>
               );
@@ -5034,13 +5128,13 @@ export default function CardBinder() {
               onClick={openNewBinderModal}
               aria-label="Create a new binder"
               title="Create a new binder"
-              className="mb-1 grid size-7 shrink-0 place-items-center rounded-md border border-dashed border-white/[0.09] text-neutral-500 transition-all hover:border-red-500/40 hover:bg-red-950/30 hover:text-red-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+              className="grid size-7 shrink-0 place-items-center rounded-md border border-dashed border-white/[0.09] text-neutral-500 transition-all hover:border-red-500/40 hover:bg-red-950/30 hover:text-red-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
             >
               <Plus size={13} strokeWidth={2} />
             </button>
           </div>
         </nav>
-        <div data-main-layout className="flex h-[calc(100vh-88px)] w-full overflow-hidden bg-neutral-950">
+        <div data-main-layout className="flex h-[calc(100vh-92px)] w-full overflow-hidden bg-neutral-950">
           <CardPool
             isOpen={isLeftSidebarOpen}
             customUploadedCards={customUploadedCards}
