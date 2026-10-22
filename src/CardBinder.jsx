@@ -1151,7 +1151,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.22.8</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.22.9</span>
         </div>
         <SaveStatus isFolderLinked={isFolderLinked} />
       </div>
@@ -1936,8 +1936,8 @@ export default function CardBinder() {
   const [saveStatus, setSaveStatus] = useState('saved');
   const [storageMode, setStorageMode] = useState('indexeddb');
   const [directoryHandles, setDirectoryHandles] = useState({});
-  const currentDirectoryHandle = directoryHandles[activeBinderId] || null;
-  const isFolderLinked = Boolean(currentDirectoryHandle && currentDirectoryHandle.kind === 'directory');
+  const currentDirectoryHandle = directoryHandles[activeBinderIdState] || null;
+  const isFolderLinked = Boolean(directoryHandles && directoryHandles[activeBinderIdState]);
   const [hydrated, setHydrated] = useState(false);
   const [toasts, setToasts] = useState([]);
   const [openPanel, setOpenPanel] = useState(null);
@@ -3114,7 +3114,7 @@ export default function CardBinder() {
   }, [currentDirectoryHandle, ensureDirectoryReadPermission, collectDirectoryHandleFiles, syncPoolFromLocalDirectory, updateBinderDirectoryMetadata, notify]);
 
   const handleDirectoryConnect = useCallback(async () => {
-    const targetBinderId = activeBinderIdRef.current;
+    const targetBinderId = activeBinderIdState;
     if (typeof window.showDirectoryPicker !== 'function') {
       document.getElementById('hub-directory-picker')?.click();
       return [];
@@ -3124,11 +3124,10 @@ export default function CardBinder() {
       const permitted = await ensureDirectoryReadPermission(handle);
       if (!permitted) throw new Error('Directory read permission was not granted.');
       await idbPutDirectoryHandle(targetBinderId, handle);
-      setDirectoryHandles((value) => {
-        const next = { ...value, [targetBinderId]: handle };
-        directoryHandlesRef.current = next;
-        return next;
-      });
+      setDirectoryHandles((value) => ({
+        ...value,
+        [targetBinderId]: handle,
+      }));
       setBinders((prevBinders) => prevBinders.map((b) =>
         b.id === targetBinderId
           ? { ...b, directoryHandleKey: binderDirectoryHandleKey(targetBinderId), directoryName: String(handle?.name || '') }
@@ -3136,7 +3135,7 @@ export default function CardBinder() {
       ));
       updateBinderDirectoryMetadata(targetBinderId, handle);
       const files = await collectDirectoryHandleFiles(handle);
-      if (activeBinderIdRef.current !== targetBinderId) {
+      if (activeBinderIdState !== targetBinderId) {
         notify('Folder connected. Sync again to import it into the active binder.', 'info');
         return [];
       }
@@ -3147,18 +3146,17 @@ export default function CardBinder() {
       notify('Could not link the selected folder.', 'error');
       return [];
     }
-  }, [ensureDirectoryReadPermission, collectDirectoryHandleFiles, syncPoolFromLocalDirectory, updateBinderDirectoryMetadata, notify]);
+  }, [activeBinderIdState, ensureDirectoryReadPermission, collectDirectoryHandleFiles, syncPoolFromLocalDirectory, updateBinderDirectoryMetadata, notify]);
 
   const handleFolderAction = useCallback(() => (
     currentDirectoryHandle ? handleDirectorySync() : handleDirectoryConnect()
   ), [currentDirectoryHandle, handleDirectorySync, handleDirectoryConnect]);
 
   const handleDisconnectFolder = useCallback(async () => {
-    const targetBinderId = activeBinderIdRef.current;
+    const targetBinderId = activeBinderIdState;
     setDirectoryHandles((value) => {
       const next = { ...value };
       delete next[targetBinderId];
-      directoryHandlesRef.current = next;
       return next;
     });
     setBinders((prevBinders) => prevBinders.map((b) =>
@@ -3177,7 +3175,7 @@ export default function CardBinder() {
       console.error('Directory handle unlink failed:', error);
       notify('Folder disconnected locally, but its cached permission token could not be removed.', 'error');
     }
-  }, [updateBinderDirectoryMetadata, notify]);
+  }, [activeBinderIdState, updateBinderDirectoryMetadata, notify]);
 
   const importFetchedCard = useCallback(async (item, highResImageUrl, options = {}) => {
     const targetBinderId = activeBinderIdRef.current;
