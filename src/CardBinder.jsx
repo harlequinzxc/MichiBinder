@@ -1151,7 +1151,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.22.9</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.22.10</span>
         </div>
         <SaveStatus isFolderLinked={isFolderLinked} />
       </div>
@@ -1513,7 +1513,7 @@ function CardPool({
   images,
   inputRef,
   uploadAndRegisterFiles,
-  syncPoolFromLocalDirectory,
+  handleDirectoryPickerFiles,
   currentDirectoryHandle,
   handleFolderAction,
   handleDisconnectFolder,
@@ -1653,7 +1653,7 @@ function CardPool({
 
           <div className="mt-3 flex flex-col gap-2 rounded-lg border border-white/[0.04] bg-neutral-950 p-2.5 shadow-inner">
             <div className="flex items-center justify-between"><div className="flex flex-col"><span className="text-xs font-semibold text-neutral-200">Cloud-Free Storage</span><span className="text-[9px] font-bold tracking-widest text-neutral-500 uppercase">CUSTOM CARD ART FOLDER</span></div></div>
-            <input type="file" webkitdirectory="" directory="" multiple className="hidden" id="hub-directory-picker" onChange={(e) => { const files = Array.from(e.target.files || []); if(files.length) { syncPoolFromLocalDirectory(files); } e.target.value = ''; }} />
+            <input type="file" webkitdirectory="" directory="" multiple className="hidden" id="hub-directory-picker" onChange={(event) => { const files = Array.from(event.target.files || []); event.target.value = ''; if (files.length) handleDirectoryPickerFiles(files); }} />
             <div className="flex flex-col gap-1.5 w-full" data-folder-link-actions>
               <button type="button" onClick={handleFolderAction} className="w-full h-8 flex items-center justify-center rounded-md bg-neutral-800 text-zinc-200 border border-white/[0.04] font-semibold text-xs transition-all hover:bg-neutral-700 active:scale-[0.98]">{Boolean(currentDirectoryHandle) ? 'Sync' : 'Link Folder'}</button>
               {Boolean(currentDirectoryHandle) ? (
@@ -3057,6 +3057,17 @@ export default function CardBinder() {
     }
   }, [pool, addFiles, notify]);
 
+  const handleDirectoryPickerFiles = useCallback(async (fileListObjects) => {
+    const files = Array.from(fileListObjects || []).filter(Boolean);
+    if (!files.length) return [];
+    const relativePath = String(files[0]?.webkitRelativePath || '');
+    const directoryName = relativePath.split('/').filter(Boolean)[0] || 'Selected Folder';
+    const targetBinderId = activeBinderIdState;
+    const fallbackHandle = { kind: 'directory', name: directoryName, requiresDirectoryPicker: true };
+    setDirectoryHandles((value) => ({ ...value, [targetBinderId]: fallbackHandle }));
+    return await syncPoolFromLocalDirectory(files);
+  }, [activeBinderIdState, syncPoolFromLocalDirectory]);
+
   const collectDirectoryHandleFiles = useCallback(async (rootHandle) => {
     const files = [];
     const traverse = async (directory) => {
@@ -3084,6 +3095,14 @@ export default function CardBinder() {
     const targetHandle = currentDirectoryHandle;
     if (!targetHandle) {
       notify('Choose a local card art folder before syncing.', 'warn');
+      return [];
+    }
+    if (targetHandle.requiresDirectoryPicker) {
+      const picker = document.getElementById('hub-directory-picker');
+      if (picker) {
+        picker.value = '';
+        picker.click();
+      }
       return [];
     }
     try {
@@ -4937,7 +4956,7 @@ export default function CardBinder() {
             images={images}
             inputRef={inputRef}
             uploadAndRegisterFiles={uploadAndRegisterFiles}
-            syncPoolFromLocalDirectory={syncPoolFromLocalDirectory}
+            handleDirectoryPickerFiles={handleDirectoryPickerFiles}
             currentDirectoryHandle={currentDirectoryHandle}
             handleFolderAction={handleFolderAction}
             handleDisconnectFolder={handleDisconnectFolder}
