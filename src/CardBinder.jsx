@@ -1188,7 +1188,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.26.1</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.26.2</span>
         </div>
         <SaveStatus isFolderLinked={isFolderLinked} />
       </div>
@@ -1455,8 +1455,8 @@ function FloatingNavigation({
               type="button"
               onClick={() => setHideAllCatalogCards((previous) => !previous)}
               aria-pressed={hideAllCatalogCards}
-              aria-label={hideAllCatalogCards ? 'Show placed cards in catalog' : 'Hide placed cards from catalog'}
-              title={hideAllCatalogCards ? 'Show placed cards in catalog' : 'Hide placed cards from catalog'}
+              aria-label={hideAllCatalogCards ? 'Unhide all binder cards' : 'Hide all binder cards'}
+              title={hideAllCatalogCards ? 'Unhide all binder cards' : 'Hide all binder cards'}
               className={`${neutralIconButton} !w-8 !h-8 relative ml-0.5 rounded-lg border border-white/[0.03] transition-colors ${hideAllCatalogCards ? '!bg-amber-950/70 !text-amber-400 !border-amber-500/20' : ''}`}
             >
               <Icon name={hideAllCatalogCards ? 'eye' : 'eyeOff'} size={15} />
@@ -1586,7 +1586,6 @@ function CardPool({
   searchQuery,
   setSearchQuery,
   fetchedCards,
-  hideAllCatalogCards,
   isLoading,
   setsList,
   selectedSet,
@@ -1854,9 +1853,7 @@ function CardPool({
                   className="scroll-area grid grid-cols-2 gap-3 p-2 overflow-y-auto max-h-[calc(100vh-220px)] scrollbar-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden group rounded-md border border-white/[0.04]"
                 >
                   {isLoading && !fetchedCards.length && Array.from({ length: 6 }, (_, index) => <span key={index} aria-hidden="true" className="aspect-[245/337] animate-pulse rounded-lg border border-white/[0.04] bg-neutral-900" />)}
-                  {fetchedCards
-                    .filter((item) => !hideAllCatalogCards || !placedTcgdexIds.has(item.id))
-                    .map((item, index) => {
+                  {fetchedCards.map((item, index) => {
                     const fullImageUrl = item.image ? `${item.image}/low.jpg` : '/placeholder.png';
                     const highResImageUrl = item.image ? `${item.image}/high.jpg` : '/placeholder.png';
                     const selectionIndex = selectedCardIds.indexOf(item.id);
@@ -4629,6 +4626,7 @@ export default function CardBinder() {
     const source = images[imgId] || pool.find((item) => item.id === imgId)?.src;
     const crop = imgId ? getCrop(page, slot.key, imgId) : { x: 50, y: 50, z: IMAGE_ZOOM_MIN };
     const isEditing = editing?.pageId === page.id && editing.key === slot.key && editing.imgId === imgId;
+    const shouldHideCardFromBed = Boolean(hideAllCatalogCards && imgId);
     const pageMerges = activeMerges(page, dims);
     const radius = Math.max(settings.view === 'binder' ? 3 : 1, gridPpi * (settings.view === 'binder' ? 0.09 : 0.04));
     const frameW = spanW(slot.cs, settings.gap, card);
@@ -4784,7 +4782,7 @@ export default function CardBinder() {
             transform: `perspective(600px) rotateX(${editing ? '0deg' : 'var(--rx, 0deg)'}) rotateY(${editing ? '0deg' : 'var(--ry, 0deg)'}) scale3d(0.98, 0.98, 0.98)`,
           }}
         >
-          {isEditing && editing.geometry && (
+          {isEditing && editing.geometry && !shouldHideCardFromBed && (
             <img
               src={source}
               alt=""
@@ -4794,7 +4792,7 @@ export default function CardBinder() {
             />
           )}
         <div className={`relative size-full overflow-hidden border bg-white transition-all duration-150 after:absolute after:inset-0 after:pointer-events-none after:bg-[radial-gradient(circle_at_var(--mx,50%)_var(--my,50%),rgba(255,255,255,0.14)_0%,transparent_60%)] after:opacity-0 hover:after:opacity-100 after:transition-opacity after:duration-300 ${settings.view === 'binder' ? 'sleeve-sheen rounded-md border-white/[0.06] bg-neutral-900/50 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),inset_0_-8px_18px_rgba(0,0,0,0.22),0_8px_22px_rgba(0,0,0,0.24)] hover:border-white/[0.12] hover:bg-neutral-900/80 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.09),0_14px_30px_rgba(0,0,0,0.42)]' : 'border-transparent'} ${isEditing ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-zinc-900' : ''}`} style={{ borderRadius: radius }}>
-          {source ? <img
+          {source && !shouldHideCardFromBed ? <img
             data-img-id={imgId}
             src={source}
             alt=""
@@ -4806,7 +4804,9 @@ export default function CardBinder() {
             data-image-zoom={round1(activeCrop.z)}
             className={`pointer-events-none absolute max-w-none transition-all duration-200 ${isSlotPrintHidden ? 'opacity-25 grayscale saturate-50' : ''}`}
             style={renderedImageStyle}
-          /> : <span className="absolute inset-0 grid place-items-center bg-zinc-800 text-zinc-500"><Icon name="image" /></span>}
+          /> : source && shouldHideCardFromBed ? (
+            <span data-card-bed-hidden className="absolute inset-0 grid place-items-center bg-neutral-950/40 text-neutral-700/60 font-mono text-[9px] uppercase tracking-wider select-none">Hidden</span>
+          ) : <span className="absolute inset-0 grid place-items-center bg-zinc-800 text-zinc-500"><Icon name="image" /></span>}
           </div>
         </div>
         {slotActions}
@@ -4884,9 +4884,10 @@ export default function CardBinder() {
               const thumbnailImageStyle = thumbnailGeometry
                 ? positionedImageStyle(thumbnailGeometry, thumbnailFrame, crop)
                 : { width: '100%', height: '100%', left: 0, top: 0, objectFit: settings.fit, objectPosition: `${crop.x}% ${crop.y}%` };
+              const shouldHideCardFromThumb = Boolean(hideAllCatalogCards && id);
               return (
                 <div className="relative size-full overflow-hidden border border-zinc-800 bg-zinc-900">
-                  {src && (
+                  {src && !shouldHideCardFromThumb ? (
                     <img
                       src={src}
                       alt=""
@@ -4898,7 +4899,9 @@ export default function CardBinder() {
                         setImageDims((value) => value[id]?.w === w && value[id]?.h === h ? value : { ...value, [id]: { w, h } });
                       }}
                     />
-                  )}
+                  ) : src && shouldHideCardFromThumb ? (
+                    <span data-thumbnail-card-hidden className="absolute inset-0 bg-neutral-950/60" />
+                  ) : null}
                 </div>
               );
             }} />
@@ -5353,7 +5356,6 @@ export default function CardBinder() {
             searchQuery={searchQuery}
             setSearchQuery={updateSearchQuery}
             fetchedCards={fetchedCards}
-            hideAllCatalogCards={hideAllCatalogCards}
             isLoading={isLoading}
             setsList={setsList}
             selectedSet={selectedSet}
