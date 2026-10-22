@@ -1151,7 +1151,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.22.2</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.22.3</span>
         </div>
         <SaveStatus isFolderLinked={isFolderLinked} />
       </div>
@@ -1936,10 +1936,10 @@ export default function CardBinder() {
   const [saveStatus, setSaveStatus] = useState('saved');
   const [storageMode, setStorageMode] = useState('indexeddb');
   const [directoryHandles, setDirectoryHandles] = useState({});
+  const [isFolderLinked, setIsFolderLinked] = useState(false);
   const currentDirectoryHandle = directoryHandles[activeBinderId] || null;
   const activeBinderRecord = binders.find((binder) => binder.id === activeBinderId) || null;
   const activeBinder = activeBinderRecord ? { ...activeBinderRecord, directoryHandle: currentDirectoryHandle } : null;
-  const isFolderLinked = Boolean(activeBinder?.directoryHandle || currentDirectoryHandle);
   const [hydrated, setHydrated] = useState(false);
   const [toasts, setToasts] = useState([]);
   const [openPanel, setOpenPanel] = useState(null);
@@ -1998,6 +1998,7 @@ export default function CardBinder() {
   const persistedRef = useRef(false);
   const bindersRef = useRef(binders);
   const activeBinderIdRef = useRef(activeBinderId);
+  const directoryHandlesRef = useRef(directoryHandles);
   const workspaceStateRef = useRef(null);
   const pagesRef = useRef(pages);
   const currentPageRef = useRef(currentPage);
@@ -2007,7 +2008,17 @@ export default function CardBinder() {
   const futureRef = useRef([]);
   bindersRef.current = binders;
   activeBinderIdRef.current = activeBinderId;
+  directoryHandlesRef.current = directoryHandles;
   workspaceStateRef.current = { selectedSet, currentPage, settings, pool, pages, cardPrices };
+
+  useEffect(() => {
+    const storedHandleKey = activeBinder?.directoryHandleKey;
+    const hasActiveHandle = Boolean(
+      storedHandleKey === binderDirectoryHandleKey(activeBinderId)
+      && currentDirectoryHandle?.kind === 'directory'
+    );
+    setIsFolderLinked(hasActiveHandle);
+  }, [activeBinderId, activeBinder?.directoryHandleKey, currentDirectoryHandle]);
 
   useEffect(() => {
     let live = true;
@@ -2054,7 +2065,9 @@ export default function CardBinder() {
         }
         if (!live) return;
 
+        directoryHandlesRef.current = hydratedHandles;
         setDirectoryHandles(hydratedHandles);
+        setIsFolderLinked(Boolean(hydratedHandles[activeBinderIdRef.current]));
         const nextBinders = bindersRef.current.map((binder) => {
           const handle = hydratedHandles[binder.id];
           const directoryHandleKey = handle ? binderDirectoryHandleKey(binder.id) : '';
@@ -2287,6 +2300,11 @@ export default function CardBinder() {
     historyRestoreTimerRef.current = [];
     pastRef.current = [];
     futureRef.current = [];
+    const targetHandle = directoryHandlesRef.current[target.id];
+    setIsFolderLinked(Boolean(
+      target.directoryHandleKey === binderDirectoryHandleKey(target.id)
+      && targetHandle?.kind === 'directory'
+    ));
     setActiveBinderIdState(target.id);
     activeBinderIdRef.current = target.id;
   }, [setPages]);
@@ -3089,8 +3107,10 @@ export default function CardBinder() {
         setDirectoryHandles((value) => {
           const next = { ...value };
           delete next[targetBinderId];
+          directoryHandlesRef.current = next;
           return next;
         });
+        if (activeBinderIdRef.current === targetBinderId) setIsFolderLinked(false);
         updateBinderDirectoryMetadata(targetBinderId, null);
         await idbDeleteDirectoryHandle(targetBinderId).catch(() => {});
         notify('Folder access expired. Link the folder again to continue.', 'error');
@@ -3120,7 +3140,12 @@ export default function CardBinder() {
       const permitted = await ensureDirectoryReadPermission(handle);
       if (!permitted) throw new Error('Directory read permission was not granted.');
       await idbPutDirectoryHandle(targetBinderId, handle);
-      setDirectoryHandles((value) => ({ ...value, [targetBinderId]: handle }));
+      setDirectoryHandles((value) => {
+        const next = { ...value, [targetBinderId]: handle };
+        directoryHandlesRef.current = next;
+        return next;
+      });
+      if (activeBinderIdRef.current === targetBinderId) setIsFolderLinked(true);
       updateBinderDirectoryMetadata(targetBinderId, handle);
       const files = await collectDirectoryHandleFiles(handle);
       if (activeBinderIdRef.current !== targetBinderId) {
@@ -3145,8 +3170,10 @@ export default function CardBinder() {
     setDirectoryHandles((value) => {
       const next = { ...value };
       delete next[targetBinderId];
+      directoryHandlesRef.current = next;
       return next;
     });
+    setIsFolderLinked(false);
     updateBinderDirectoryMetadata(targetBinderId, null);
     setSaveStatus('saved');
     const picker = document.getElementById('hub-directory-picker');
