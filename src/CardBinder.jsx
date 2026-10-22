@@ -1188,7 +1188,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.26.2</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.26.3</span>
         </div>
         <SaveStatus isFolderLinked={isFolderLinked} />
       </div>
@@ -1420,7 +1420,8 @@ function FloatingNavigation({
   onUndo,
   onRedo,
   hideAllCatalogCards,
-  setHideAllCatalogCards,
+  hasPlacedCatalogCards,
+  onToggleCatalogPrintVisibility,
   combineMode,
   onToggleCombine,
   canMerge,
@@ -1453,10 +1454,12 @@ function FloatingNavigation({
             <button type="button" onClick={onRedo} disabled={!canRedo} aria-label="Redo" title="Redo" className={neutralIconButton}><Icon name="redo" /></button>
             <button
               type="button"
-              onClick={() => setHideAllCatalogCards((previous) => !previous)}
+              data-catalog-print-toggle
+              onClick={onToggleCatalogPrintVisibility}
+              disabled={!hasPlacedCatalogCards}
               aria-pressed={hideAllCatalogCards}
-              aria-label={hideAllCatalogCards ? 'Unhide all binder cards' : 'Hide all binder cards'}
-              title={hideAllCatalogCards ? 'Unhide all binder cards' : 'Hide all binder cards'}
+              aria-label={hideAllCatalogCards ? 'Include all catalog cards in print' : 'Exclude all catalog cards from print'}
+              title={hasPlacedCatalogCards ? (hideAllCatalogCards ? 'Include all catalog cards in print' : 'Exclude all catalog cards from print') : 'No catalog cards are placed'}
               className={`${neutralIconButton} !w-8 !h-8 relative ml-0.5 rounded-lg border border-white/[0.03] transition-colors ${hideAllCatalogCards ? '!bg-amber-950/70 !text-amber-400 !border-amber-500/20' : ''}`}
             >
               <Icon name={hideAllCatalogCards ? 'eye' : 'eyeOff'} size={15} />
@@ -1985,7 +1988,6 @@ export default function CardBinder() {
   const [editingBinderId, setEditingBinderId] = useState(null);
   const [binderRenameDraft, setDraftBinderRename] = useState('');
   const [draggedBinderId, setDraggedBinderId] = useState(null);
-  const [hideAllCatalogCards, setHideAllCatalogCards] = useState(false);
   const binderDragTargetRef = useRef(null);
 
   const handleBinderTabDragStart = (event, binderId) => {
@@ -2254,6 +2256,11 @@ export default function CardBinder() {
   const customUploadedIds = useMemo(() => new Set(customUploadedCards.map((item) => item.id)), [customUploadedCards]);
   const allPoolIds = useMemo(() => new Set(pool.map((item) => item.id)), [pool]);
   const tcgdexAssetIds = useMemo(() => new Set(pool.filter((item) => item.source === 'tcgdex').map((item) => item.id)), [pool]);
+  const catalogPrintTargets = useMemo(() => pages.flatMap((page) => Object.entries(page.slots || {})
+    .filter(([, assetId]) => tcgdexAssetIds.has(assetId))
+    .map(([key]) => ({ pageId: page.id, key, hidden: Boolean(page.hiddenSlotsFromPrint?.[key]) }))), [pages, tcgdexAssetIds]);
+  const hasPlacedCatalogCards = catalogPrintTargets.length > 0;
+  const hideAllCatalogCards = hasPlacedCatalogCards && catalogPrintTargets.every((target) => target.hidden);
   const totalPlacedCardsCount = useMemo(() => pages.reduce((total, page) => (
     total + Object.values(page.slots || {}).filter((assetId) => tcgdexAssetIds.has(assetId) || customUploadedIds.has(assetId)).length
   ), 0), [pages, tcgdexAssetIds, customUploadedIds]);
@@ -3541,6 +3548,29 @@ export default function CardBinder() {
     notify('Slot print visibility updated.', 'success');
   }, [applyCanvasChange, notify]);
 
+  const toggleCatalogPrintVisibility = useCallback(() => {
+    if (!catalogPrintTargets.length) return;
+    const shouldHide = !hideAllCatalogCards;
+    const result = applyCanvasChange((allPages) => allPages.map((page) => {
+      let changed = false;
+      const nextHidden = { ...(page.hiddenSlotsFromPrint || {}) };
+      Object.entries(page.slots || {}).forEach(([key, assetId]) => {
+        if (!tcgdexAssetIds.has(assetId)) return;
+        if (shouldHide) {
+          if (nextHidden[key] !== true) changed = true;
+          nextHidden[key] = true;
+        } else if (Object.prototype.hasOwnProperty.call(nextHidden, key)) {
+          delete nextHidden[key];
+          changed = true;
+        }
+      });
+      return changed ? { ...page, hiddenSlotsFromPrint: nextHidden } : page;
+    }));
+    if (result.changed) {
+      notify(`${shouldHide ? 'Excluded' : 'Included'} ${plural(catalogPrintTargets.length, 'catalog card')} ${shouldHide ? 'from' : 'in'} print.`, 'success');
+    }
+  }, [applyCanvasChange, catalogPrintTargets, hideAllCatalogCards, notify, tcgdexAssetIds]);
+
   const updateSectionName = useCallback((pageId, sectionName) => {
     applyCanvasChange((allPages) => allPages.map((page) => (
       page.id === pageId ? { ...page, sectionName } : page
@@ -4626,7 +4656,6 @@ export default function CardBinder() {
     const source = images[imgId] || pool.find((item) => item.id === imgId)?.src;
     const crop = imgId ? getCrop(page, slot.key, imgId) : { x: 50, y: 50, z: IMAGE_ZOOM_MIN };
     const isEditing = editing?.pageId === page.id && editing.key === slot.key && editing.imgId === imgId;
-    const shouldHideCardFromBed = Boolean(hideAllCatalogCards && imgId);
     const pageMerges = activeMerges(page, dims);
     const radius = Math.max(settings.view === 'binder' ? 3 : 1, gridPpi * (settings.view === 'binder' ? 0.09 : 0.04));
     const frameW = spanW(slot.cs, settings.gap, card);
@@ -4782,7 +4811,7 @@ export default function CardBinder() {
             transform: `perspective(600px) rotateX(${editing ? '0deg' : 'var(--rx, 0deg)'}) rotateY(${editing ? '0deg' : 'var(--ry, 0deg)'}) scale3d(0.98, 0.98, 0.98)`,
           }}
         >
-          {isEditing && editing.geometry && !shouldHideCardFromBed && (
+          {isEditing && editing.geometry && (
             <img
               src={source}
               alt=""
@@ -4792,7 +4821,7 @@ export default function CardBinder() {
             />
           )}
         <div className={`relative size-full overflow-hidden border bg-white transition-all duration-150 after:absolute after:inset-0 after:pointer-events-none after:bg-[radial-gradient(circle_at_var(--mx,50%)_var(--my,50%),rgba(255,255,255,0.14)_0%,transparent_60%)] after:opacity-0 hover:after:opacity-100 after:transition-opacity after:duration-300 ${settings.view === 'binder' ? 'sleeve-sheen rounded-md border-white/[0.06] bg-neutral-900/50 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),inset_0_-8px_18px_rgba(0,0,0,0.22),0_8px_22px_rgba(0,0,0,0.24)] hover:border-white/[0.12] hover:bg-neutral-900/80 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.09),0_14px_30px_rgba(0,0,0,0.42)]' : 'border-transparent'} ${isEditing ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-zinc-900' : ''}`} style={{ borderRadius: radius }}>
-          {source && !shouldHideCardFromBed ? <img
+          {source ? <img
             data-img-id={imgId}
             src={source}
             alt=""
@@ -4804,9 +4833,7 @@ export default function CardBinder() {
             data-image-zoom={round1(activeCrop.z)}
             className={`pointer-events-none absolute max-w-none transition-all duration-200 ${isSlotPrintHidden ? 'opacity-25 grayscale saturate-50' : ''}`}
             style={renderedImageStyle}
-          /> : source && shouldHideCardFromBed ? (
-            <span data-card-bed-hidden className="absolute inset-0 grid place-items-center bg-neutral-950/40 text-neutral-700/60 font-mono text-[9px] uppercase tracking-wider select-none">Hidden</span>
-          ) : <span className="absolute inset-0 grid place-items-center bg-zinc-800 text-zinc-500"><Icon name="image" /></span>}
+          /> : <span className="absolute inset-0 grid place-items-center bg-zinc-800 text-zinc-500"><Icon name="image" /></span>}
           </div>
         </div>
         {slotActions}
@@ -4884,10 +4911,9 @@ export default function CardBinder() {
               const thumbnailImageStyle = thumbnailGeometry
                 ? positionedImageStyle(thumbnailGeometry, thumbnailFrame, crop)
                 : { width: '100%', height: '100%', left: 0, top: 0, objectFit: settings.fit, objectPosition: `${crop.x}% ${crop.y}%` };
-              const shouldHideCardFromThumb = Boolean(hideAllCatalogCards && id);
               return (
                 <div className="relative size-full overflow-hidden border border-zinc-800 bg-zinc-900">
-                  {src && !shouldHideCardFromThumb ? (
+                  {src && (
                     <img
                       src={src}
                       alt=""
@@ -4899,9 +4925,7 @@ export default function CardBinder() {
                         setImageDims((value) => value[id]?.w === w && value[id]?.h === h ? value : { ...value, [id]: { w, h } });
                       }}
                     />
-                  ) : src && shouldHideCardFromThumb ? (
-                    <span data-thumbnail-card-hidden className="absolute inset-0 bg-neutral-950/60" />
-                  ) : null}
+                  )}
                 </div>
               );
             }} />
@@ -5475,7 +5499,8 @@ export default function CardBinder() {
               onUndo={undoAction}
               onRedo={redoAction}
               hideAllCatalogCards={hideAllCatalogCards}
-              setHideAllCatalogCards={setHideAllCatalogCards}
+              hasPlacedCatalogCards={hasPlacedCatalogCards}
+              onToggleCatalogPrintVisibility={toggleCatalogPrintVisibility}
               combineMode={combineMode}
               onToggleCombine={() => setCombineMode((value) => !value)}
               canMerge={canMerge}
