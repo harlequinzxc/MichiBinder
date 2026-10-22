@@ -540,10 +540,10 @@ const getCrop = (page, key, imageId) => {
 };
 const isDefaultCrop = (crop) => crop.x === 50 && crop.y === 50 && crop.z === IMAGE_ZOOM_MIN;
 
-function compactCustomPrintPages(pages, dims, customIds) {
+function compactPrintPages(pages, dims, includedIds, scope = 'all', minimumPages = 0) {
   const instances = pages.flatMap((page) =>
     getSlots(page, dims)
-      .filter((slot) => page.slots[slot.key] && customIds.has(page.slots[slot.key]) && !page.hiddenSlotsFromPrint?.[slot.key])
+      .filter((slot) => page.slots[slot.key] && includedIds.has(page.slots[slot.key]) && !page.hiddenSlotsFromPrint?.[slot.key])
       .map((slot) => ({
         id: page.slots[slot.key],
         colSpan: Number(slot.colSpan) || 1,
@@ -552,7 +552,7 @@ function compactCustomPrintPages(pages, dims, customIds) {
       }))
   );
 
-  if (!instances.length) return [];
+  if (!instances.length && !minimumPages) return [];
 
   const packingRows = dims.rows;
   const packingCols = dims.cols;
@@ -561,8 +561,8 @@ function compactCustomPrintPages(pages, dims, customIds) {
   const addCompiledPage = () => {
     const pageIndex = compiledPages.length;
     compiledPages.push({
-      id: `print-custom-page-${pageIndex + 1}`,
-      sheetId: `print-custom-sheet-${Math.floor(pageIndex / 2) + 1}`,
+      id: `print-${scope}-page-${pageIndex + 1}`,
+      sheetId: `print-${scope}-sheet-${Math.floor(pageIndex / 2) + 1}`,
       face: pageIndex % 2 === 0 ? 'front' : 'back',
       merges: [],
       slots: {},
@@ -592,7 +592,7 @@ function compactCustomPrintPages(pages, dims, customIds) {
     return null;
   };
 
-  addCompiledPage();
+  if (instances.length) addCompiledPage();
   instances.forEach((instance) => {
     const rowSpan = clamp(instance.rowSpan, 1, packingRows);
     const colSpan = clamp(instance.colSpan, 1, packingCols);
@@ -608,7 +608,7 @@ function compactCustomPrintPages(pages, dims, customIds) {
     page.slots[key] = instance.id;
     page.metaData[key] = { colSpan, rowSpan };
     if (rowSpan * colSpan > 1) {
-      page.merges.push({ id: `print-custom-merge-${frame.pageIndex}-${key}`, r: frame.row, c: frame.col, rs: rowSpan, cs: colSpan });
+      page.merges.push({ id: `print-${scope}-merge-${frame.pageIndex}-${key}`, r: frame.row, c: frame.col, rs: rowSpan, cs: colSpan });
     }
     if (!isDefaultCrop(instance.crop)) {
       page.crops[key] = { img: instance.id, ...instance.crop };
@@ -620,7 +620,8 @@ function compactCustomPrintPages(pages, dims, customIds) {
     }
   });
 
-  return compiledPages.filter((page) => Object.keys(page.slots).length);
+  while (compiledPages.length < minimumPages) addCompiledPage();
+  return minimumPages ? compiledPages : compiledPages.filter((page) => Object.keys(page.slots).length);
 }
 
 function imageFitGeometry(imageW, imageH, frame, fit = 'cover', zoom = IMAGE_ZOOM_MIN) {
@@ -1188,7 +1189,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.26.3</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.26.4</span>
         </div>
         <SaveStatus isFolderLinked={isFolderLinked} />
       </div>
@@ -2295,26 +2296,12 @@ export default function CardBinder() {
     ? (currencyDisplay === 'SGD' ? `S$${(activeSpreadValueUSD * displayRate).toFixed(2)}` : `$${activeSpreadValueUSD.toFixed(2)}`)
     : null;
   const printPages = useMemo(() => {
-    // Whole-page print exclusions apply to both the complete and uploads-only compilers.
-    const filteredSheets = pages.filter((page) => !page.hiddenFromPrint);
-
-    if (printScope === 'custom') {
-      return compactCustomPrintPages(filteredSheets, dims, customUploadedIds);
-    }
-    return filteredSheets
-      .map((page) => {
-        // Slot overrides are independent from page visibility and remain keyed to the source slot.
-        const slots = Object.fromEntries(
-          Object.entries(page.slots || {}).filter(([key, id]) => {
-            const isSlotHidden = page.hiddenSlotsFromPrint?.[key];
-            return allPoolIds.has(id) && !isSlotHidden;
-          })
-        );
-        const crops = Object.fromEntries(Object.entries(page.crops || {}).filter(([key, crop]) => slots[key] === crop.img));
-        return { ...page, slots, crops };
-      })
-      .filter((page) => !settings.skipEmptyPages || getSlots(page, dims).some((slot) => page.slots[slot.key]));
-  }, [pages, settings.skipEmptyPages, dims, printScope, customUploadedIds, allPoolIds]);
+    // Whole-page and per-slot exclusions are omitted before either print scope is packed.
+    const printablePages = pages.filter((page) => !page.hiddenFromPrint);
+    return printScope === 'custom'
+      ? compactPrintPages(printablePages, dims, customUploadedIds, 'custom')
+      : compactPrintPages(printablePages, dims, allPoolIds, 'all', settings.skipEmptyPages ? 0 : printablePages.length);
+  }, [pages, dims, printScope, customUploadedIds, allPoolIds, settings.skipEmptyPages]);
   const printStateRef = useRef({ printPages, printScope });
   printStateRef.current = { printPages, printScope };
 

@@ -11,6 +11,7 @@ MichiBinder is a private, desktop-first card-layout workspace for arranging trad
 - Combine adjacent pockets into oversized frames and split them again.
 - Reposition and zoom cropped images per slot with pointer, keyboard, an amber 100–300% slider, or the mouse wheel.
 - Add, duplicate, delete, navigate, and print multiple binder pages.
+- Use **Include all** to omit print-hidden cards and compact the remaining cards across print sheets without changing the live binder layout.
 - Preview a dark binder sheet or the exact paper output.
 - Configure physical card dimensions, scale, gaps, image fit, paper, and cut guides.
 - Save layouts to `localStorage` and image blobs to IndexedDB, with an automatic local-storage fallback.
