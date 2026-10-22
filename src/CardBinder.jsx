@@ -1188,7 +1188,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.26.0</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.26.1</span>
         </div>
         <SaveStatus isFolderLinked={isFolderLinked} />
       </div>
@@ -1455,8 +1455,8 @@ function FloatingNavigation({
               type="button"
               onClick={() => setHideAllCatalogCards((previous) => !previous)}
               aria-pressed={hideAllCatalogCards}
-              aria-label={hideAllCatalogCards ? 'Show all catalog cards' : 'Hide all catalog cards'}
-              title={hideAllCatalogCards ? 'Show all catalog cards' : 'Hide all catalog cards'}
+              aria-label={hideAllCatalogCards ? 'Show placed cards in catalog' : 'Hide placed cards from catalog'}
+              title={hideAllCatalogCards ? 'Show placed cards in catalog' : 'Hide placed cards from catalog'}
               className={`${neutralIconButton} !w-8 !h-8 relative ml-0.5 rounded-lg border border-white/[0.03] transition-colors ${hideAllCatalogCards ? '!bg-amber-950/70 !text-amber-400 !border-amber-500/20' : ''}`}
             >
               <Icon name={hideAllCatalogCards ? 'eye' : 'eyeOff'} size={15} />
@@ -1586,6 +1586,7 @@ function CardPool({
   searchQuery,
   setSearchQuery,
   fetchedCards,
+  hideAllCatalogCards,
   isLoading,
   setsList,
   selectedSet,
@@ -1853,7 +1854,9 @@ function CardPool({
                   className="scroll-area grid grid-cols-2 gap-3 p-2 overflow-y-auto max-h-[calc(100vh-220px)] scrollbar-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden group rounded-md border border-white/[0.04]"
                 >
                   {isLoading && !fetchedCards.length && Array.from({ length: 6 }, (_, index) => <span key={index} aria-hidden="true" className="aspect-[245/337] animate-pulse rounded-lg border border-white/[0.04] bg-neutral-900" />)}
-                  {fetchedCards.map((item, index) => {
+                  {fetchedCards
+                    .filter((item) => !hideAllCatalogCards || !placedTcgdexIds.has(item.id))
+                    .map((item, index) => {
                     const fullImageUrl = item.image ? `${item.image}/low.jpg` : '/placeholder.png';
                     const highResImageUrl = item.image ? `${item.image}/high.jpg` : '/placeholder.png';
                     const selectionIndex = selectedCardIds.indexOf(item.id);
@@ -1947,7 +1950,7 @@ function CanvasHelper({ editing, multiDrag, flowCount, offsetX, onCenter, onCanc
     content = <><Icon name="wand" /><span>Dropping {plural(multiDrag, 'card')} into the first empty slots{flowCount ? ` · ${flowCount} will flow to the next page(s)` : ''}</span></>;
   } else return null;
 
-  return <div data-reposition-ui={editing ? '' : undefined} className={`fixed bottom-32 left-1/2 z-50 flex h-8 w-auto min-w-fit max-w-none -translate-x-1/2 items-center gap-1.5 rounded-full border px-3 text-[11px] whitespace-nowrap shadow-2xl shadow-black/60 backdrop-blur-md ${tone}`}>{content}</div>;
+  return <div data-reposition-ui={editing ? '' : undefined} className={`fixed bottom-[76px] left-1/2 z-50 mb-[var(--timeline-lift)] flex h-8 w-auto min-w-fit max-w-none -translate-x-1/2 items-center gap-1.5 rounded-full border px-3 text-[11px] whitespace-nowrap shadow-2xl shadow-black/60 backdrop-blur-md transition-[margin-bottom] duration-300 motion-reduce:transition-none ${tone}`}>{content}</div>;
 }
 
 function BinderSpine({ view }) {
@@ -5349,7 +5352,8 @@ export default function CardBinder() {
             setActiveTab={setActiveTab}
             searchQuery={searchQuery}
             setSearchQuery={updateSearchQuery}
-            fetchedCards={hideAllCatalogCards ? [] : fetchedCards}
+            fetchedCards={fetchedCards}
+            hideAllCatalogCards={hideAllCatalogCards}
             isLoading={isLoading}
             setsList={setsList}
             selectedSet={selectedSet}
@@ -5363,7 +5367,7 @@ export default function CardBinder() {
             onFetchedCardAdd={addFetchedCardToPage}
             scrollToNextUnplacedCard={scrollToNextUnplacedCard}
           />
-          <main data-dynamic-workspace data-zen-mode={isZenMode} className="relative flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-neutral-950">
+          <main data-dynamic-workspace data-zen-mode={isZenMode} className="relative flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-neutral-950" style={{ '--timeline-lift': showBottomTimeline ? '112px' : '0px' }}>
             <div data-preview-surface className="relative flex min-h-0 w-full flex-1 items-center overflow-hidden">
               <div
                 ref={stageRef}
@@ -5445,6 +5449,22 @@ export default function CardBinder() {
                 getGridRipPromptText={getGridRipPromptText}
               />
             </div>
+            <CanvasHelper
+              editing={editing}
+              multiDrag={dragBatchSize}
+              flowCount={multiFlow}
+              offsetX={0}
+              onCenter={() => {
+                const value = editingRef.current;
+                if (!value) return;
+                const next = { ...value, x: 50, y: 50 };
+                editingRef.current = next;
+                setEditing(next);
+              }}
+              onZoomChange={updateEditingZoom}
+              onCancel={cancelEditing}
+              onDone={commitEditing}
+            />
             <FloatingNavigation
               showBottomTimeline={showBottomTimeline}
               onToggleTimeline={() => setShowBottomTimeline((value) => !value)}
@@ -5506,22 +5526,6 @@ export default function CardBinder() {
             </div>
           </main>
         </div>
-        <CanvasHelper
-          editing={editing}
-          multiDrag={dragBatchSize}
-          flowCount={multiFlow}
-          offsetX={0}
-          onCenter={() => {
-            const value = editingRef.current;
-            if (!value) return;
-            const next = { ...value, x: 50, y: 50 };
-            editingRef.current = next;
-            setEditing(next);
-          }}
-          onZoomChange={updateEditingZoom}
-          onCancel={cancelEditing}
-          onDone={commitEditing}
-        />
         <div className="no-print pointer-events-none fixed bottom-10 right-20 z-[100] flex w-[360px] flex-col items-end gap-2">
           {toasts.map((toast) => <div key={toast.id} role="status" className={`animate-toast pointer-events-auto flex max-w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-[12px] shadow-2xl shadow-black/40 ${toastTones[toast.tone] || toastTones.info}`}><span className="leading-relaxed">{toast.message}</span>{toast.action && <button type="button" onClick={() => { setToasts((value) => value.filter((item) => item.id !== toast.id)); toast.action.onClick(); }} className="shrink-0 rounded-md bg-white/10 px-2 py-1 font-semibold text-white hover:bg-white/20">{toast.action.label}</button>}<button type="button" title="Dismiss" aria-label="Dismiss notification" onClick={() => setToasts((value) => value.filter((item) => item.id !== toast.id))} className="grid size-6 shrink-0 place-items-center rounded-md text-current hover:bg-white/10"><Icon name="x" /></button></div>)}
         </div>
