@@ -1151,7 +1151,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.22.6</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.22.7</span>
         </div>
         <SaveStatus isFolderLinked={isFolderLinked} />
       </div>
@@ -1514,7 +1514,7 @@ function CardPool({
   inputRef,
   uploadAndRegisterFiles,
   syncPoolFromLocalDirectory,
-  isFolderLinked,
+  currentDirectoryHandle,
   handleFolderAction,
   handleDisconnectFolder,
   onClearAllUploads,
@@ -1655,8 +1655,8 @@ function CardPool({
             <div className="flex items-center justify-between"><div className="flex flex-col"><span className="text-xs font-semibold text-neutral-200">Cloud-Free Storage</span><span className="text-[9px] font-bold tracking-widest text-neutral-500 uppercase">CUSTOM CARD ART FOLDER</span></div></div>
             <input type="file" webkitdirectory="" directory="" multiple className="hidden" id="hub-directory-picker" onChange={(e) => { const files = Array.from(e.target.files || []); if(files.length) { syncPoolFromLocalDirectory(files); } e.target.value = ''; }} />
             <div className="flex flex-col gap-1.5 w-full" data-folder-link-actions>
-              <button type="button" onClick={handleFolderAction} className="w-full h-8 flex items-center justify-center rounded-md bg-neutral-800 text-zinc-200 border border-white/[0.04] font-semibold text-xs transition-all hover:bg-neutral-700 active:scale-[0.98]">{isFolderLinked ? 'Sync' : 'Link Folder'}</button>
-              {isFolderLinked ? (
+              <button type="button" onClick={handleFolderAction} className="w-full h-8 flex items-center justify-center rounded-md bg-neutral-800 text-zinc-200 border border-white/[0.04] font-semibold text-xs transition-all hover:bg-neutral-700 active:scale-[0.98]">{Boolean(currentDirectoryHandle) ? 'Sync' : 'Link Folder'}</button>
+              {Boolean(currentDirectoryHandle) ? (
                 <button type="button" onClick={handleDisconnectFolder} className="w-full text-center text-[9px] font-bold tracking-widest text-neutral-500 hover:text-red-400 uppercase font-sans mt-0.5 transition-colors cursor-pointer">Disconnect Folder</button>
               ) : (
                 <span aria-hidden="true" className="invisible w-full select-none text-center text-[9px] font-bold tracking-widest uppercase font-sans mt-0.5">Disconnect Folder</span>
@@ -4940,7 +4940,7 @@ export default function CardBinder() {
             inputRef={inputRef}
             uploadAndRegisterFiles={uploadAndRegisterFiles}
             syncPoolFromLocalDirectory={syncPoolFromLocalDirectory}
-            isFolderLinked={isFolderLinked}
+            currentDirectoryHandle={currentDirectoryHandle}
             handleFolderAction={handleFolderAction}
             handleDisconnectFolder={handleDisconnectFolder}
             onClearAllUploads={handleClearAllUploads}
