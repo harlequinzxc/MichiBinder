@@ -1188,7 +1188,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.25.0</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.26.0</span>
         </div>
         <SaveStatus isFolderLinked={isFolderLinked} />
       </div>
@@ -1419,6 +1419,8 @@ function FloatingNavigation({
   canRedo,
   onUndo,
   onRedo,
+  hideAllCatalogCards,
+  setHideAllCatalogCards,
   combineMode,
   onToggleCombine,
   canMerge,
@@ -1446,9 +1448,19 @@ function FloatingNavigation({
     <div data-bottom-control-bar className="no-print relative flex w-full shrink-0 items-center justify-center border-t border-white/[0.06] bg-neutral-900/60 px-6 py-3 backdrop-blur-md select-none">
       <div className="flex w-full items-center justify-center">
         <div data-floating-navigation className="flex w-fit max-w-[calc(100%_-_10rem)] items-center gap-2 overflow-x-auto rounded-xl border border-white/[0.06] bg-neutral-950 px-4 py-2 shadow-2xl scrollbar-none [scrollbar-width:none] min-[1281px]:gap-4 [&::-webkit-scrollbar]:hidden">
-          <div role="group" aria-label="History" className="flex shrink-0 items-center gap-1">
+          <div role="group" aria-label="History and Visibility" className="flex shrink-0 items-center gap-1">
             <button type="button" onClick={onUndo} disabled={!canUndo} aria-label="Undo" title="Undo" className={neutralIconButton}><Icon name="undo" /></button>
             <button type="button" onClick={onRedo} disabled={!canRedo} aria-label="Redo" title="Redo" className={neutralIconButton}><Icon name="redo" /></button>
+            <button
+              type="button"
+              onClick={() => setHideAllCatalogCards((previous) => !previous)}
+              aria-pressed={hideAllCatalogCards}
+              aria-label={hideAllCatalogCards ? 'Show all catalog cards' : 'Hide all catalog cards'}
+              title={hideAllCatalogCards ? 'Show all catalog cards' : 'Hide all catalog cards'}
+              className={`${neutralIconButton} !w-8 !h-8 relative ml-0.5 rounded-lg border border-white/[0.03] transition-colors ${hideAllCatalogCards ? '!bg-amber-950/70 !text-amber-400 !border-amber-500/20' : ''}`}
+            >
+              <Icon name={hideAllCatalogCards ? 'eye' : 'eyeOff'} size={15} />
+            </button>
           </div>
           <span aria-hidden="true" className="h-4 w-px bg-white/[0.06] flex shrink-0" />
           <div role="group" aria-label="Slot structure" className="flex shrink-0 items-center gap-1">
@@ -1935,7 +1947,7 @@ function CanvasHelper({ editing, multiDrag, flowCount, offsetX, onCenter, onCanc
     content = <><Icon name="wand" /><span>Dropping {plural(multiDrag, 'card')} into the first empty slots{flowCount ? ` · ${flowCount} will flow to the next page(s)` : ''}</span></>;
   } else return null;
 
-  return <div data-reposition-ui={editing ? '' : undefined} className={`absolute top-full z-30 mt-4 flex h-8 w-auto min-w-fit max-w-none -translate-x-1/2 items-center gap-1.5 rounded-full border px-3 text-[11px] whitespace-nowrap shadow-xl shadow-black/30 ${tone}`} style={{ left: `calc(50% + ${offsetX}px)` }}>{content}</div>;
+  return <div data-reposition-ui={editing ? '' : undefined} className={`fixed bottom-32 left-1/2 z-50 flex h-8 w-auto min-w-fit max-w-none -translate-x-1/2 items-center gap-1.5 rounded-full border px-3 text-[11px] whitespace-nowrap shadow-2xl shadow-black/60 backdrop-blur-md ${tone}`}>{content}</div>;
 }
 
 function BinderSpine({ view }) {
@@ -1973,6 +1985,7 @@ export default function CardBinder() {
   const [editingBinderId, setEditingBinderId] = useState(null);
   const [binderRenameDraft, setDraftBinderRename] = useState('');
   const [draggedBinderId, setDraggedBinderId] = useState(null);
+  const [hideAllCatalogCards, setHideAllCatalogCards] = useState(false);
   const binderDragTargetRef = useRef(null);
 
   const handleBinderTabDragStart = (event, binderId) => {
@@ -4605,7 +4618,6 @@ export default function CardBinder() {
   const frameWidth = frameWIn * ppi;
   const frameHeight = frameHIn * ppi;
   const spreadWidth = frameWidth * 2 + spineGap;
-  const helperOffsetX = settings.view === 'binder' ? ((SHEET_PAD.left - SHEET_PAD.right) / 2) * ppi : 0;
   const dragBatchSize = dragInfo?.kind === 'pool' ? dragInfo.ids.length : dragInfo?.kind === 'remote-batch' ? dragInfo.cards.length : 0;
   const multiFlow = dragBatchSize > 1 ? Math.max(0, planPlacement(pages, currentPage, null, dragBatchSize, dims).filter((target) => target.pageIndex > currentPage).length) : 0;
 
@@ -4962,7 +4974,6 @@ export default function CardBinder() {
             {renderEditorGrid(page, pageIndex)}
           </div>
         )}
-        {showHelper && pageIndex === currentPage && <CanvasHelper editing={editing} multiDrag={dragBatchSize} flowCount={multiFlow} offsetX={side === 'left' ? -helperOffsetX : helperOffsetX} onCenter={() => { const value = editingRef.current; if (value) { const next = { ...value, x: 50, y: 50 }; editingRef.current = next; setEditing(next); } }} onZoomChange={updateEditingZoom} onCancel={cancelEditing} onDone={commitEditing} />}
       </div>
     );
   };
@@ -5338,7 +5349,7 @@ export default function CardBinder() {
             setActiveTab={setActiveTab}
             searchQuery={searchQuery}
             setSearchQuery={updateSearchQuery}
-            fetchedCards={fetchedCards}
+            fetchedCards={hideAllCatalogCards ? [] : fetchedCards}
             isLoading={isLoading}
             setsList={setsList}
             selectedSet={selectedSet}
@@ -5441,6 +5452,8 @@ export default function CardBinder() {
               canRedo={futureRef.current.length > 0}
               onUndo={undoAction}
               onRedo={redoAction}
+              hideAllCatalogCards={hideAllCatalogCards}
+              setHideAllCatalogCards={setHideAllCatalogCards}
               combineMode={combineMode}
               onToggleCombine={() => setCombineMode((value) => !value)}
               canMerge={canMerge}
@@ -5493,6 +5506,22 @@ export default function CardBinder() {
             </div>
           </main>
         </div>
+        <CanvasHelper
+          editing={editing}
+          multiDrag={dragBatchSize}
+          flowCount={multiFlow}
+          offsetX={0}
+          onCenter={() => {
+            const value = editingRef.current;
+            if (!value) return;
+            const next = { ...value, x: 50, y: 50 };
+            editingRef.current = next;
+            setEditing(next);
+          }}
+          onZoomChange={updateEditingZoom}
+          onCancel={cancelEditing}
+          onDone={commitEditing}
+        />
         <div className="no-print pointer-events-none fixed bottom-10 right-20 z-[100] flex w-[360px] flex-col items-end gap-2">
           {toasts.map((toast) => <div key={toast.id} role="status" className={`animate-toast pointer-events-auto flex max-w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-[12px] shadow-2xl shadow-black/40 ${toastTones[toast.tone] || toastTones.info}`}><span className="leading-relaxed">{toast.message}</span>{toast.action && <button type="button" onClick={() => { setToasts((value) => value.filter((item) => item.id !== toast.id)); toast.action.onClick(); }} className="shrink-0 rounded-md bg-white/10 px-2 py-1 font-semibold text-white hover:bg-white/20">{toast.action.label}</button>}<button type="button" title="Dismiss" aria-label="Dismiss notification" onClick={() => setToasts((value) => value.filter((item) => item.id !== toast.id))} className="grid size-6 shrink-0 place-items-center rounded-md text-current hover:bg-white/10"><Icon name="x" /></button></div>)}
         </div>
