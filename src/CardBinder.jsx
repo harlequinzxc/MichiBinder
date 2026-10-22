@@ -130,6 +130,9 @@ const BINDER_DIRECTORY_HANDLE_PREFIX = 'binder-directory:';
 const binderDirectoryHandleKey = (binderId) => `${BINDER_DIRECTORY_HANDLE_PREFIX}${binderId}`;
 const IDB_VERSION = 4;
 const HISTORY_LIMIT = 30;
+const IMAGE_ZOOM_MIN = 100;
+const IMAGE_ZOOM_MAX = 300;
+const IMAGE_ZOOM_STEP = 5;
 const SHEET_PAD = { top: 0.3, right: 0.3, bottom: 0.3, left: 0.62 };
 const THUMB_BOX = { w: 40, h: 40 * 1.414, pad: 3 };
 const PAPER_SIZES = {
@@ -525,10 +528,17 @@ function applyPlacement(previousPages, ids, pageIndex, startKey, dims) {
   return { pages, placed: targets.length, created: Math.max(0, pages.length - before), targets };
 }
 
+const sanitizeZoom = (value) => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? clamp(numeric, IMAGE_ZOOM_MIN, IMAGE_ZOOM_MAX) : IMAGE_ZOOM_MIN;
+};
 const getCrop = (page, key, imageId) => {
   const crop = page.crops?.[key];
-  return crop?.img === imageId ? { x: crop.x, y: crop.y } : { x: 50, y: 50 };
+  return crop?.img === imageId
+    ? { x: clamp(crop.x, 0, 100), y: clamp(crop.y, 0, 100), z: sanitizeZoom(crop.z) }
+    : { x: 50, y: 50, z: IMAGE_ZOOM_MIN };
 };
+const isDefaultCrop = (crop) => crop.x === 50 && crop.y === 50 && crop.z === IMAGE_ZOOM_MIN;
 
 function compactCustomPrintPages(pages, dims, customIds) {
   const instances = pages.flatMap((page) =>
@@ -600,7 +610,7 @@ function compactCustomPrintPages(pages, dims, customIds) {
     if (rowSpan * colSpan > 1) {
       page.merges.push({ id: `print-custom-merge-${frame.pageIndex}-${key}`, r: frame.row, c: frame.col, rs: rowSpan, cs: colSpan });
     }
-    if (instance.crop.x !== 50 || instance.crop.y !== 50) {
+    if (!isDefaultCrop(instance.crop)) {
       page.crops[key] = { img: instance.id, ...instance.crop };
     }
     for (let rowOffset = 0; rowOffset < rowSpan; rowOffset += 1) {
@@ -613,13 +623,29 @@ function compactCustomPrintPages(pages, dims, customIds) {
   return compiledPages.filter((page) => Object.keys(page.slots).length);
 }
 
-function coverGeometry(imageW, imageH, frame) {
-  if (!imageW || !imageH || !frame?.w || !frame?.h) return { dispW: frame?.w || 0, dispH: frame?.h || 0, ovX: 0, ovY: 0 };
-  const scale = Math.max(frame.w / imageW, frame.h / imageH);
+function imageFitGeometry(imageW, imageH, frame, fit = 'cover', zoom = IMAGE_ZOOM_MIN) {
+  if (!imageW || !imageH || !frame?.w || !frame?.h) {
+    return { dispW: frame?.w || 0, dispH: frame?.h || 0, ovX: 0, ovY: 0 };
+  }
+  const fitScale = fit === 'contain'
+    ? Math.min(frame.w / imageW, frame.h / imageH)
+    : Math.max(frame.w / imageW, frame.h / imageH);
+  const scale = fitScale * (sanitizeZoom(zoom) / 100);
   const dispW = imageW * scale;
   const dispH = imageH * scale;
   return { dispW, dispH, ovX: Math.max(0, dispW - frame.w), ovY: Math.max(0, dispH - frame.h) };
 }
+
+function coverGeometry(imageW, imageH, frame, zoom = IMAGE_ZOOM_MIN) {
+  return imageFitGeometry(imageW, imageH, frame, 'cover', zoom);
+}
+
+const positionedImageStyle = (geometry, frame, crop) => ({
+  width: geometry.dispW,
+  height: geometry.dispH,
+  left: ((frame.w - geometry.dispW) * crop.x) / 100,
+  top: ((frame.h - geometry.dispH) * crop.y) / 100,
+});
 
 function pruneMissingImages(pages, validIds) {
   return pages.map((page) => {
@@ -649,7 +675,7 @@ function sanitizePage(value = {}) {
     .filter(([key, id]) => anchors.has(key) && typeof id === 'string' && id));
   const crops = {};
   Object.entries(value.crops || {}).forEach(([key, crop]) => {
-    if (slots[key] && crop?.img === slots[key]) crops[key] = { img: crop.img, x: clamp(crop.x, 0, 100), y: clamp(crop.y, 0, 100) };
+    if (slots[key] && crop?.img === slots[key]) crops[key] = { img: crop.img, x: clamp(crop.x, 0, 100), y: clamp(crop.y, 0, 100), z: sanitizeZoom(crop.z) };
   });
   const hiddenSlotsFromPrint = Object.fromEntries(Object.entries(value.hiddenSlotsFromPrint || {})
     .filter(([key, hidden]) => anchors.has(key) && Boolean(hidden))
@@ -1162,7 +1188,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.24.1</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.25.0</span>
         </div>
         <SaveStatus isFolderLinked={isFolderLinked} />
       </div>
@@ -1875,12 +1901,35 @@ function CardPool({
   );
 }
 
-function CanvasHelper({ editing, multiDrag, flowCount, offsetX, onCenter, onCancel, onDone }) {
+function CanvasHelper({ editing, multiDrag, flowCount, offsetX, onCenter, onCancel, onDone, onZoomChange }) {
   let tone = 'border-zinc-800 bg-[#121214] text-zinc-200';
   let content;
   if (editing) {
     tone = 'border-amber-400/30 bg-amber-950/90 text-amber-100';
-    content = <><Icon name="move" /><span>Reposition image — drag inside the slot · arrows nudge · click outside to confirm</span><ToolButton label="Center" dense onClick={onCenter} /><ToolButton label="Cancel" dense onClick={onCancel} /><ToolButton label="Done" dense variant="primary" onClick={onDone} /></>;
+    content = (
+      <>
+        <Icon name="move" />
+        <span>Drag to reposition · wheel or slider to zoom</span>
+        <label className="ml-1 flex items-center gap-2 border-l border-amber-400/20 pl-3">
+          <span className="font-mono text-[9px] font-bold uppercase tracking-widest text-amber-200/80">Zoom</span>
+          <input
+            data-zoom-slider
+            type="range"
+            min={IMAGE_ZOOM_MIN}
+            max={IMAGE_ZOOM_MAX}
+            step={IMAGE_ZOOM_STEP}
+            value={Math.round(editing.z ?? IMAGE_ZOOM_MIN)}
+            onChange={(event) => onZoomChange(Number(event.target.value))}
+            aria-label="Image zoom percentage"
+            className="h-1.5 w-24 cursor-pointer accent-amber-400"
+          />
+          <output className="w-10 text-right font-mono text-[10px] font-bold tabular-nums text-amber-100">{Math.round(editing.z ?? IMAGE_ZOOM_MIN)}%</output>
+        </label>
+        <ToolButton label="Center" dense onClick={onCenter} />
+        <ToolButton label="Cancel" dense onClick={onCancel} />
+        <ToolButton label="Done" dense variant="primary" onClick={onDone} />
+      </>
+    );
   } else if (multiDrag > 1) {
     tone = 'border-emerald-400/30 bg-emerald-950/90 text-emerald-100';
     content = <><Icon name="wand" /><span>Dropping {plural(multiDrag, 'card')} into the first empty slots{flowCount ? ` · ${flowCount} will flow to the next page(s)` : ''}</span></>;
@@ -3493,8 +3542,9 @@ export default function CardBinder() {
       const crops = { ...page.crops };
       const x = round1(value.x);
       const y = round1(value.y);
-      if (x === 50 && y === 50) delete crops[value.key];
-      else crops[value.key] = { img: value.imgId, x, y };
+      const z = round1(sanitizeZoom(value.z));
+      if (isDefaultCrop({ x, y, z })) delete crops[value.key];
+      else crops[value.key] = { img: value.imgId, x, y, z };
       return { ...page, crops };
     }));
     setEditing(null);
@@ -3635,14 +3685,14 @@ export default function CardBinder() {
       const destinationCrop = destinationId ? getCrop(next[targetPageIndex], destinationKey, destinationId) : null;
       if (destinationId) {
         next[sourceIndex].slots[payload.key] = destinationId;
-        if (destinationCrop.x === 50 && destinationCrop.y === 50) delete next[sourceIndex].crops[payload.key];
+        if (isDefaultCrop(destinationCrop)) delete next[sourceIndex].crops[payload.key];
         else next[sourceIndex].crops[payload.key] = { img: destinationId, ...destinationCrop };
       } else {
         delete next[sourceIndex].slots[payload.key];
         delete next[sourceIndex].crops[payload.key];
       }
       next[targetPageIndex].slots[destinationKey] = payload.imgId;
-      if (sourceCrop.x === 50 && sourceCrop.y === 50) delete next[targetPageIndex].crops[destinationKey];
+      if (isDefaultCrop(sourceCrop)) delete next[targetPageIndex].crops[destinationKey];
       else next[targetPageIndex].crops[destinationKey] = { img: payload.imgId, ...sourceCrop };
       return next;
     });
@@ -3925,7 +3975,7 @@ export default function CardBinder() {
       insideKeys.forEach((key) => { delete slots[key]; delete crops[key]; });
       if (kept) {
         slots[anchor] = kept.id;
-        if (kept.crop.x !== 50 || kept.crop.y !== 50) crops[anchor] = { img: kept.id, ...kept.crop };
+        if (!isDefaultCrop(kept.crop)) crops[anchor] = { img: kept.id, ...kept.crop };
       }
       const merges = page.merges.filter((merge) => !boxesIntersect(merge, box));
       merges.push({ id: uid('merge'), ...box });
@@ -4041,13 +4091,45 @@ export default function CardBinder() {
     const element = event.currentTarget.closest('[data-key]');
     const rect = element?.getBoundingClientRect();
     const natural = imageDims[imgId];
-    const geometry = coverGeometry(natural?.w, natural?.h, { w: rect?.width || 0, h: rect?.height || 0 });
-    if (geometry.ovX < 1 && geometry.ovY < 1) { notify('This image already fits the slot without cropping.', 'info'); return; }
+    const frame = { w: rect?.width || 0, h: rect?.height || 0 };
     const crop = getCrop(page, slot.key, imgId);
-    const next = { pageId: page.id, key: slot.key, imgId, x: crop.x, y: crop.y, originX: crop.x, originY: crop.y, hasX: geometry.ovX >= 1, hasY: geometry.ovY >= 1, geometry };
+    const geometry = coverGeometry(natural?.w, natural?.h, frame, crop.z);
+    const next = {
+      pageId: page.id,
+      key: slot.key,
+      imgId,
+      x: crop.x,
+      y: crop.y,
+      z: crop.z,
+      originX: crop.x,
+      originY: crop.y,
+      originZ: crop.z,
+      imageW: natural?.w || 0,
+      imageH: natural?.h || 0,
+      frame,
+      hasX: geometry.ovX >= 1,
+      hasY: geometry.ovY >= 1,
+      geometry,
+    };
     editingRef.current = next;
     setEditing(next);
   }, [settings.fit, notify, imageDims]);
+
+  const updateEditingZoom = useCallback((nextZoom) => {
+    const value = editingRef.current;
+    if (!value) return;
+    const z = sanitizeZoom(nextZoom);
+    const geometry = coverGeometry(value.imageW, value.imageH, value.frame, z);
+    const next = {
+      ...value,
+      z,
+      hasX: geometry.ovX >= 1,
+      hasY: geometry.ovY >= 1,
+      geometry,
+    };
+    editingRef.current = next;
+    setEditing(next);
+  }, []);
 
   const beginPan = useCallback((event) => {
     const value = editingRef.current;
@@ -4070,6 +4152,21 @@ export default function CardBinder() {
   }, []);
 
   const endPan = useCallback(() => { panRef.current = null; }, []);
+
+  useEffect(() => {
+    if (!editing) return undefined;
+    const stage = stageRef.current;
+    if (!stage) return undefined;
+    const zoomWithWheel = (event) => {
+      if (!editingRef.current || !event.target.closest?.('[data-editing-slot]') || event.deltaY === 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const direction = event.deltaY < 0 ? 1 : -1;
+      updateEditingZoom(editingRef.current.z + direction * IMAGE_ZOOM_STEP);
+    };
+    stage.addEventListener('wheel', zoomWithWheel, { passive: false });
+    return () => stage.removeEventListener('wheel', zoomWithWheel);
+  }, [Boolean(editing), updateEditingZoom]);
 
   useEffect(() => {
     if (!editing) return undefined;
@@ -4515,13 +4612,21 @@ export default function CardBinder() {
   const renderEditorSlot = (page, pageIndex, slot, slotIndex) => {
     const imgId = page.slots[slot.key];
     const source = images[imgId] || pool.find((item) => item.id === imgId)?.src;
-    const crop = imgId ? getCrop(page, slot.key, imgId) : { x: 50, y: 50 };
+    const crop = imgId ? getCrop(page, slot.key, imgId) : { x: 50, y: 50, z: IMAGE_ZOOM_MIN };
     const isEditing = editing?.pageId === page.id && editing.key === slot.key && editing.imgId === imgId;
     const pageMerges = activeMerges(page, dims);
     const radius = Math.max(settings.view === 'binder' ? 3 : 1, gridPpi * (settings.view === 'binder' ? 0.09 : 0.04));
     const frameW = spanW(slot.cs, settings.gap, card);
     const frameH = spanH(slot.rs, settings.gap, card);
     const natural = imageDims[imgId];
+    const activeCrop = isEditing ? editing : crop;
+    const renderedFrame = { w: frameW * gridPpi, h: frameH * gridPpi };
+    const renderedGeometry = natural
+      ? imageFitGeometry(natural.w, natural.h, renderedFrame, settings.fit, activeCrop.z)
+      : null;
+    const renderedImageStyle = renderedGeometry
+      ? positionedImageStyle(renderedGeometry, renderedFrame, activeCrop)
+      : { width: '100%', height: '100%', left: 0, top: 0, objectFit: settings.fit, objectPosition: `${activeCrop.x}% ${activeCrop.y}%` };
     const dpi = natural ? Math.round(settings.fit === 'cover'
       ? Math.min(natural.w / (frameW * printFit), natural.h / (frameH * printFit))
       : Math.max(natural.w / (frameW * printFit), natural.h / (frameH * printFit))) : null;
@@ -4665,18 +4770,14 @@ export default function CardBinder() {
           }}
         >
           {isEditing && editing.geometry && (
-          <img
-            src={source}
-            alt=""
-            className="pointer-events-none absolute z-30 max-w-none opacity-40"
-            style={{
-              width: editing.geometry.dispW,
-              height: editing.geometry.dispH,
-              left: -(editing.geometry.ovX * editing.x) / 100,
-              top: -(editing.geometry.ovY * editing.y) / 100,
-            }}
-          />
-        )}
+            <img
+              src={source}
+              alt=""
+              data-reposition-ghost
+              className="pointer-events-none absolute z-30 max-w-none opacity-40"
+              style={positionedImageStyle(editing.geometry, editing.frame, editing)}
+            />
+          )}
         <div className={`relative size-full overflow-hidden border bg-white transition-all duration-150 after:absolute after:inset-0 after:pointer-events-none after:bg-[radial-gradient(circle_at_var(--mx,50%)_var(--my,50%),rgba(255,255,255,0.14)_0%,transparent_60%)] after:opacity-0 hover:after:opacity-100 after:transition-opacity after:duration-300 ${settings.view === 'binder' ? 'sleeve-sheen rounded-md border-white/[0.06] bg-neutral-900/50 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),inset_0_-8px_18px_rgba(0,0,0,0.22),0_8px_22px_rgba(0,0,0,0.24)] hover:border-white/[0.12] hover:bg-neutral-900/80 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.09),0_14px_30px_rgba(0,0,0,0.42)]' : 'border-transparent'} ${isEditing ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-zinc-900' : ''}`} style={{ borderRadius: radius }}>
           {source ? <img
             data-img-id={imgId}
@@ -4687,8 +4788,9 @@ export default function CardBinder() {
               setImageDims((value) => value[imgId]?.w === w && value[imgId]?.h === h ? value : { ...value, [imgId]: { w, h } });
             }}
             data-print-hidden={isSlotPrintHidden ? '' : undefined}
-            className={`size-full transition-all duration-200 ${isSlotPrintHidden ? 'opacity-25 grayscale saturate-50 scale-[0.98]' : ''}`}
-            style={{ objectFit: settings.fit, objectPosition: `${isEditing ? editing.x : crop.x}% ${isEditing ? editing.y : crop.y}%` }}
+            data-image-zoom={round1(activeCrop.z)}
+            className={`pointer-events-none absolute max-w-none transition-all duration-200 ${isSlotPrintHidden ? 'opacity-25 grayscale saturate-50' : ''}`}
+            style={renderedImageStyle}
           /> : <span className="absolute inset-0 grid place-items-center bg-zinc-800 text-zinc-500"><Icon name="image" /></span>}
           </div>
         </div>
@@ -4758,8 +4860,32 @@ export default function CardBinder() {
             <SheetGrid page={page} card={card} gap={settings.gap} unit={`${unit}px`} dims={dims} renderSlot={(slot) => {
               const id = page.slots[slot.key];
               const src = images[id] || pool.find((item) => item.id === id)?.src;
-              const crop = id ? getCrop(page, slot.key, id) : { x: 50, y: 50 };
-              return <div className="size-full overflow-hidden border border-zinc-800 bg-zinc-900">{src && <img src={src} alt="" className="w-full h-full object-contain rounded-[1px]" style={{ objectPosition: `${crop.x}% ${crop.y}%` }} />}</div>;
+              const crop = id ? getCrop(page, slot.key, id) : { x: 50, y: 50, z: IMAGE_ZOOM_MIN };
+              const natural = imageDims[id];
+              const thumbnailFrame = { w: spanW(slot.cs, settings.gap, card) * unit, h: spanH(slot.rs, settings.gap, card) * unit };
+              const thumbnailGeometry = natural
+                ? imageFitGeometry(natural.w, natural.h, thumbnailFrame, settings.fit, crop.z)
+                : null;
+              const thumbnailImageStyle = thumbnailGeometry
+                ? positionedImageStyle(thumbnailGeometry, thumbnailFrame, crop)
+                : { width: '100%', height: '100%', left: 0, top: 0, objectFit: settings.fit, objectPosition: `${crop.x}% ${crop.y}%` };
+              return (
+                <div className="relative size-full overflow-hidden border border-zinc-800 bg-zinc-900">
+                  {src && (
+                    <img
+                      src={src}
+                      alt=""
+                      data-thumbnail-zoom={round1(crop.z)}
+                      className="pointer-events-none absolute max-w-none rounded-[1px]"
+                      style={thumbnailImageStyle}
+                      onLoad={(event) => {
+                        const { naturalWidth: w, naturalHeight: h } = event.currentTarget;
+                        setImageDims((value) => value[id]?.w === w && value[id]?.h === h ? value : { ...value, [id]: { w, h } });
+                      }}
+                    />
+                  )}
+                </div>
+              );
             }} />
           </div>
         </div>
@@ -4836,7 +4962,7 @@ export default function CardBinder() {
             {renderEditorGrid(page, pageIndex)}
           </div>
         )}
-        {showHelper && pageIndex === currentPage && <CanvasHelper editing={editing} multiDrag={dragBatchSize} flowCount={multiFlow} offsetX={side === 'left' ? -helperOffsetX : helperOffsetX} onCenter={() => { const value = editingRef.current; if (value) { const next = { ...value, x: 50, y: 50 }; editingRef.current = next; setEditing(next); } }} onCancel={cancelEditing} onDone={commitEditing} />}
+        {showHelper && pageIndex === currentPage && <CanvasHelper editing={editing} multiDrag={dragBatchSize} flowCount={multiFlow} offsetX={side === 'left' ? -helperOffsetX : helperOffsetX} onCenter={() => { const value = editingRef.current; if (value) { const next = { ...value, x: 50, y: 50 }; editingRef.current = next; setEditing(next); } }} onZoomChange={updateEditingZoom} onCancel={cancelEditing} onDone={commitEditing} />}
       </div>
     );
   };
@@ -4998,8 +5124,23 @@ export default function CardBinder() {
                 const customMeta = page.metaData?.[slot.key];
                 const colSpan = customMeta ? customMeta.colSpan : (slot.cs || 1);
                 const rowSpan = customMeta ? customMeta.rowSpan : (slot.rs || 1);
-                const crop = id ? getCrop(page, slot.key, id) : { x: 50, y: 50 };
+                const crop = id ? getCrop(page, slot.key, id) : { x: 50, y: 50, z: IMAGE_ZOOM_MIN };
                 const focusPosition = `${crop.x}% ${crop.y}%`;
+                const printContentWidth = paper.wIn - 0.6;
+                const printContentHeight = paper.hIn - 0.6;
+                const printCellWidth = (printContentWidth - settings.gap * (dims.cols - 1)) / dims.cols;
+                const printCellHeight = (printContentHeight - settings.gap * (dims.rows - 1)) / dims.rows;
+                const printFrame = {
+                  w: printCellWidth * colSpan + settings.gap * (colSpan - 1),
+                  h: printCellHeight * rowSpan + settings.gap * (rowSpan - 1),
+                };
+                const natural = imageDims[id];
+                const printGeometry = natural
+                  ? imageFitGeometry(natural.w, natural.h, printFrame, settings.fit, crop.z)
+                  : null;
+                const backgroundSize = crop.z === IMAGE_ZOOM_MIN || !printGeometry
+                  ? settings.fit
+                  : `${(printGeometry.dispW / printFrame.w) * 100}% ${(printGeometry.dispH / printFrame.h) * 100}%`;
 
                 return (
                   <div
@@ -5015,17 +5156,32 @@ export default function CardBinder() {
                     }}
                   >
                     {cardImageURL && (
-                      <div
-                        className="w-full h-full printable-card-slice"
-                        style={{
-                          backgroundImage: `url(${cardImageURL})`,
-                          backgroundSize: settings.fit === 'cover' ? 'cover' : 'contain',
-                          backgroundPosition: focusPosition,
-                          backgroundRepeat: 'no-repeat',
-                          width: '100%',
-                          height: '100%',
-                        }}
-                      />
+                      <>
+                        <img
+                          src={cardImageURL}
+                          alt=""
+                          hidden
+                          onLoad={(event) => {
+                            const { naturalWidth: w, naturalHeight: h } = event.currentTarget;
+                            setImageDims((value) => value[id]?.w === w && value[id]?.h === h ? value : { ...value, [id]: { w, h } });
+                          }}
+                        />
+                        <div
+                          data-print-image={id}
+                          data-print-crop-x={round1(crop.x)}
+                          data-print-crop-y={round1(crop.y)}
+                          data-print-zoom={round1(crop.z)}
+                          className="w-full h-full printable-card-slice"
+                          style={{
+                            backgroundImage: `url(${cardImageURL})`,
+                            backgroundSize,
+                            backgroundPosition: focusPosition,
+                            backgroundRepeat: 'no-repeat',
+                            width: '100%',
+                            height: '100%',
+                          }}
+                        />
+                      </>
                     )}
                     {settings.cutGuides && <span aria-hidden="true" className="pointer-events-none absolute inset-0 z-10" style={{ outline: '0.2pt solid #9ca3af' }} />}
                   </div>

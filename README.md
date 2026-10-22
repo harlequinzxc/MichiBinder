@@ -9,7 +9,7 @@ MichiBinder is a private, desktop-first card-layout workspace for arranging trad
 - Select from TCGdex or Michi with standard Shift and Ctrl/Command gestures, then drag the batch into consecutive binder pockets.
 - Use 4-pocket (2 × 2), 9-pocket (3 × 3), or 12-pocket (4 × 3) layouts.
 - Combine adjacent pockets into oversized frames and split them again.
-- Reposition cropped images inside their frames with pointer or keyboard controls.
+- Reposition and zoom cropped images per slot with pointer, keyboard, an amber 100–300% slider, or the mouse wheel.
 - Add, duplicate, delete, navigate, and print multiple binder pages.
 - Preview a dark binder sheet or the exact paper output.
 - Configure physical card dimensions, scale, gaps, image fit, paper, and cut guides.
@@ -55,8 +55,9 @@ Do not use the print dialog's “Fit to page” option; MichiBinder has already 
 | `←` / `→` | Previous / next page |
 | `PageUp` / `PageDown` | Previous / next page |
 | `F` | Fill from the current pool selection |
-| Double-click a filled slot | Reposition a cropped image |
+| Double-click a filled slot | Reposition and zoom an image |
 | Repositioning: arrows | Nudge by 1%; hold `Shift` to nudge by 10% |
+| Repositioning: mouse wheel | Zoom in or out by 5% without scrolling the page |
 
 ## Local development
 
