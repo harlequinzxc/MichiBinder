@@ -72,10 +72,6 @@ const CUSTOM_MIN_MM = 25;
 const CUSTOM_MAX_MM = 150;
 const DEFAULT_CARD_SIZE = { preset: 'pokemon', scale: 1, customWmm: 65, customHmm: 90 };
 const PRINT_SAFE_MARGIN_IN = 0.125;
-// Chromium can round fractional CSS Grid tracks differently in generated PDFs. Build the
-// print grid on an integral 100 px/mm model, then map it back to exact CSS physical units.
-const PRINT_MODEL_PX_PER_MM = 100;
-const PRINT_MODEL_SCALE = 96 / (25.4 * PRINT_MODEL_PX_PER_MM);
 const DRAG_MIME = 'application/x-card-binder';
 const TCGDEX_API_BASE = 'https://api.tcgdex.net/v2/en';
 const TCGDEX_SEARCH_ENDPOINT = `${TCGDEX_API_BASE}/cards?name=`;
@@ -1193,7 +1189,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.26.5</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.26.6</span>
         </div>
         <SaveStatus isFolderLinked={isFolderLinked} />
       </div>
@@ -5152,13 +5148,6 @@ export default function CardBinder() {
   const printGap = settings.gap * printFit;
   const printGridWidth = spanW(dims.cols, printGap, printCard);
   const printGridHeight = spanH(dims.rows, printGap, printCard);
-  const printModelCard = {
-    w: (printCard.w / MM) * PRINT_MODEL_PX_PER_MM,
-    h: (printCard.h / MM) * PRINT_MODEL_PX_PER_MM,
-  };
-  const printModelGap = (printGap / MM) * PRINT_MODEL_PX_PER_MM;
-  const printModelGridWidth = spanW(dims.cols, printModelGap, printModelCard);
-  const printModelGridHeight = spanH(dims.rows, printModelGap, printModelCard);
 
   const printTree = (
     <div className="print-root" aria-hidden="true" style={{ '--paper-w': paper.w, '--paper-h': paper.h }}>
@@ -5181,83 +5170,75 @@ export default function CardBinder() {
             >
               <div
                 data-print-grid
-                className="sheet-grid absolute left-0 top-0 bg-white text-black overflow-hidden"
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: `repeat(${dims.cols}, ${printModelCard.w}px)`,
-                  gridTemplateRows: `repeat(${dims.rows}, ${printModelCard.h}px)`,
-                  gap: `${printModelGap}px`,
-                  width: `${printModelGridWidth}px`,
-                  height: `${printModelGridHeight}px`,
-                  transform: `scale(${PRINT_MODEL_SCALE})`,
-                  transformOrigin: 'top left',
-                }}
+                className="relative size-full bg-white text-black overflow-hidden"
               >
                 {printSlots.map((slot) => {
-                const id = page.slots[slot.key];
-                const cardImageURL = images[id] || pool.find((item) => item.id === id)?.src;
-                const customMeta = page.metaData?.[slot.key];
-                const colSpan = customMeta ? customMeta.colSpan : (slot.cs || 1);
-                const rowSpan = customMeta ? customMeta.rowSpan : (slot.rs || 1);
-                const crop = id ? getCrop(page, slot.key, id) : { x: 50, y: 50, z: IMAGE_ZOOM_MIN };
-                const focusPosition = `${crop.x}% ${crop.y}%`;
-                const printFrame = {
-                  w: spanW(colSpan, printGap, printCard),
-                  h: spanH(rowSpan, printGap, printCard),
-                };
-                const natural = imageDims[id];
-                const printGeometry = natural
-                  ? imageFitGeometry(natural.w, natural.h, printFrame, settings.fit, crop.z)
-                  : null;
-                const backgroundSize = crop.z === IMAGE_ZOOM_MIN || !printGeometry
-                  ? settings.fit
-                  : `${(printGeometry.dispW / printFrame.w) * 100}% ${(printGeometry.dispH / printFrame.h) * 100}%`;
+                  const id = page.slots[slot.key];
+                  const cardImageURL = images[id] || pool.find((item) => item.id === id)?.src;
+                  const customMeta = page.metaData?.[slot.key];
+                  const colSpan = customMeta ? customMeta.colSpan : (slot.cs || 1);
+                  const rowSpan = customMeta ? customMeta.rowSpan : (slot.rs || 1);
+                  const crop = id ? getCrop(page, slot.key, id) : { x: 50, y: 50, z: IMAGE_ZOOM_MIN };
+                  const focusPosition = `${crop.x}% ${crop.y}%`;
+                  const printFrame = {
+                    w: spanW(colSpan, printGap, printCard),
+                    h: spanH(rowSpan, printGap, printCard),
+                  };
+                  const printLeft = slot.c * (printCard.w + printGap);
+                  const printTop = slot.r * (printCard.h + printGap);
+                  const natural = imageDims[id];
+                  const printGeometry = natural
+                    ? imageFitGeometry(natural.w, natural.h, printFrame, settings.fit, crop.z)
+                    : null;
+                  const backgroundSize = crop.z === IMAGE_ZOOM_MIN || !printGeometry
+                    ? settings.fit
+                    : `${(printGeometry.dispW / printFrame.w) * 100}% ${(printGeometry.dispH / printFrame.h) * 100}%`;
 
-                return (
-                  <div
-                    key={slot.key}
-                    data-print-slot={slot.key}
-                    data-print-source-slot={slot.key}
-                    data-print-frame-width-mm={round1(printFrame.w / MM)}
-                    data-print-frame-height-mm={round1(printFrame.h / MM)}
-                    className="relative overflow-hidden bg-neutral-100/50"
-                    style={{
-                      gridColumn: `${slot.c + 1} / span ${colSpan}`,
-                      gridRow: `${slot.r + 1} / span ${rowSpan}`,
-                      width: '100%',
-                      height: '100%',
-                    }}
-                  >
-                    {cardImageURL && (
-                      <>
-                        <img
-                          src={cardImageURL}
-                          alt=""
-                          hidden
-                          onLoad={(event) => {
-                            const { naturalWidth: w, naturalHeight: h } = event.currentTarget;
-                            setImageDims((value) => value[id]?.w === w && value[id]?.h === h ? value : { ...value, [id]: { w, h } });
-                          }}
-                        />
-                        <div
-                          data-print-image={id}
-                          data-print-crop-x={round1(crop.x)}
-                          data-print-crop-y={round1(crop.y)}
-                          data-print-zoom={round1(crop.z)}
-                          className="w-full h-full printable-card-slice"
-                          style={{
-                            backgroundImage: `url(${cardImageURL})`,
-                            backgroundSize,
-                            backgroundPosition: focusPosition,
-                            backgroundRepeat: 'no-repeat',
-                            width: '100%',
-                            height: '100%',
-                          }}
-                        />
-                      </>
-                    )}
-                    {settings.cutGuides && <span aria-hidden="true" className="pointer-events-none absolute inset-0 z-10" style={{ outline: `${0.2 / PRINT_MODEL_SCALE}pt solid #9ca3af` }} />}
-                  </div>
+                  return (
+                    <div
+                      key={slot.key}
+                      data-print-slot={slot.key}
+                      data-print-source-slot={slot.key}
+                      data-print-frame-width-mm={round1(printFrame.w / MM)}
+                      data-print-frame-height-mm={round1(printFrame.h / MM)}
+                      className="absolute overflow-hidden bg-neutral-100/50"
+                      style={{
+                        left: `${printLeft / MM}mm`,
+                        top: `${printTop / MM}mm`,
+                        width: `${printFrame.w / MM}mm`,
+                        height: `${printFrame.h / MM}mm`,
+                      }}
+                    >
+                      {cardImageURL && (
+                        <>
+                          <img
+                            src={cardImageURL}
+                            alt=""
+                            hidden
+                            onLoad={(event) => {
+                              const { naturalWidth: w, naturalHeight: h } = event.currentTarget;
+                              setImageDims((value) => value[id]?.w === w && value[id]?.h === h ? value : { ...value, [id]: { w, h } });
+                            }}
+                          />
+                          <div
+                            data-print-image={id}
+                            data-print-crop-x={round1(crop.x)}
+                            data-print-crop-y={round1(crop.y)}
+                            data-print-zoom={round1(crop.z)}
+                            className="w-full h-full printable-card-slice"
+                            style={{
+                              backgroundImage: `url(${cardImageURL})`,
+                              backgroundSize,
+                              backgroundPosition: focusPosition,
+                              backgroundRepeat: 'no-repeat',
+                              width: '100%',
+                              height: '100%',
+                            }}
+                          />
+                        </>
+                      )}
+                      {settings.cutGuides && <span aria-hidden="true" className="pointer-events-none absolute inset-0 z-10" style={{ outline: '0.2pt solid #9ca3af' }} />}
+                    </div>
                   );
                 })}
               </div>
