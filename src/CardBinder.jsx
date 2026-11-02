@@ -72,6 +72,10 @@ const CUSTOM_MIN_MM = 25;
 const CUSTOM_MAX_MM = 150;
 const DEFAULT_CARD_SIZE = { preset: 'pokemon', scale: 1, customWmm: 65, customHmm: 90 };
 const PRINT_SAFE_MARGIN_IN = 0.125;
+// Chromium can round fractional CSS Grid tracks differently in generated PDFs. Build the
+// print grid on an integral 100 px/mm model, then map it back to exact CSS physical units.
+const PRINT_MODEL_PX_PER_MM = 100;
+const PRINT_MODEL_SCALE = 96 / (25.4 * PRINT_MODEL_PX_PER_MM);
 const DRAG_MIME = 'application/x-card-binder';
 const TCGDEX_API_BASE = 'https://api.tcgdex.net/v2/en';
 const TCGDEX_SEARCH_ENDPOINT = `${TCGDEX_API_BASE}/cards?name=`;
@@ -1189,7 +1193,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.26.4</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.26.5</span>
         </div>
         <SaveStatus isFolderLinked={isFolderLinked} />
       </div>
@@ -1289,6 +1293,10 @@ function RightControlRail({
             <RailButton icon="printer" label="Print / PDF" active={openPanel === 'print-menu'} expanded={openPanel === 'print-menu'} onClick={() => togglePanel('print-menu')} />
             {openPanel === 'print-menu' && (
               <RailPopover title="Print / PDF" icon="printer">
+                <div data-print-command-size className={`flex items-center justify-between rounded-lg border px-3 py-2 font-mono text-[10px] ${fitInfo.fitsTrueSize ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300' : 'border-amber-500/20 bg-amber-500/10 text-amber-300'}`}>
+                  <span>PDF card size</span>
+                  <strong>{fmtMm(fitInfo.outputCardW)} × {fmtMm(fitInfo.outputCardH)} mm</strong>
+                </div>
                 <span className="text-[9px] font-bold tracking-widest text-neutral-500 uppercase">Print scope</span>
                 <div className="grid gap-1.5">
                   <button type="button" onClick={() => { setPrintScope('all'); setTimeout(() => onPrint(), 50); }} className="flex w-full items-center gap-2 rounded-lg border border-white/[0.05] bg-neutral-900/60 px-3 py-2 text-left transition-colors hover:bg-neutral-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500">
@@ -1513,10 +1521,16 @@ function PrintSetupContent({ settings, setSettings, fitInfo, suggestedPaper, pri
           {Object.entries(PAPER_SIZES).map(([key, paper]) => <option key={key} value={key}>{paper.label}</option>)}
         </select>
       </label>
-      <div className={`flex items-center gap-2 rounded-lg p-2 ${fitInfo.fitsTrueSize ? 'bg-emerald-500/10 text-emerald-300' : 'bg-amber-500/10 text-amber-300'}`}>
-        <Icon name={fitInfo.fitsTrueSize ? 'check' : 'alert'} />
-        <span>{fitInfo.fitsTrueSize ? `True size on ${PAPER_SIZES[settings.paper].short}` : `${PAPER_SIZES[settings.paper].short} prints at ${fmtPct(fitInfo.printFit)}`}</span>
-        {!fitInfo.fitsTrueSize && suggestedPaper && <button type="button" onClick={() => setSettings((value) => ({ ...value, paper: suggestedPaper }))} className="ml-auto font-semibold underline decoration-white/30 underline-offset-2">Use {PAPER_SIZES[suggestedPaper].short}</button>}
+      <div className={`rounded-lg p-2 ${fitInfo.fitsTrueSize ? 'bg-emerald-500/10 text-emerald-300' : 'bg-amber-500/10 text-amber-300'}`}>
+        <div className="flex items-center gap-2">
+          <Icon name={fitInfo.fitsTrueSize ? 'check' : 'alert'} />
+          <span>{fitInfo.fitsTrueSize ? `True size on ${PAPER_SIZES[settings.paper].short}` : `${PAPER_SIZES[settings.paper].short} prints at ${fmtPct(fitInfo.printFit)}`}</span>
+          {!fitInfo.fitsTrueSize && suggestedPaper && <button type="button" onClick={() => setSettings((value) => ({ ...value, paper: suggestedPaper }))} className="ml-auto font-semibold underline decoration-white/30 underline-offset-2">Use {PAPER_SIZES[suggestedPaper].short}</button>}
+        </div>
+        <div data-print-output-size className="mt-2 flex items-center justify-between border-t border-current/15 pt-2 font-mono text-[10px]">
+          <span className="opacity-75">PDF card size</span>
+          <strong>{fmtMm(fitInfo.outputCardW)} × {fmtMm(fitInfo.outputCardH)} mm</strong>
+        </div>
       </div>
       <fieldset>
         <legend className="mb-1 text-[11px] font-medium text-zinc-400">Pocket gap</legend>
@@ -2236,7 +2250,14 @@ export default function CardBinder() {
   const fitFor = useCallback((paperValue) => Math.min(1, (paperValue.wIn - 2 * PRINT_SAFE_MARGIN_IN) / gridW, (paperValue.hIn - 2 * PRINT_SAFE_MARGIN_IN) / gridH), [gridW, gridH]);
   const printFit = fitFor(paper);
   const fitsTrueSize = printFit >= 0.9999;
-  const fitInfo = { gridW, gridH, printFit, fitsTrueSize };
+  const fitInfo = {
+    gridW,
+    gridH,
+    printFit,
+    fitsTrueSize,
+    outputCardW: card.w * printFit,
+    outputCardH: card.h * printFit,
+  };
   const suggestedPaper = Object.entries(PAPER_SIZES).find(([, value]) => fitFor(value) >= 0.9999)?.[0] || null;
   const current = pages[currentPage] || pages[0];
   const currentFilledCount = useMemo(() => current ? getSlots(current, dims).filter((slot) => current.slots[slot.key]).length : 0, [current, dims]);
@@ -5127,6 +5148,18 @@ export default function CardBinder() {
     );
   };
 
+  const printCard = { w: card.w * printFit, h: card.h * printFit };
+  const printGap = settings.gap * printFit;
+  const printGridWidth = spanW(dims.cols, printGap, printCard);
+  const printGridHeight = spanH(dims.rows, printGap, printCard);
+  const printModelCard = {
+    w: (printCard.w / MM) * PRINT_MODEL_PX_PER_MM,
+    h: (printCard.h / MM) * PRINT_MODEL_PX_PER_MM,
+  };
+  const printModelGap = (printGap / MM) * PRINT_MODEL_PX_PER_MM;
+  const printModelGridWidth = spanW(dims.cols, printModelGap, printModelCard);
+  const printModelGridHeight = spanH(dims.rows, printModelGap, printModelCard);
+
   const printTree = (
     <div className="print-root" aria-hidden="true" style={{ '--paper-w': paper.w, '--paper-h': paper.h }}>
       <style>{`@page { size: ${paper.w} ${paper.h}; margin: 0; }`}</style>
@@ -5136,17 +5169,31 @@ export default function CardBinder() {
           <section key={page.id} className="print-page">
             <div
               data-print-sheet
-              className="sheet-grid w-full size-full bg-white text-black p-[0.3in] overflow-hidden print:m-0"
+              data-print-card-width-mm={round1(printCard.w / MM)}
+              data-print-card-height-mm={round1(printCard.h / MM)}
+              data-print-scale={round1(printFit * 100)}
+              className="relative bg-white text-black overflow-visible print:m-0"
               style={{
-                display: 'grid',
-                gridTemplateColumns: `repeat(${dims.cols}, 1fr)`,
-                gridTemplateRows: `repeat(${dims.rows}, 1fr)`,
-                gap: `${settings.gap}in`,
-                width: '100%',
-                height: '100%',
+                width: `${printGridWidth / MM}mm`,
+                height: `${printGridHeight / MM}mm`,
+                boxSizing: 'border-box',
               }}
             >
-              {printSlots.map((slot) => {
+              <div
+                data-print-grid
+                className="sheet-grid absolute left-0 top-0 bg-white text-black overflow-hidden"
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: `repeat(${dims.cols}, ${printModelCard.w}px)`,
+                  gridTemplateRows: `repeat(${dims.rows}, ${printModelCard.h}px)`,
+                  gap: `${printModelGap}px`,
+                  width: `${printModelGridWidth}px`,
+                  height: `${printModelGridHeight}px`,
+                  transform: `scale(${PRINT_MODEL_SCALE})`,
+                  transformOrigin: 'top left',
+                }}
+              >
+                {printSlots.map((slot) => {
                 const id = page.slots[slot.key];
                 const cardImageURL = images[id] || pool.find((item) => item.id === id)?.src;
                 const customMeta = page.metaData?.[slot.key];
@@ -5154,13 +5201,9 @@ export default function CardBinder() {
                 const rowSpan = customMeta ? customMeta.rowSpan : (slot.rs || 1);
                 const crop = id ? getCrop(page, slot.key, id) : { x: 50, y: 50, z: IMAGE_ZOOM_MIN };
                 const focusPosition = `${crop.x}% ${crop.y}%`;
-                const printContentWidth = paper.wIn - 0.6;
-                const printContentHeight = paper.hIn - 0.6;
-                const printCellWidth = (printContentWidth - settings.gap * (dims.cols - 1)) / dims.cols;
-                const printCellHeight = (printContentHeight - settings.gap * (dims.rows - 1)) / dims.rows;
                 const printFrame = {
-                  w: printCellWidth * colSpan + settings.gap * (colSpan - 1),
-                  h: printCellHeight * rowSpan + settings.gap * (rowSpan - 1),
+                  w: spanW(colSpan, printGap, printCard),
+                  h: spanH(rowSpan, printGap, printCard),
                 };
                 const natural = imageDims[id];
                 const printGeometry = natural
@@ -5175,6 +5218,8 @@ export default function CardBinder() {
                     key={slot.key}
                     data-print-slot={slot.key}
                     data-print-source-slot={slot.key}
+                    data-print-frame-width-mm={round1(printFrame.w / MM)}
+                    data-print-frame-height-mm={round1(printFrame.h / MM)}
                     className="relative overflow-hidden bg-neutral-100/50"
                     style={{
                       gridColumn: `${slot.c + 1} / span ${colSpan}`,
@@ -5211,10 +5256,11 @@ export default function CardBinder() {
                         />
                       </>
                     )}
-                    {settings.cutGuides && <span aria-hidden="true" className="pointer-events-none absolute inset-0 z-10" style={{ outline: '0.2pt solid #9ca3af' }} />}
+                    {settings.cutGuides && <span aria-hidden="true" className="pointer-events-none absolute inset-0 z-10" style={{ outline: `${0.2 / PRINT_MODEL_SCALE}pt solid #9ca3af` }} />}
                   </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           </section>
         );

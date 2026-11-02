@@ -28,9 +28,9 @@ MichiBinder is a private, desktop-first card-layout workspace for arranging trad
 
 ## Card size and print accuracy
 
-All dimensions shown in the app are **millimetres**. The layout engine converts them to physical inches internally so browser print output remains true to size. The default Pokémon TCG preset is 65 × 90 mm. At 100% scale with a 1.5 mm gap, a 9-pocket grid fits at true size on A4.
+All dimensions shown in the app are **millimetres**. The default Pokémon TCG preset is 65 × 90 mm. At 100% scale with a 1.5 mm gap, a 9-pocket grid fits at true size on A4. The print renderer uses fixed physical card tracks rather than stretching rows or columns to fill the paper, so the PDF card geometry matches the Paper preview.
 
-The true-size badge reports whether the selected grid fits inside the current paper's safe area. If it does not fit, the app shows the exact reduction and suggests the smallest supported larger paper.
+Both **Print / PDF** and **Print setup** disclose the calculated PDF card size before printing. The true-size badge reports whether the selected grid fits inside the current paper's safe area; if it does not fit, the displayed output dimensions include the exact reduction and the app suggests the smallest supported larger paper.
 
 ### Save as PDF
 

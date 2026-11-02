@@ -376,7 +376,8 @@ img {
 
   .print-page {
     width: var(--paper-w);
-    height: calc(var(--paper-h) - 1mm);
+    height: var(--paper-h);
+    box-sizing: border-box;
     display: flex;
     align-items: center;
     justify-content: center;
