@@ -32,6 +32,7 @@ import {
   RotateCw,
   Ruler,
   RulerDimensionLine,
+  Save,
   Sparkles,
   SquareDashedMousePointer,
   TableCellsMerge,
@@ -64,6 +65,10 @@ const MM = 1 / 25.4;
 const STORAGE_KEY = 'digital-card-binder:v1';
 const BINDER_REPOSITORY_KEY = 'digital-card-binder:repository:v1';
 const BINDER_REPOSITORY_VERSION = 1;
+const PROJECT_FILE_FORMAT = 'michibinder-project';
+const PROJECT_FILE_VERSION = 1;
+const PROJECT_FILE_EXTENSION = '.michibinder';
+const PROJECT_FILE_MIME = 'application/vnd.michibinder+json';
 const SCHEMA_VERSION = 5;
 const CARD_PRESETS = [{ id: 'pokemon', label: 'Pokémon TCG', hint: '65 × 90 mm', wMm: 65, hMm: 90 }];
 const SCALE_MIN = 0.8;
@@ -270,6 +275,52 @@ const normalizeTcgdexSets = (payload) => {
     });
 };
 const safeFileName = (value) => String(value || 'pokemon-card').replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim() || 'pokemon-card';
+const blobToDataUrl = (blob) => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => resolve(String(reader.result || ''));
+  reader.onerror = () => reject(reader.error || new Error('Could not read image data.'));
+  reader.readAsDataURL(blob);
+});
+const imageSourceToDataUrl = async (source) => {
+  const value = typeof source === 'string' ? source.trim() : '';
+  if (value.startsWith('data:image/')) return value;
+  if (!value) throw new Error('Image source is missing.');
+  const response = await fetch(value);
+  if (!response.ok) throw new Error(`Image request returned ${response.status}.`);
+  const blob = await response.blob();
+  if (!blob.type.startsWith('image/')) throw new Error('Asset is not an image.');
+  return blobToDataUrl(blob);
+};
+const projectDataUrlToBlob = async (dataUrl) => {
+  if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) throw new Error('Project image data is invalid.');
+  const response = await fetch(dataUrl);
+  const blob = await response.blob();
+  if (!blob.type.startsWith('image/')) throw new Error('Project asset is not an image.');
+  const objectUrl = URL.createObjectURL(blob);
+  try {
+    await new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => image.naturalWidth > 0 && image.naturalHeight > 0 ? resolve() : reject(new Error('Project image has no dimensions.'));
+      image.onerror = () => reject(new Error('Project image data could not be decoded.'));
+      image.src = objectUrl;
+    });
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+  return blob;
+};
+const uniqueImportedName = (requestedName, usedNames) => {
+  const base = String(requestedName || 'Imported Binder').trim().slice(0, 80) || 'Imported Binder';
+  let candidate = base;
+  let suffix = 1;
+  while (usedNames.has(candidate.toLocaleLowerCase())) {
+    suffix += 1;
+    const label = suffix === 2 ? ' (Imported)' : ` (Imported ${suffix - 1})`;
+    candidate = `${base.slice(0, Math.max(1, 80 - label.length))}${label}`;
+  }
+  usedNames.add(candidate.toLocaleLowerCase());
+  return candidate;
+};
 const inferTcgdexId = (item) => {
   if (item?.source !== 'tcgdex') return '';
   if (typeof item.tcgdexId === 'string' && item.tcgdexId.trim()) return item.tcgdexId.trim();
@@ -922,6 +973,117 @@ const idbDeleteLegacyDirectoryHandle = async () => {
   });
 };
 
+const collectRepositoryIds = (binders) => {
+  const used = {
+    binders: new Set(),
+    assets: new Set(),
+    pages: new Set(),
+    sheets: new Set(),
+    merges: new Set(),
+  };
+  binders.forEach((binder) => {
+    used.binders.add(binder.id);
+    binder.pool.forEach((item) => used.assets.add(item.id));
+    binder.pages.forEach((page) => {
+      used.pages.add(page.id);
+      if (page.sheetId) used.sheets.add(page.sheetId);
+      (page.merges || []).forEach((merge) => used.merges.add(merge.id));
+    });
+  });
+  return used;
+};
+const createCollisionSafeId = (prefix, usedIds) => {
+  let candidate = uid(prefix);
+  while (usedIds.has(candidate)) candidate = uid(prefix);
+  usedIds.add(candidate);
+  return candidate;
+};
+const remapPortableProject = (project, existingBinders) => {
+  if (!project || project.format !== PROJECT_FILE_FORMAT) throw new Error('This is not a MichiBinder project file.');
+  const version = Number(project.version);
+  if (!Number.isInteger(version) || version < 1 || version > PROJECT_FILE_VERSION) throw new Error('This project file version is not supported.');
+  if (!Array.isArray(project.binders) || !project.binders.length) throw new Error('The project does not contain any binders.');
+
+  const used = collectRepositoryIds(existingBinders);
+  const usedNames = new Set(existingBinders.map((binder) => binder.name.toLocaleLowerCase()));
+  const binderIdMap = new Map();
+  const imported = project.binders.map((entry, binderIndex) => {
+    if (!entry?.binder || typeof entry.binder !== 'object' || Array.isArray(entry.binder)) throw new Error(`Binder ${binderIndex + 1} is invalid.`);
+    if (!Array.isArray(entry.assets)) throw new Error(`Binder ${binderIndex + 1} does not contain embedded assets.`);
+    const sourceBinder = sanitizeBinderRecord(entry.binder, binderIndex);
+    const sourceBinderId = typeof entry.binder.id === 'string' && entry.binder.id ? entry.binder.id : '';
+    if (!sourceBinderId || binderIdMap.has(sourceBinderId)) throw new Error('Project binder IDs are missing or duplicated.');
+    const newBinderId = createCollisionSafeId('binder', used.binders);
+    binderIdMap.set(sourceBinderId, newBinderId);
+
+    const embeddedAssets = new Map();
+    entry.assets.forEach((asset) => {
+      const assetId = typeof asset?.id === 'string' ? asset.id : '';
+      if (!assetId || embeddedAssets.has(assetId) || typeof asset.data !== 'string' || !asset.data.startsWith('data:image/')) {
+        throw new Error(`Embedded assets for “${sourceBinder.name}” are invalid.`);
+      }
+      embeddedAssets.set(assetId, asset.data);
+    });
+    const assetIdMap = new Map();
+    const seenSourceAssetIds = new Set();
+    const remappedAssets = sourceBinder.pool.map((item) => {
+      if (seenSourceAssetIds.has(item.id)) throw new Error(`“${sourceBinder.name}” contains duplicate card IDs.`);
+      seenSourceAssetIds.add(item.id);
+      const data = embeddedAssets.get(item.id);
+      if (!data) throw new Error(`“${sourceBinder.name}” is missing the image for “${item.name}”.`);
+      const id = createCollisionSafeId('image', used.assets);
+      assetIdMap.set(item.id, id);
+      return { id, sourceId: item.id, data };
+    });
+    if (embeddedAssets.size !== remappedAssets.length) throw new Error(`“${sourceBinder.name}” contains unreferenced embedded assets.`);
+
+    const sheetIdMap = new Map();
+    sourceBinder.pages.forEach((page) => {
+      if (page.sheetId && !sheetIdMap.has(page.sheetId)) sheetIdMap.set(page.sheetId, createCollisionSafeId('sheet', used.sheets));
+    });
+    const remappedPages = sourceBinder.pages.map((page) => {
+      const slots = Object.fromEntries(Object.entries(page.slots || {}).map(([key, assetId]) => {
+        const remappedId = assetIdMap.get(assetId);
+        if (!remappedId) throw new Error(`“${sourceBinder.name}” contains a card assignment without an embedded image.`);
+        return [key, remappedId];
+      }));
+      const crops = Object.fromEntries(Object.entries(page.crops || {})
+        .filter(([key]) => slots[key])
+        .map(([key, crop]) => [key, { ...crop, img: slots[key] }]));
+      return {
+        ...page,
+        id: createCollisionSafeId('page', used.pages),
+        sheetId: sheetIdMap.get(page.sheetId) || createCollisionSafeId('sheet', used.sheets),
+        merges: (page.merges || []).map((merge) => ({ ...merge, id: createCollisionSafeId('merge', used.merges) })),
+        slots,
+        crops,
+      };
+    });
+    const remappedPool = sourceBinder.pool.map((item) => {
+      const { src: _discardedSource, ...portableItem } = item;
+      return { ...portableItem, id: assetIdMap.get(item.id) };
+    });
+    const remappedPrices = Object.fromEntries(Object.entries(sourceBinder.cardPrices || {}).map(([key, value]) => [assetIdMap.get(key) || key, value]));
+    const binder = sanitizeBinderRecord({
+      ...sourceBinder,
+      id: newBinderId,
+      name: uniqueImportedName(sourceBinder.name, usedNames),
+      directoryHandleKey: '',
+      directoryName: '',
+      updatedAt: new Date().toISOString(),
+      pool: remappedPool,
+      pages: remappedPages,
+      cardPrices: remappedPrices,
+    }, existingBinders.length + binderIndex);
+    return { binder, assets: remappedAssets };
+  });
+  const requestedActiveId = typeof project.activeBinderId === 'string' ? project.activeBinderId : '';
+  return {
+    imported,
+    activeBinderId: binderIdMap.get(requestedActiveId) || imported[0].binder.id,
+  };
+};
+
 const ICONS = {
   alert: AlertTriangle,
   book: BookOpen,
@@ -937,6 +1099,7 @@ const ICONS = {
   eyeOff: EyeOff,
   file: FileIcon,
   fileSliders: FileSliders,
+  folderOpen: FolderOpen,
   grid: LayoutGrid,
   grid2x2: Grid2X2,
   grid3x3: Grid3X3,
@@ -957,6 +1120,7 @@ const ICONS = {
   rotate: RotateCw,
   ruler: Ruler,
   rulerDimension: RulerDimensionLine,
+  save: Save,
   selectAll: Check,
   split: TableCellsSplit,
   sparkles: Sparkles,
@@ -1189,7 +1353,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.26.6</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.27.0</span>
         </div>
         <SaveStatus isFolderLinked={isFolderLinked} />
       </div>
@@ -1218,17 +1382,18 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
   );
 }
 
-function RailButton({ icon, label, active = false, expanded, onClick, className = '', children }) {
+function RailButton({ icon, label, active = false, expanded, onClick, disabled = false, className = '', children }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       aria-label={label}
       aria-pressed={active}
       aria-expanded={expanded}
       aria-haspopup={expanded === undefined ? undefined : 'dialog'}
       title={label}
-      className={`relative w-8 h-8 flex shrink-0 items-center justify-center rounded-lg bg-neutral-800/40 hover:bg-neutral-700/60 border border-white/[0.03] transition-all duration-100 active:scale-[0.93] transform-gpu will-change-transform cursor-pointer shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${active ? '!border-red-500/30 !bg-red-950/70 text-red-300' : 'text-neutral-400 hover:text-neutral-200'} ${className}`}
+      className={`relative w-8 h-8 flex shrink-0 items-center justify-center rounded-lg bg-neutral-800/40 hover:bg-neutral-700/60 border border-white/[0.03] transition-all duration-100 active:scale-[0.93] transform-gpu will-change-transform cursor-pointer shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:pointer-events-none disabled:cursor-wait disabled:text-neutral-700 ${active ? '!border-red-500/30 !bg-red-950/70 text-red-300' : 'text-neutral-400 hover:text-neutral-200'} ${className}`}
     >
       {icon && <Icon name={icon} />}
       {children}
@@ -1269,6 +1434,9 @@ function RightControlRail({
   onReset,
   installPrompt,
   onInstall,
+  onSaveProject,
+  onOpenProject,
+  projectTransferStatus,
   notify,
   getGridRipPromptText,
 }) {
@@ -1282,8 +1450,13 @@ function RightControlRail({
   const chooseView = (view) => { onViewChange(view); setOpenPanel(null); };
 
   return (
-    <aside data-control-rail aria-label="Layout and print controls" className="no-print py-3 pr-3 flex items-center justify-center z-40 select-none max-h-[calc(100vh-176px)] shrink-0">
-      <div data-control-pod className="w-14 h-full bg-neutral-900/85 backdrop-blur-md border border-white/[0.06] rounded-2xl flex flex-col items-center py-4 gap-6 shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)] [@media(max-height:720px)]:gap-3">
+    <aside data-control-rail aria-label="Project, layout, and print controls" className="no-print py-3 pr-3 flex items-center justify-center z-40 select-none max-h-[calc(100vh-176px)] shrink-0">
+      <div data-control-pod className="w-14 h-full bg-neutral-900/85 backdrop-blur-md border border-white/[0.06] rounded-2xl flex flex-col items-center py-4 gap-4 shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)] [@media(max-height:720px)]:gap-2">
+        <div data-rail-zone="project" className="flex flex-col items-center gap-2 [@media(max-height:720px)]:gap-1">
+          <RailButton icon="save" label={projectTransferStatus === 'saving' ? 'Saving project…' : 'Save project'} onClick={onSaveProject} disabled={Boolean(projectTransferStatus)} />
+          <RailButton icon="folderOpen" label={projectTransferStatus === 'opening' ? 'Opening project…' : 'Open project'} onClick={onOpenProject} disabled={Boolean(projectTransferStatus)} />
+        </div>
+        <span aria-hidden="true" className="h-px w-7 bg-white/[0.06]" />
         <div data-rail-zone="primary" className="flex flex-col items-center gap-2 [@media(max-height:720px)]:gap-1">
           <div className="relative flex">
             <RailButton icon="printer" label="Print / PDF" active={openPanel === 'print-menu'} expanded={openPanel === 'print-menu'} onClick={() => togglePanel('print-menu')} />
@@ -2079,6 +2252,7 @@ export default function CardBinder() {
   const [selectedCardIds, setSelectedCardIds] = useState([]);
   const [selectionAnchorId, setSelectionAnchorId] = useState(null);
   const [saveStatus, setSaveStatus] = useState('saved');
+  const [projectTransferStatus, setProjectTransferStatus] = useState('');
   const [storageMode, setStorageMode] = useState('indexeddb');
   const [directoryHandles, setDirectoryHandles] = useState({});
   const currentDirectoryHandle = directoryHandles[activeBinderIdState] || null;
@@ -2115,6 +2289,7 @@ export default function CardBinder() {
   const timelineScrollRef = useRef(null);
   const timelineRevealPageIdRef = useRef(null);
   const inputRef = useRef(null);
+  const projectInputRef = useRef(null);
   const dragRef = useRef(null);
   const searchAbortRef = useRef(null);
   const searchDebounceRef = useRef(null);
@@ -2492,31 +2667,176 @@ export default function CardBinder() {
     notify(`${binder.name} is ready.`, 'success');
   }, [commitAndActivateBinder, notify]);
 
-  const handleWizardJsonImport = useCallback(async (file) => {
+  const importLegacyBinderSnapshot = useCallback((parsed, file) => {
+    const repositoryCandidate = Array.isArray(parsed?.binders)
+      ? parsed.binders.find((binder) => binder.id === parsed.activeBinderId) || parsed.binders[0]
+      : parsed?.binder || parsed;
+    if (!repositoryCandidate || typeof repositoryCandidate !== 'object' || Array.isArray(repositoryCandidate)) throw new Error('Backup does not contain binder data.');
+    const fallbackName = String(file.name || 'Restored Binder').replace(/\.json$/i, '');
+    const usedNames = new Set(bindersRef.current.map((binder) => binder.name.toLocaleLowerCase()));
+    const binder = sanitizeBinderRecord({
+      ...repositoryCandidate,
+      id: uid('binder'),
+      name: uniqueImportedName(repositoryCandidate.name || fallbackName, usedNames),
+      directoryHandleKey: '',
+      directoryName: '',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    commitAndActivateBinder(binder, true);
+    setIsBinderWizardOpen(false);
+    notify(`${binder.name} restored from legacy JSON. Images not embedded in that backup must be re-added.`, 'success');
+  }, [commitAndActivateBinder, notify]);
+
+  const handleSaveProject = useCallback(async () => {
+    if (projectTransferStatus) return;
+    setProjectTransferStatus('saving');
+    try {
+      const activeId = activeBinderIdRef.current;
+      const currentBinders = bindersRef.current.map((binder) => (
+        binder.id === activeId ? snapshotActiveBinder(binder) : binder
+      ));
+      if (!currentBinders.length) throw new Error('Create a binder before saving a project.');
+      bindersRef.current = currentBinders;
+      setBinders(currentBinders);
+      persistBinderRepository(currentBinders, activeId);
+
+      let storedRecords = [];
+      try { storedRecords = await idbGetAll(); } catch { /* Data-URL and currently rendered sources remain available. */ }
+      const storedByBinderAndAsset = new Map();
+      storedRecords.forEach((record) => {
+        if (record?.binderId && (record.assetId || record.id)) {
+          storedByBinderAndAsset.set(binderImageRecordId(record.binderId, record.assetId || record.id), record);
+        } else if (record?.id) {
+          storedByBinderAndAsset.set(binderImageRecordId(activeId, record.id), record);
+        }
+      });
+
+      const portableBinders = [];
+      for (const binder of currentBinders) {
+        const seenAssetIds = new Set();
+        const assets = [];
+        for (const item of binder.pool) {
+          if (seenAssetIds.has(item.id)) throw new Error(`“${binder.name}” contains duplicate card IDs.`);
+          seenAssetIds.add(item.id);
+          const record = storedByBinderAndAsset.get(binderImageRecordId(binder.id, item.id));
+          let data = '';
+          if (record?.blob instanceof Blob) data = await blobToDataUrl(record.blob);
+          if (!data) {
+            const source = binder.id === activeId ? images[item.id] || item.src : item.src;
+            try { data = await imageSourceToDataUrl(source); } catch { /* A specific portability error is raised below. */ }
+          }
+          if (!data) throw new Error(`Could not embed “${item.name}” from “${binder.name}”. Open that binder while online or reconnect its Custom Card Vault, then try again.`);
+          assets.push({ id: item.id, data });
+        }
+        portableBinders.push({
+          binder: {
+            ...binder,
+            directoryHandleKey: '',
+            directoryName: '',
+            pool: binder.pool.map(({ src: _discardedSource, ...item }) => item),
+          },
+          assets,
+        });
+      }
+
+      const payload = {
+        format: PROJECT_FILE_FORMAT,
+        version: PROJECT_FILE_VERSION,
+        exportedAt: new Date().toISOString(),
+        exportedBy: 'MichiBinder',
+        activeBinderId: activeId,
+        binders: portableBinders,
+      };
+      const blob = new Blob([JSON.stringify(payload)], { type: PROJECT_FILE_MIME });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `${safeFileName(currentBinders.length === 1 ? currentBinders[0].name : 'MichiBinder Workspace')}${PROJECT_FILE_EXTENSION}`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      const imageCount = portableBinders.reduce((total, entry) => total + entry.assets.length, 0);
+      notify(`Project saved with ${plural(currentBinders.length, 'binder')} and ${plural(imageCount, 'embedded image')}.`, 'success');
+    } catch (error) {
+      notify(error?.message || 'The project could not be saved.', 'error');
+    } finally {
+      setProjectTransferStatus('');
+    }
+  }, [images, notify, projectTransferStatus, snapshotActiveBinder]);
+
+  const handleOpenProjectFile = useCallback(async (file) => {
+    if (!file || projectTransferStatus) return;
+    setProjectTransferStatus('opening');
+    let storedRecordIds = [];
     try {
       const parsed = JSON.parse(await file.text());
-      const repositoryCandidate = Array.isArray(parsed?.binders)
-        ? parsed.binders.find((binder) => binder.id === parsed.activeBinderId) || parsed.binders[0]
-        : parsed?.binder || parsed;
-      if (!repositoryCandidate || typeof repositoryCandidate !== 'object' || Array.isArray(repositoryCandidate)) throw new Error('Backup does not contain binder data.');
-      const fallbackName = String(file.name || 'Restored Binder').replace(/\.json$/i, '');
-      const binder = sanitizeBinderRecord({
-        ...repositoryCandidate,
-        id: uid('binder'),
-        name: repositoryCandidate.name || fallbackName,
-        directoryHandleKey: '',
-        directoryName: '',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-      commitAndActivateBinder(binder, true);
+      if (parsed?.format !== PROJECT_FILE_FORMAT) {
+        importLegacyBinderSnapshot(parsed, file);
+        return;
+      }
+
+      const activeId = activeBinderIdRef.current;
+      const existingBinders = bindersRef.current.map((binder) => (
+        binder.id === activeId ? snapshotActiveBinder(binder) : binder
+      ));
+      const remapped = remapPortableProject(parsed, existingBinders);
+      const storageRecords = [];
+      for (const entry of remapped.imported) {
+        for (let index = 0; index < entry.assets.length; index += 1) {
+          const asset = entry.assets[index];
+          const item = entry.binder.pool[index];
+          const blob = await projectDataUrlToBlob(asset.data);
+          storageRecords.push({
+            id: binderImageRecordId(entry.binder.id, asset.id),
+            assetId: asset.id,
+            binderId: entry.binder.id,
+            name: item.name,
+            type: blob.type,
+            blob,
+            source: item.source,
+            added: Date.now() + storageRecords.length,
+            ...(item.tcgdexId ? { tcgdexId: item.tcgdexId } : {}),
+          });
+        }
+      }
+
+      let importedEntries = remapped.imported;
+      try {
+        if (storageRecords.length) await idbPutMany(storageRecords);
+        storedRecordIds = storageRecords.map((record) => record.id);
+        setStorageMode('indexeddb');
+      } catch {
+        importedEntries = remapped.imported.map((entry) => ({
+          ...entry,
+          binder: {
+            ...entry.binder,
+            pool: entry.binder.pool.map((item, index) => ({ ...item, src: entry.assets[index].data })),
+          },
+        }));
+        setStorageMode('localstorage');
+      }
+
+      const importedBinders = importedEntries.map((entry) => entry.binder);
+      const nextBinders = [...existingBinders, ...importedBinders];
+      const target = importedBinders.find((binder) => binder.id === remapped.activeBinderId) || importedBinders[0];
+      persistBinderRepository(nextBinders, target.id);
+      localStorage.removeItem(STORAGE_KEY);
+      bindersRef.current = nextBinders;
+      setBinders(nextBinders);
+      activeBinderIdRef.current = target.id;
+      hydrateBinderWorkspace(target);
       setIsBinderWizardOpen(false);
-      notify(`${binder.name} restored from backup.`, 'success');
+      const imageCount = storageRecords.length;
+      notify(`Imported ${plural(importedBinders.length, 'binder')} with ${plural(imageCount, 'embedded image')}. Reconnect Custom Card Vault folders on this computer.`, 'success');
     } catch (error) {
-      console.error('Binder backup import failed:', error);
-      notify('The selected backup file is not a valid binder snapshot.', 'error');
+      if (storedRecordIds.length) idbDeleteMany(storedRecordIds).catch(() => {});
+      notify(error?.message || 'The selected file is not a valid MichiBinder project.', 'error');
+    } finally {
+      setProjectTransferStatus('');
     }
-  }, [commitAndActivateBinder, notify]);
+  }, [hydrateBinderWorkspace, importLegacyBinderSnapshot, notify, projectTransferStatus, snapshotActiveBinder]);
 
   useEffect(() => {
     if (!isBinderWizardOpen) return undefined;
@@ -5258,6 +5578,18 @@ export default function CardBinder() {
 
   return (
     <>
+      <input
+        ref={projectInputRef}
+        type="file"
+        accept={`${PROJECT_FILE_EXTENSION},${PROJECT_FILE_MIME},application/json,.json`}
+        aria-label="Open MichiBinder project"
+        className="sr-only no-print"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.target.value = '';
+          if (file) handleOpenProjectFile(file);
+        }}
+      />
       <div className="app-shell relative z-0 flex flex-col bg-[#0B0B0C] text-zinc-200" inert={isBinderWizardOpen ? true : undefined} aria-hidden={isBinderWizardOpen ? 'true' : undefined}>
         <AppBar
           isLeftSidebarOpen={isLeftSidebarOpen}
@@ -5485,6 +5817,9 @@ export default function CardBinder() {
                 onReset={resetBinder}
                 installPrompt={installPrompt}
                 onInstall={async () => { await installPrompt.prompt(); setInstallPrompt(null); }}
+                onSaveProject={handleSaveProject}
+                onOpenProject={() => projectInputRef.current?.click()}
+                projectTransferStatus={projectTransferStatus}
                 notify={notify}
                 getGridRipPromptText={getGridRipPromptText}
               />
@@ -5624,11 +5959,10 @@ export default function CardBinder() {
                 <div className="rounded-xl border border-white/[0.06] bg-neutral-950/55 p-3">
                   <div className="flex items-center justify-between gap-4">
                     <div className="min-w-0">
-                      <p className="text-[10px] font-semibold text-neutral-300">Restore a JSON backup</p>
-                      <p className="mt-0.5 text-[9px] leading-relaxed text-neutral-600">Restore from backup file</p>
+                      <p className="text-[10px] font-semibold text-neutral-300">Open a portable project</p>
+                      <p className="mt-0.5 text-[9px] leading-relaxed text-neutral-600">Imports all binders and embedded images; legacy JSON is also supported</p>
                     </div>
-                    <button type="button" onClick={() => document.getElementById('wizard-backup-picker')?.click()} className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-white/[0.08] bg-neutral-800 px-2.5 text-[10px] font-semibold text-neutral-300 transition-colors hover:bg-neutral-700 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Upload size={12} /> Restore</button>
-                    <input id="wizard-backup-picker" type="file" accept="application/json,.json" className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (file) handleWizardJsonImport(file); }} />
+                    <button type="button" disabled={Boolean(projectTransferStatus)} onClick={() => projectInputRef.current?.click()} className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-white/[0.08] bg-neutral-800 px-2.5 text-[10px] font-semibold text-neutral-300 transition-colors hover:bg-neutral-700 hover:text-white disabled:cursor-wait disabled:text-neutral-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><FolderOpen size={12} /> Open</button>
                   </div>
                 </div>
               </div>
