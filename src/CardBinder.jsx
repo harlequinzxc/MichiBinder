@@ -1353,7 +1353,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.27.1</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.27.2</span>
         </div>
         <SaveStatus isFolderLinked={isFolderLinked} />
       </div>
@@ -2771,6 +2771,84 @@ export default function CardBinder() {
     notify(`${binder.name} restored from legacy JSON. Images not embedded in that backup must be re-added.`, 'success');
   }, [commitAndActivateBinder, notify]);
 
+  const removeUnavailableProjectAsset = useCallback((asset) => {
+    const sourceBinder = bindersRef.current.find((binder) => binder.id === asset?.binderId);
+    if (!sourceBinder) {
+      notify('That binder is no longer available.', 'warn');
+      return;
+    }
+    if (!window.confirm(`Permanently remove the unavailable unplaced card “${asset.name}” from “${sourceBinder.name}”?`)) return;
+
+    const activeId = activeBinderIdRef.current;
+    const liveWorkspace = workspaceStateRef.current;
+    let nextBinders = bindersRef.current.map((binder) => (
+      binder.id === activeId && liveWorkspace
+        ? serializeBinderWorkspace(binder, liveWorkspace)
+        : binder
+    ));
+    const committedTarget = nextBinders.find((binder) => binder.id === asset.binderId);
+    if (!committedTarget?.pool.some((item) => item.id === asset.assetId)) {
+      notify(`“${asset.name}” was already removed from the library.`, 'info');
+      return;
+    }
+    const nextPool = committedTarget.pool.filter((item) => item.id !== asset.assetId);
+    const nextPages = pruneMissingImages(committedTarget.pages, new Set(nextPool.map((item) => item.id)));
+    const nextPrices = { ...committedTarget.cardPrices };
+    delete nextPrices[asset.assetId];
+    const nextTarget = {
+      ...committedTarget,
+      updatedAt: new Date().toISOString(),
+      pool: nextPool,
+      pages: nextPages,
+      cardPrices: nextPrices,
+    };
+    nextBinders = nextBinders.map((binder) => binder.id === asset.binderId ? nextTarget : binder);
+
+    try {
+      persistBinderRepository(nextBinders, activeId);
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      notify('The unavailable card could not be removed from browser storage.', 'error');
+      return;
+    }
+    bindersRef.current = nextBinders;
+    setBinders(nextBinders);
+
+    if (asset.binderId === activeId) {
+      setPool(nextPool);
+      pagesRef.current = nextPages;
+      setPages(nextPages);
+      cardPricesRef.current = nextPrices;
+      setCardPrices(nextPrices);
+      setSelectedCardIds((value) => value.filter((id) => id !== asset.assetId));
+      setSelectionAnchorId((value) => value === asset.assetId ? null : value);
+      setSelBox(null);
+      setSelectionPageId(null);
+      if (editingRef.current?.imgId === asset.assetId) {
+        editingRef.current = null;
+        setEditing(null);
+      }
+      setImages((value) => {
+        const next = { ...value };
+        const source = next[asset.assetId];
+        if (source?.startsWith('blob:')) {
+          URL.revokeObjectURL(source);
+          objectUrlsRef.current.delete(source);
+        }
+        delete next[asset.assetId];
+        return next;
+      });
+      pastRef.current = [];
+      futureRef.current = [];
+      setSaveStatus('saved');
+    }
+    sessionIdsRef.current.delete(asset.assetId);
+    idbDeleteBinderAssets(asset.binderId, [asset.assetId]).catch(() => {
+      notify('The library entry was removed, but stale image storage could not be cleaned up.', 'warn');
+    });
+    notify(`“${asset.name}” removed from the ${sourceBinder.name} library. Try Save project again.`, 'success');
+  }, [notify, setPages]);
+
   const handleSaveProject = useCallback(async () => {
     if (projectTransferStatus) return;
     setProjectTransferStatus('saving');
@@ -2817,7 +2895,10 @@ export default function CardBinder() {
               placement = { pageId: page.id, pageIndex, key: entry[0] };
               return true;
             });
-            const error = new Error(`Could not embed “${item.name}” from “${binder.name}”. Open that binder while online or reconnect its Custom Card Vault, then try again.`);
+            const detail = placement
+              ? 'Open that binder while online or reconnect its Custom Card Vault, then try again.'
+              : 'This is an unplaced library card, so removing a placed copy does not delete it.';
+            const error = new Error(`Could not embed “${item.name}” from “${binder.name}”. ${detail}`);
             error.code = 'PROJECT_ASSET_UNAVAILABLE';
             error.projectAsset = {
               binderId: binder.id,
@@ -2863,13 +2944,15 @@ export default function CardBinder() {
       notify(`Project saved with ${plural(currentBinders.length, 'binder')} and ${plural(imageCount, 'embedded image')}.`, 'success');
     } catch (error) {
       const action = error?.code === 'PROJECT_ASSET_UNAVAILABLE' && error.projectAsset
-        ? { label: 'Show card', onClick: () => setProjectAssetLocator(error.projectAsset) }
+        ? error.projectAsset.pageId
+          ? { label: 'Show card', onClick: () => setProjectAssetLocator(error.projectAsset) }
+          : { label: 'Remove unused', onClick: () => removeUnavailableProjectAsset(error.projectAsset) }
         : null;
       notify(error?.message || 'The project could not be saved.', 'error', action);
     } finally {
       setProjectTransferStatus('');
     }
-  }, [images, notify, projectTransferStatus, snapshotActiveBinder]);
+  }, [images, notify, projectTransferStatus, removeUnavailableProjectAsset, snapshotActiveBinder]);
 
   const handleOpenProjectFile = useCallback(async (file) => {
     if (!file || projectTransferStatus) return;
