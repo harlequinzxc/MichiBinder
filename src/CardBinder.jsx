@@ -1353,7 +1353,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.27.0</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.27.1</span>
         </div>
         <SaveStatus isFolderLinked={isFolderLinked} />
       </div>
@@ -2253,6 +2253,8 @@ export default function CardBinder() {
   const [selectionAnchorId, setSelectionAnchorId] = useState(null);
   const [saveStatus, setSaveStatus] = useState('saved');
   const [projectTransferStatus, setProjectTransferStatus] = useState('');
+  const [projectAssetLocator, setProjectAssetLocator] = useState(null);
+  const [projectAssetHighlight, setProjectAssetHighlight] = useState(null);
   const [storageMode, setStorageMode] = useState('indexeddb');
   const [directoryHandles, setDirectoryHandles] = useState({});
   const currentDirectoryHandle = directoryHandles[activeBinderIdState] || null;
@@ -2310,6 +2312,7 @@ export default function CardBinder() {
   const pageFlipTimerRef = useRef([]);
   const pageFlipTokenRef = useRef(0);
   const historyRestoreTimerRef = useRef([]);
+  const projectAssetHighlightTimerRef = useRef(null);
   const dimensionsRef = useRef(null);
   const sessionIdsRef = useRef(new Set());
   const objectUrlsRef = useRef(new Set());
@@ -2615,6 +2618,8 @@ export default function CardBinder() {
     setCombineModeState(false);
     setEditing(null);
     editingRef.current = null;
+    window.clearTimeout(projectAssetHighlightTimerRef.current);
+    setProjectAssetHighlight(null);
     setOpenPanel(null);
     setPageFlip({ animating: false, turned: false, direction: 1, token: 0, plan: null });
     historyRestoreTimerRef.current.forEach((timer) => window.clearTimeout(timer));
@@ -2650,6 +2655,84 @@ export default function CardBinder() {
     const target = bindersRef.current.find((binder) => binder.id === binderId);
     if (target) commitAndActivateBinder(target);
   }, [commitAndActivateBinder]);
+
+  useEffect(() => {
+    if (!projectAssetLocator) return;
+    if (!bindersRef.current.some((binder) => binder.id === projectAssetLocator.binderId)) {
+      notify('That binder is no longer available.', 'warn');
+      setProjectAssetLocator(null);
+      return;
+    }
+    if (activeBinderId !== projectAssetLocator.binderId) {
+      setActiveBinderId(projectAssetLocator.binderId);
+      return;
+    }
+    if (!hydrated) return;
+
+    const workspace = workspaceStateRef.current;
+    if (!workspace) return;
+    const targetPageIndex = projectAssetLocator.pageId
+      ? workspace.pages.findIndex((page) => page.id === projectAssetLocator.pageId)
+      : -1;
+    if (targetPageIndex >= 0 && projectAssetLocator.key) {
+      const targetPage = workspace.pages[targetPageIndex];
+      const targetIsVisible = getSlots(targetPage, dimsRef.current).some((slot) => slot.key === projectAssetLocator.key);
+      previousPageIndexRef.current = currentPageRef.current;
+      currentPageRef.current = targetPageIndex;
+      setCurrentPage(targetPageIndex);
+      setPageFlip({ animating: false, turned: false, direction: 1, token: 0, plan: null });
+      timelineRevealPageIdRef.current = targetPage.id;
+      setShowBottomTimeline(true);
+      setOpenPanel(null);
+      setSelBox(null);
+      setSelectionPageId(null);
+      window.clearTimeout(projectAssetHighlightTimerRef.current);
+      if (targetIsVisible) {
+        setProjectAssetHighlight({
+          binderId: projectAssetLocator.binderId,
+          assetId: projectAssetLocator.assetId,
+          pageId: targetPage.id,
+          key: projectAssetLocator.key,
+        });
+        projectAssetHighlightTimerRef.current = window.setTimeout(() => setProjectAssetHighlight(null), 6500);
+        notify(`Pointing to “${projectAssetLocator.name}” on page ${targetPageIndex + 1}.`, 'warn');
+      } else {
+        setProjectAssetHighlight(null);
+        notify(`“${projectAssetLocator.name}” is assigned on page ${targetPageIndex + 1}, outside the current ${dimsRef.current.cols} × ${dimsRef.current.rows} layout.`, 'warn');
+      }
+      setProjectAssetLocator(null);
+      return;
+    }
+
+    setIsLeftSidebarOpen(true);
+    if (projectAssetLocator.source === 'tcgdex') {
+      searchAbortRef.current?.abort();
+      setCatalogPage(1);
+      setHasMoreCards(true);
+      setFetchedCards([]);
+      setSearchError('');
+      setActiveTab('cards');
+      setSearchQuery(projectAssetLocator.name);
+      setSelectedCardIds(projectAssetLocator.tcgdexId ? [projectAssetLocator.tcgdexId] : []);
+      notify(`“${projectAssetLocator.name}” is not assigned to a page. Its Cards search is open.`, 'warn');
+    } else {
+      const libraryEntryExists = workspace.pool.some((item) => item.id === projectAssetLocator.assetId);
+      setActiveTab('michi');
+      setSelectedCardIds(libraryEntryExists ? [projectAssetLocator.assetId] : []);
+      if (libraryEntryExists) {
+        window.setTimeout(() => {
+          const card = [...document.querySelectorAll('[data-local-card]')]
+            .find((element) => element.dataset.localCard === projectAssetLocator.assetId);
+          card?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          card?.focus({ preventScroll: true });
+        }, 100);
+      }
+      notify(libraryEntryExists
+        ? `“${projectAssetLocator.name}” is not assigned to a page. Its Michi library entry is selected.`
+        : `“${projectAssetLocator.name}” is not assigned to a page and its image entry is unavailable. Reconnect Custom Card Vault.`, 'warn');
+    }
+    setProjectAssetLocator(null);
+  }, [activeBinderId, hydrated, notify, projectAssetLocator, setActiveBinderId]);
 
   const openNewBinderModal = useCallback(() => setIsBinderWizardOpen(true), []);
 
@@ -2726,7 +2809,26 @@ export default function CardBinder() {
             const source = binder.id === activeId ? images[item.id] || item.src : item.src;
             try { data = await imageSourceToDataUrl(source); } catch { /* A specific portability error is raised below. */ }
           }
-          if (!data) throw new Error(`Could not embed “${item.name}” from “${binder.name}”. Open that binder while online or reconnect its Custom Card Vault, then try again.`);
+          if (!data) {
+            let placement = null;
+            binder.pages.some((page, pageIndex) => {
+              const entry = Object.entries(page.slots || {}).find(([, assetId]) => assetId === item.id);
+              if (!entry) return false;
+              placement = { pageId: page.id, pageIndex, key: entry[0] };
+              return true;
+            });
+            const error = new Error(`Could not embed “${item.name}” from “${binder.name}”. Open that binder while online or reconnect its Custom Card Vault, then try again.`);
+            error.code = 'PROJECT_ASSET_UNAVAILABLE';
+            error.projectAsset = {
+              binderId: binder.id,
+              assetId: item.id,
+              name: item.name,
+              source: item.source,
+              tcgdexId: item.tcgdexId || '',
+              ...placement,
+            };
+            throw error;
+          }
           assets.push({ id: item.id, data });
         }
         portableBinders.push({
@@ -2760,7 +2862,10 @@ export default function CardBinder() {
       const imageCount = portableBinders.reduce((total, entry) => total + entry.assets.length, 0);
       notify(`Project saved with ${plural(currentBinders.length, 'binder')} and ${plural(imageCount, 'embedded image')}.`, 'success');
     } catch (error) {
-      notify(error?.message || 'The project could not be saved.', 'error');
+      const action = error?.code === 'PROJECT_ASSET_UNAVAILABLE' && error.projectAsset
+        ? { label: 'Show card', onClick: () => setProjectAssetLocator(error.projectAsset) }
+        : null;
+      notify(error?.message || 'The project could not be saved.', 'error', action);
     } finally {
       setProjectTransferStatus('');
     }
@@ -3213,6 +3318,7 @@ export default function CardBinder() {
   }, [activeBinderId, setPages]);
 
   useEffect(() => () => {
+    window.clearTimeout(projectAssetHighlightTimerRef.current);
     objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
     objectUrlsRef.current.clear();
   }, []);
@@ -5004,6 +5110,15 @@ export default function CardBinder() {
     const labelVisible = (frameW * gridPpi) >= 72;
     const slotActionsAvailable = !combineMode && !dragInfo && !marqueeActive && !editing;
     const isSlotPrintHidden = Boolean(page.hiddenSlotsFromPrint?.[slot.key]);
+    const isProjectAssetHighlighted = projectAssetHighlight?.binderId === activeBinderId
+      && projectAssetHighlight.pageId === page.id
+      && projectAssetHighlight.key === slot.key;
+    const projectAssetBadge = isProjectAssetHighlighted ? (
+      <span data-project-asset-badge className="pointer-events-none absolute left-1/2 top-2 z-[70] flex -translate-x-1/2 items-center gap-1 rounded-full border border-amber-300/40 bg-amber-950/95 px-2 py-1 text-[9px] font-bold whitespace-nowrap text-amber-100 shadow-xl backdrop-blur-sm">
+        <Icon name="alert" />
+        <span>Image needed for project</span>
+      </span>
+    ) : null;
     const handleCardPointerMove = (event) => {
       if (isEditing) { movePan(event); return; }
       if (editing || combineMode || dragInfo || marqueeActive || event.buttons) return;
@@ -5083,7 +5198,10 @@ export default function CardBinder() {
 
     if (!imgId) {
       return (
-        <div className="group/slot relative size-full">
+        <div
+          data-project-asset-highlight={isProjectAssetHighlighted ? '' : undefined}
+          className={`group/slot relative size-full ${isProjectAssetHighlighted ? 'z-50 rounded-md ring-4 ring-amber-400 ring-offset-2 ring-offset-neutral-950 animate-pulse motion-reduce:animate-none' : ''}`}
+        >
           <button
             type="button"
             onPointerDown={(event) => beginMarquee(event, slot, true, page, pageIndex)}
@@ -5098,6 +5216,7 @@ export default function CardBinder() {
           >
             {labelVisible && <span className="flex flex-col items-center gap-1.5"><span className="text-neutral-700 transition-colors group-hover:text-neutral-500"><Icon name="plus" strokeWidth={1.1} /></span><span className="text-[9px] font-mono font-medium tracking-widest text-neutral-600 uppercase transition-colors group-hover:text-neutral-400">{slot.cs * slot.rs > 1 ? `${boxDims(slot)} frame` : `Slot ${slotIndex + 1}`}</span></span>}
           </button>
+          {projectAssetBadge}
           {slotActions}
         </div>
       );
@@ -5107,6 +5226,7 @@ export default function CardBinder() {
       <div
         data-card-tilt
         data-editing-slot={isEditing ? '' : undefined}
+        data-project-asset-highlight={isProjectAssetHighlighted ? '' : undefined}
         draggable={!combineMode && !editing}
         onDragStart={(event) => { handleCardPointerLeave(event); startSlotDrag(event, page.id, slot.key, imgId); }}
         onDragEnd={resetDrag}
@@ -5125,7 +5245,7 @@ export default function CardBinder() {
           activateCanvasPage(pageIndex);
           if (combineMode) { setSelectionPageId(page.id); setSelBox(expandBox(mergeBox(slot), pageMerges)); }
         }}
-        className={`group group/slot relative size-full hover:z-40 ${!combineMode && !editing ? 'cursor-grab active:cursor-grabbing' : ''}`}
+        className={`group group/slot relative size-full hover:z-40 ${!combineMode && !editing ? 'cursor-grab active:cursor-grabbing' : ''} ${isProjectAssetHighlighted ? 'z-50 rounded-md ring-4 ring-amber-400 ring-offset-2 ring-offset-neutral-950 animate-pulse motion-reduce:animate-none' : ''}`}
         style={{ '--rx': '0deg', '--ry': '0deg', '--mx': '50%', '--my': '50%' }}
       >
         <div
@@ -5160,6 +5280,7 @@ export default function CardBinder() {
           /> : <span className="absolute inset-0 grid place-items-center bg-zinc-800 text-zinc-500"><Icon name="image" /></span>}
           </div>
         </div>
+        {projectAssetBadge}
         {slotActions}
         {!dragInfo && !combineMode && !editing && dpi && (
           <span
