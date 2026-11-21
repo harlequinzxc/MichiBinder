@@ -2,10 +2,10 @@
 
 This file is the project's durable memory and source of truth for engineering history and current implementation state. It records what exists, why it exists, what was replaced, what failed, and what remains incomplete. It describes reality; it is not a second rules file or a speculative roadmap.
 
-## Current state — v4.27.4
+## Current state — v4.27.5
 
-- **Ledger date:** 2026-10-18
-- **Application state entering this correction pass:** commit `4c20e5e` / v4.27.3
+- **Ledger date:** 2026-11-21
+- **Application state entering this documentation correction:** commit `a274b32` / v4.27.4
 - **Product:** a private, desktop-first, multi-binder trading-card layout and true-size print workspace
 - **Runtime:** static client-only React 19 PWA built by Vite 6 with Tailwind CSS v4 through `@tailwindcss/vite`
 - **Runtime dependencies:** only `react`, `react-dom`, and `lucide-react`
@@ -14,8 +14,9 @@ This file is the project's durable memory and source of truth for engineering hi
 - **Persistence:** a versioned multi-binder repository in `localStorage`; binder-scoped image blobs and binder-scoped native directory handles in IndexedDB; data URL/local-storage fallback when IndexedDB is unavailable; versioned portable `.michibinder` files embed every binder and card image for offline transfer
 - **Network boundary:** TCGdex REST/API assets and the public open ExchangeRate-API USD feed; custom assets and portable project transfers remain entirely local with no upload, proxy, scraper, manifest, or remote-sync request path; no MichiBinder backend, account, telemetry, or required environment variable
 - **Deployment:** static `dist/` output on Vercel through `vercel.json`
-- **Last functional change:** TCGdex ingestion and project export now retry trusted `/low.jpg` artwork when a card-specific `/high.jpg` request fails, allowing cards such as Jolteon ex to become local IndexedDB blobs and portable embedded images instead of repeat remote-only blockers
-- **Last verified behavior:** production build; mocked Jolteon high-quality 404 with valid low artwork; existing high-only fallback export recovered and embedded low art; fresh catalogue add persisted low art locally after high failure; subsequent export succeeded with image networking disabled; retained assigned locator and duplicate cleanup; synchronized v4.27.4 title pill; and zero browser/page errors
+- **Last functional change:** TCGdex ingestion and project export retry trusted `/low.jpg` artwork when a card-specific `/high.jpg` request fails, allowing cards such as Jolteon ex to become local IndexedDB blobs and portable embedded images instead of repeat remote-only blockers
+- **Last documentation change:** every release heading was audited one-to-one against all 134 pre-v4.27.5 GitHub commit author timestamps converted to the project’s Asia/Singapore calendar date; 26 incorrect historical release dates plus the stale current ledger date were corrected
+- **Last verified behavior:** all 134 existing release headings match their corresponding GitHub commit date in Asia/Singapore with zero mismatches; v4.26.5–v4.26.6 now read 2026-11-02, v4.27.0–v4.27.4 now read 2026-11-21, the ledger date is 2026-11-21, package/title metadata is synchronized at v4.27.5, and production still builds cleanly
 - **Active incomplete implementation:** none. Remaining gaps are documented near the end of this file.
 
 ## Strict SemVer policy and audit
@@ -34,7 +35,7 @@ The 2026-10-21 full-ledger audit confirmed the three post-inception major bounda
 2. **v3.0.0:** the toolbar/tray composition was dismantled and rebuilt as the four-area workspace with contextual bottom navigation.
 3. **v4.0.0:** top-heavy configuration controls were removed and replaced by the standalone right utility rail plus cohesive bottom structural controller.
 
-The audit also confirmed that presentation-only releases remain patches; capability releases such as TCGdex integration, source workspaces, valuation, upload deletion, print slicing, and first-unplaced tracking remain minors; and later fixes that complete those existing contracts remain patches. Specifically, v4.8.2 restored the Custom metric removed during v4.8.1 consolidation, while v4.11.1–v4.11.7 corrected lifecycle and print-slicing gaps in capabilities introduced by v4.11.0 and earlier print releases. Persistent per-tab scroll memory is a new stateful interaction and therefore begins v4.12.0 rather than v4.11.8; continuously measurable inactive-panel background scrolling is likewise a new cross-tab capability and begins v4.15.0; premium layout-aware prompt compilation and copy workflows begin v4.16.0, while their preview-format and prompt-copy corrections remain the v4.16.1 patch; remote public-asset ingestion begins v4.17.0, its replacement with bulk Imgur album deconstruction and concurrent streaming begins v4.18.0, the CORS-safe public-page scraper correction remains the v4.18.1 patch, cloud-first ImgBB upload interception begins v4.19.0, cross-device downstream ImgBB profile rehydration begins v4.20.0, the GridRip boundary-instruction correction remains the v4.20.1 patch, the cloud-control/header presentation correction remains the v4.20.2 patch, the downstream root-profile parser correction remains the v4.20.3 patch, the JSONP profile-loader correction remains the v4.20.4 patch, the device-ledger rehydration correction remains the v4.20.5 patch, the public-manifest registry correction remains the v4.20.6 patch, and the authoritative clipboard-reconciliation correction remains the v4.20.7 patch. Browser-native authoritative directory mounting replaces the retired online custom-asset architecture as a new ingestion capability and therefore begins v4.21.0; cached-handle unlinking completes that capability as the v4.21.1 patch. Independent multi-binder workspace creation, switching, restoration, and persistence form a new stateful lifecycle capability and therefore begin v4.22.0; native-handle-derived folder truth and its associated health/copy correction remain the v4.22.1 patch, binder-scoped handle allocation and the requested human-copy cleanup complete that lifecycle as the v4.22.2 patch, the explicit reactive folder-state bridge is the v4.22.3 patch, its replacement with an authoritative memoized native-handle selector is the v4.22.4 patch, activation-time handle-context rebroadcasting is the v4.22.5 patch, simplifying folder health to a direct current-handle Boolean is the v4.22.6 patch, binding the sidebar controls directly to that handle is the v4.22.7 patch, synchronously aligning the active state/ref channel during workspace activation is the v4.22.8 patch, routing folder selection plus Link/Disconnect directly through active React state is the v4.22.9 patch, and restoring linked-session UI semantics for the directory-input fallback is the v4.22.10 patch. Persistent inline binder renaming and adjacent tab reordering are new stateful workspace-management interactions and therefore begin v4.23.0 rather than extending the v4.22 patch line. Persistent page/slot print exclusion and native drag-driven workspace ordering are new backward-compatible workflows and therefore begin v4.24.0. Restoring crop vectors and unified merged spans in the existing print workflow is a corrective v4.24.1 patch. Persistent per-slot image zoom with slider and wheel calibration is a new stateful editing capability and therefore begins v4.25.0. Global catalogue-result visibility is another backward-compatible stateful workspace capability and therefore begins v4.26.0; correcting that control to target placed results and re-anchoring its companion helper remain the v4.26.1 patch; moving the visibility target from source results to non-destructive live-workspace masks remains the v4.26.2 patch; correcting the same control to use catalogue-only per-slot print exclusions instead of visual masks remains the v4.26.3 patch; compacting the remaining **Include all** print cards after exclusions remains the v4.26.4 patch; correcting the complete print renderer from paper-stretched tracks to physically calibrated card geometry remains the v4.26.5 patch; replacing its cross-page transform after Chromium clipped all non-final preview pages remains the v4.26.6 patch; portable all-binder project export/import with embedded images is a new backward-compatible workspace lifecycle and therefore begins v4.27.0; locating an image that blocks that established export workflow is the v4.27.1 usability correction; removing an unavailable unplaced library record that cannot have a page target is the v4.27.2 correction; aggregating duplicate unavailable records so cleanup does not fail repeatedly under the same card name is the v4.27.3 correction; retrying TCGdex low-quality artwork when a card-specific high-quality asset is unavailable is the v4.27.4 compatibility correction.
+The audit also confirmed that presentation-only releases remain patches; capability releases such as TCGdex integration, source workspaces, valuation, upload deletion, print slicing, and first-unplaced tracking remain minors; and later fixes that complete those existing contracts remain patches. Specifically, v4.8.2 restored the Custom metric removed during v4.8.1 consolidation, while v4.11.1–v4.11.7 corrected lifecycle and print-slicing gaps in capabilities introduced by v4.11.0 and earlier print releases. Persistent per-tab scroll memory is a new stateful interaction and therefore begins v4.12.0 rather than v4.11.8; continuously measurable inactive-panel background scrolling is likewise a new cross-tab capability and begins v4.15.0; premium layout-aware prompt compilation and copy workflows begin v4.16.0, while their preview-format and prompt-copy corrections remain the v4.16.1 patch; remote public-asset ingestion begins v4.17.0, its replacement with bulk Imgur album deconstruction and concurrent streaming begins v4.18.0, the CORS-safe public-page scraper correction remains the v4.18.1 patch, cloud-first ImgBB upload interception begins v4.19.0, cross-device downstream ImgBB profile rehydration begins v4.20.0, the GridRip boundary-instruction correction remains the v4.20.1 patch, the cloud-control/header presentation correction remains the v4.20.2 patch, the downstream root-profile parser correction remains the v4.20.3 patch, the JSONP profile-loader correction remains the v4.20.4 patch, the device-ledger rehydration correction remains the v4.20.5 patch, the public-manifest registry correction remains the v4.20.6 patch, and the authoritative clipboard-reconciliation correction remains the v4.20.7 patch. Browser-native authoritative directory mounting replaces the retired online custom-asset architecture as a new ingestion capability and therefore begins v4.21.0; cached-handle unlinking completes that capability as the v4.21.1 patch. Independent multi-binder workspace creation, switching, restoration, and persistence form a new stateful lifecycle capability and therefore begin v4.22.0; native-handle-derived folder truth and its associated health/copy correction remain the v4.22.1 patch, binder-scoped handle allocation and the requested human-copy cleanup complete that lifecycle as the v4.22.2 patch, the explicit reactive folder-state bridge is the v4.22.3 patch, its replacement with an authoritative memoized native-handle selector is the v4.22.4 patch, activation-time handle-context rebroadcasting is the v4.22.5 patch, simplifying folder health to a direct current-handle Boolean is the v4.22.6 patch, binding the sidebar controls directly to that handle is the v4.22.7 patch, synchronously aligning the active state/ref channel during workspace activation is the v4.22.8 patch, routing folder selection plus Link/Disconnect directly through active React state is the v4.22.9 patch, and restoring linked-session UI semantics for the directory-input fallback is the v4.22.10 patch. Persistent inline binder renaming and adjacent tab reordering are new stateful workspace-management interactions and therefore begin v4.23.0 rather than extending the v4.22 patch line. Persistent page/slot print exclusion and native drag-driven workspace ordering are new backward-compatible workflows and therefore begin v4.24.0. Restoring crop vectors and unified merged spans in the existing print workflow is a corrective v4.24.1 patch. Persistent per-slot image zoom with slider and wheel calibration is a new stateful editing capability and therefore begins v4.25.0. Global catalogue-result visibility is another backward-compatible stateful workspace capability and therefore begins v4.26.0; correcting that control to target placed results and re-anchoring its companion helper remain the v4.26.1 patch; moving the visibility target from source results to non-destructive live-workspace masks remains the v4.26.2 patch; correcting the same control to use catalogue-only per-slot print exclusions instead of visual masks remains the v4.26.3 patch; compacting the remaining **Include all** print cards after exclusions remains the v4.26.4 patch; correcting the complete print renderer from paper-stretched tracks to physically calibrated card geometry remains the v4.26.5 patch; replacing its cross-page transform after Chromium clipped all non-final preview pages remains the v4.26.6 patch; portable all-binder project export/import with embedded images is a new backward-compatible workspace lifecycle and therefore begins v4.27.0; locating an image that blocks that established export workflow is the v4.27.1 usability correction; removing an unavailable unplaced library record that cannot have a page target is the v4.27.2 correction; aggregating duplicate unavailable records so cleanup does not fail repeatedly under the same card name is the v4.27.3 correction; retrying TCGdex low-quality artwork when a card-specific high-quality asset is unavailable is the v4.27.4 compatibility correction; reconciling release headings with their authoritative Asia/Singapore commit dates is the v4.27.5 documentation patch.
 
 Historical entries are ordered from oldest to newest. Commit links, rather than nonexistent retrospective Git tags, are the immutable references.
 
@@ -182,14 +183,14 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Clarified visual hierarchy between global controls, page tools, help/status surfaces, and the binder itself.
 - Refined depth and contrast so controls remain legible without competing with card art.
 
-## [v2.2.7] — 2026-10-19 — [`2b4e52c`](https://github.com/harlequinzxc/MichiBinder/commit/2b4e52c3fd7c1d0a19a3a47088501cd222cda1e1)
+## [v2.2.7] — 2026-10-20 — [`2b4e52c`](https://github.com/harlequinzxc/MichiBinder/commit/2b4e52c3fd7c1d0a19a3a47088501cd222cda1e1)
 
 ### Improved
 
 - Rebalanced header density and responsive visibility.
 - Deepened binder beds, sleeves, covers, and workspace shadows without changing print geometry.
 
-## [v2.2.8] — 2026-10-19 — [`909614d`](https://github.com/harlequinzxc/MichiBinder/commit/909614d0a849fb8b3e1e07fa49065204bdbbb79c)
+## [v2.2.8] — 2026-10-20 — [`909614d`](https://github.com/harlequinzxc/MichiBinder/commit/909614d0a849fb8b3e1e07fa49065204bdbbb79c)
 
 ### Added
 
@@ -199,13 +200,13 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 
 - Applied Inter locally and refined typography/material details. Self-hosting preserved the no-font-network and static deployment boundary.
 
-## [v2.2.9] — 2026-10-19 — [`87a15e0`](https://github.com/harlequinzxc/MichiBinder/commit/87a15e08125f95e59187cf214b12bbdcb341948a)
+## [v2.2.9] — 2026-10-20 — [`87a15e0`](https://github.com/harlequinzxc/MichiBinder/commit/87a15e08125f95e59187cf214b12bbdcb341948a)
 
 ### Improved
 
 - Tightened toolbar, upload tray, slot-label, cover, and active-thumbnail spacing, sizing, and micro-interactions.
 
-## [v2.2.10] — 2026-10-19 — [`0f862a3`](https://github.com/harlequinzxc/MichiBinder/commit/0f862a3e7f0811b1cedeb5776cd6ef5f4854f064)
+## [v2.2.10] — 2026-10-20 — [`0f862a3`](https://github.com/harlequinzxc/MichiBinder/commit/0f862a3e7f0811b1cedeb5776cd6ef5f4854f064)
 
 ### Improved
 
@@ -216,7 +217,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 
 - Removed duplicated structural controls that had become scattered across page surfaces.
 
-## [v2.3.0] — 2026-10-19 — [`9228d40`](https://github.com/harlequinzxc/MichiBinder/commit/9228d40602bd1e074a877673e54b117662b1d476)
+## [v2.3.0] — 2026-10-20 — [`9228d40`](https://github.com/harlequinzxc/MichiBinder/commit/9228d40602bd1e074a877673e54b117662b1d476)
 
 ### Added
 
@@ -229,7 +230,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Normalized extensionless TCGdex image bases and restricted trusted absolute image URLs to `assets.tcgdex.net`.
 - Downloaded high-resolution images into local storage when possible; retained a CDN URL only when browser/CORS policy blocks blob ingestion.
 
-## [v2.4.0] — 2026-10-19 — [`849a14b`](https://github.com/harlequinzxc/MichiBinder/commit/849a14bbe6a4b1a1a6e5d99158e0d4553f677d2f)
+## [v2.4.0] — 2026-10-20 — [`849a14b`](https://github.com/harlequinzxc/MichiBinder/commit/849a14bbe6a4b1a1a6e5d99158e0d4553f677d2f)
 
 ### Added
 
@@ -239,7 +240,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 
 - Accepted both direct arrays and `{ data }` API envelopes and retried set listing without server sort parameters when the endpoint returned 400/422.
 
-## [v2.5.0] — 2026-10-19 — [`71a8295`](https://github.com/harlequinzxc/MichiBinder/commit/71a82950b7e1ddaec308100e50944ca84654f990)
+## [v2.5.0] — 2026-10-20 — [`71a8295`](https://github.com/harlequinzxc/MichiBinder/commit/71a82950b7e1ddaec308100e50944ca84654f990)
 
 ### Added
 
@@ -250,13 +251,13 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 
 - Clarified scope-specific empty-print messaging and refined active timeline framing and page materials.
 
-## [v2.5.1] — 2026-10-19 — [`41a802b`](https://github.com/harlequinzxc/MichiBinder/commit/41a802b6345e0c5de9ac6a4e8216363640604756)
+## [v2.5.1] — 2026-10-20 — [`41a802b`](https://github.com/harlequinzxc/MichiBinder/commit/41a802b6345e0c5de9ac6a4e8216363640604756)
 
 ### Fixed
 
 - Raised Print Setup's stacking level so it no longer rendered beneath workspace surfaces.
 
-## [v2.6.0] — 2026-10-19 — [`78d500d`](https://github.com/harlequinzxc/MichiBinder/commit/78d500d55830fddd7b2002d325b5e01dacde0aa3)
+## [v2.6.0] — 2026-10-20 — [`78d500d`](https://github.com/harlequinzxc/MichiBinder/commit/78d500d55830fddd7b2002d325b5e01dacde0aa3)
 
 ### Added
 
@@ -267,7 +268,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 
 - Carried source identity through IndexedDB, fallback persistence, selection, and drag ingestion so remote and private cards remain interoperable without becoming indistinguishable.
 
-## [v2.7.0] — 2026-10-19 — [`536ee2d`](https://github.com/harlequinzxc/MichiBinder/commit/536ee2dd4a9de9f51f22acb3326043fab019a3e3)
+## [v2.7.0] — 2026-10-20 — [`536ee2d`](https://github.com/harlequinzxc/MichiBinder/commit/536ee2dd4a9de9f51f22acb3326043fab019a3e3)
 
 ### Added
 
@@ -278,7 +279,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 
 - Removed redundant sidebar filters/actions and the old `tcgdex` tab ID to simplify source switching.
 
-## [v2.8.0] — 2026-10-19 — [`57ada8c`](https://github.com/harlequinzxc/MichiBinder/commit/57ada8c0faead71786a97c65b4d6a54438e4a4b0)
+## [v2.8.0] — 2026-10-20 — [`57ada8c`](https://github.com/harlequinzxc/MichiBinder/commit/57ada8c0faead71786a97c65b4d6a54438e4a4b0)
 
 ### Added
 
@@ -290,7 +291,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Rebranded Digital Card Binder as MichiBinder across metadata, manifest, README, notifications, and portrait guard.
 - Refined page-tray geometry and active thumbnail framing.
 
-## [v2.9.0] — 2026-10-19 — [`75c3f59`](https://github.com/harlequinzxc/MichiBinder/commit/75c3f59c0e7afb716a5b2e8dc3955632038b496a)
+## [v2.9.0] — 2026-10-20 — [`75c3f59`](https://github.com/harlequinzxc/MichiBinder/commit/75c3f59c0e7afb716a5b2e8dc3955632038b496a)
 
 ### Added
 
@@ -643,7 +644,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Verified complete-price and provider-null visibility behavior at 1600×1000, 1366×768, and 1200×700 with zero browser errors.
 - Advanced package and lockfile metadata to v4.6.4.
 
-## [v4.6.5] — 2026-10-20
+## [v4.6.5] — 2026-10-21
 
 ### Fixed
 
@@ -653,7 +654,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Verified hidden overflow on the workspace, preview surface, and canvas stage; exact viewport-sized document bounds; twelve-card custom-grid rendering; exact card ratio; contained image fit; hidden asset-list scrollbars; and zero browser errors at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.6.5.
 
-## [v4.6.6] — 2026-10-20
+## [v4.6.6] — 2026-10-21
 
 ### Fixed
 
@@ -662,7 +663,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Verified the exact wrapper and image class strings, twelve-card rendering, 245/337 geometry, contained image fit, hidden catalogue scrollbars, canvas containment, viewport-sized document bounds, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.6.6.
 
-## [v4.6.7] — 2026-10-20
+## [v4.6.7] — 2026-10-21
 
 ### Fixed
 
@@ -671,7 +672,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Verified twelve custom cards remain direct children of the sole grid, exact 245/337 geometry, 0.45 placed opacity, grayscale filtering, unmodified unplaced presentation, canvas containment, hidden list scrollbars, viewport-sized document bounds, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.6.7.
 
-## [v4.6.8] — 2026-10-20
+## [v4.6.8] — 2026-10-21
 
 ### Fixed
 
@@ -681,7 +682,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Verified twelve direct grid children, zero nested grids, exact class strings, 245/337 geometry, full card-image bounds, 12px horizontal and vertical gaps, working overflow scrolling, hidden scrollbar chrome, canvas containment, viewport-sized document bounds, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.6.8.
 
-## [v4.7.0] — 2026-10-20
+## [v4.7.0] — 2026-10-21
 
 ### Added
 
@@ -696,7 +697,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Verified ascending display from reverse-ordered persisted input, twelve direct non-overlapping grid children, placed-state styling, exact confirmation copy and button classes, retention of unrelated TCGdex pool and slot data, immediate persisted custom-data removal, native list scrolling, canvas containment, viewport-sized document bounds, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.7.0.
 
-## [v4.7.1] — 2026-10-20
+## [v4.7.1] — 2026-10-21
 
 ### Fixed
 
@@ -706,7 +707,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Verified placed and unplaced image classes, 0.45 placed opacity, grayscale filtering, full-frame cover behavior, isolated hover state, 0.75 hover opacity, and zero browser errors at 1600×1000, 1366×768, and 1200×700.
 - Advanced package and lockfile metadata to v4.7.1.
 
-## [v4.8.0] — 2026-10-20
+## [v4.8.0] — 2026-10-21
 
 ### Added
 
@@ -1809,7 +1810,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Rechecked **Uploads only** with the same hidden assignment and verified its one-sheet order remains unchanged. Also disabled empty-page skipping and verified packed content remains on the first print sheet while the source page count is retained, then re-enabled it and verified the trailing blank sheet disappears.
 - Rebuilt the production bundle, recorded zero browser/page errors, and synchronized package, lockfile, and title-pill metadata at v4.26.4 without changing dependencies.
 
-## [v4.26.5] — 2026-10-22
+## [v4.26.5] — 2026-11-02
 
 ### Fixed
 
@@ -1828,7 +1829,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Verified a 2×2 merged card prints once at 131.5 × 181.5 mm with a 1.5 mm gap and retains exact crop coordinates `23/77` plus 180% zoom.
 - Rebuilt the production bundle, recorded zero browser/page errors, and synchronized package, lockfile, and title-pill metadata at v4.26.5 without changing dependencies.
 
-## [v4.26.6] — 2026-10-22
+## [v4.26.6] — 2026-11-02
 
 ### Fixed
 
@@ -1844,7 +1845,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Re-ran one-page live/Paper/print physical calibration, ten-card Include-all compaction, Uploads-only filtering, unchanged live assignments, merged 2×2 dimensions, crop/zoom metadata, and output-size disclosure with zero browser errors.
 - Rebuilt the production bundle and synchronized package, lockfile, and title-pill metadata at v4.26.6 without changing dependencies.
 
-## [v4.27.0] — 2026-10-18
+## [v4.27.0] — 2026-11-21
 
 ### Added
 
@@ -1869,7 +1870,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Rejected malformed empty and undecodable-image projects without changing the existing repository, checked the expanded right rail without clipping at 1440×900, completed fallback import/reload at 1280×800, rebuilt production, and recorded zero browser/page errors across the project harnesses.
 - Synchronized package, lockfile, and unchanged-class title-pill metadata at v4.27.0 without changing dependencies.
 
-## [v4.27.1] — 2026-10-18
+## [v4.27.1] — 2026-11-21
 
 ### Improved
 
@@ -1885,7 +1886,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Selected **Show card** and confirmed activation of **30th Anniversary**, page-one timeline navigation, an exact slot-level `data-project-asset-highlight`, the visible **Image needed for project** badge, and the follow-up page-location notification after missing-image reconciliation.
 - Rebuilt production, retained the v4.27.0 project round-trip contract, recorded zero browser/page errors, and synchronized package, lockfile, and unchanged-class title-pill metadata at v4.27.1 without changing dependencies.
 
-## [v4.27.2] — 2026-10-18
+## [v4.27.2] — 2026-11-21
 
 ### Fixed
 
@@ -1902,7 +1903,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Re-ran the placed-card **Show card** locator to confirm binder activation, page navigation, exact amber slot highlighting, and zero browser/page errors remain intact.
 - Rebuilt production and synchronized package, lockfile, and unchanged-class title-pill metadata at v4.27.2 without changing dependencies.
 
-## [v4.27.3] — 2026-10-18
+## [v4.27.3] — 2026-11-21
 
 ### Fixed
 
@@ -1919,7 +1920,7 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Retried Save project and downloaded a valid two-binder file containing exactly the preserved Jolteon asset and its embedded image.
 - Re-ran the placed-card **Show card** locator, rebuilt production, recorded zero browser/page errors, and synchronized package, lockfile, and unchanged-class title-pill metadata at v4.27.3 without changing dependencies.
 
-## [v4.27.4] — 2026-10-18
+## [v4.27.4] — 2026-11-21
 
 ### Fixed
 
@@ -1935,6 +1936,19 @@ Historical entries are ordered from oldest to newest. Commit links, rather than 
 - Added Jolteon from a mocked Cards result under the same high-404/low-success condition. Confirmed ingestion requested high then low, stored the low blob in IndexedDB, and rendered the placed card.
 - Disabled all image networking after the fresh add and successfully exported the binder from its local blob, proving the fixed path no longer depends on the CDN during project save.
 - Re-ran the assigned-card locator and three-duplicate aggregate cleanup harnesses, rebuilt production, recorded zero browser/page errors, and synchronized package, lockfile, and unchanged-class title-pill metadata at v4.27.4 without changing dependencies.
+
+## [v4.27.5] — 2026-11-21
+
+### Corrected
+
+- Audited all 134 existing release headings one-to-one against the repository's complete GitHub commit chronology, using each matching commit's author timestamp converted to the `Asia/Singapore` calendar date.
+- Corrected 26 historical date mismatches: v2.2.7–v2.9.0 moved from October 19 to October 20, v4.6.5–v4.8.0 moved from October 20 to October 21, v4.26.5–v4.26.6 moved from October 22 to November 2, and v4.27.0–v4.27.4 moved from October 18 to November 21.
+- Corrected the current-state ledger date from October 18 to November 21 and synchronized package, lockfile, title-pill, and current-state metadata at v4.27.5. No application behavior, dependency, persistence, or data-format contract changed.
+
+### Verified
+
+- Re-ran the full heading-to-commit comparison after the edits and found zero date mismatches across all 134 pre-v4.27.5 releases.
+- Rebuilt the production bundle and checked the final patch for whitespace errors.
 
 ---
 
