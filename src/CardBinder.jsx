@@ -281,15 +281,40 @@ const blobToDataUrl = (blob) => new Promise((resolve, reject) => {
   reader.onerror = () => reject(reader.error || new Error('Could not read image data.'));
   reader.readAsDataURL(blob);
 });
-const imageSourceToDataUrl = async (source) => {
+const imageSourceCandidates = (source) => {
   const value = typeof source === 'string' ? source.trim() : '';
+  if (!value) return [];
+  const candidates = [value];
+  try {
+    const url = new URL(value);
+    if (url.origin === TCGDEX_ASSET_CDN && /\/high\.(?:jpe?g|png|webp|avif)$/i.test(url.pathname)) {
+      const lowResolutionUrl = new URL(url.href);
+      lowResolutionUrl.pathname = lowResolutionUrl.pathname.replace(/\/high\.(?:jpe?g|png|webp|avif)$/i, '/low.jpg');
+      candidates.push(lowResolutionUrl.href);
+    }
+  } catch {
+    // Relative and data URLs use their original source only.
+  }
+  return [...new Set(candidates)];
+};
+const imageSourceToDataUrl = async (source) => {
+  const candidates = imageSourceCandidates(source);
+  const value = candidates[0] || '';
   if (value.startsWith('data:image/')) return value;
   if (!value) throw new Error('Image source is missing.');
-  const response = await fetch(value);
-  if (!response.ok) throw new Error(`Image request returned ${response.status}.`);
-  const blob = await response.blob();
-  if (!blob.type.startsWith('image/')) throw new Error('Asset is not an image.');
-  return blobToDataUrl(blob);
+  let lastError = null;
+  for (const candidate of candidates) {
+    try {
+      const response = await fetch(candidate);
+      if (!response.ok) throw new Error(`Image request returned ${response.status}.`);
+      const blob = await response.blob();
+      if (!blob.type.startsWith('image/')) throw new Error('Asset is not an image.');
+      return blobToDataUrl(blob);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error('Image source could not be read.');
 };
 const projectDataUrlToBlob = async (dataUrl) => {
   if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) throw new Error('Project image data is invalid.');
@@ -1353,7 +1378,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.27.3</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.27.4</span>
         </div>
         <SaveStatus isFolderLinked={isFolderLinked} />
       </div>
@@ -3913,24 +3938,29 @@ export default function CardBinder() {
     hydrateCardPrice(item.id, item);
     const requestedSource = highResImageUrl || item.url || (item.image ? `${item.image}/high.jpg` : '/placeholder.png');
     const source = requestedSource === '/placeholder.png' || requestedSource.startsWith(`${TCGDEX_ASSET_CDN}/`) ? requestedSource : '/placeholder.png';
-    try {
-      const response = await fetch(source);
-      if (!response.ok) throw new Error(`Image download returned ${response.status}`);
-      const blob = await response.blob();
-      if (!blob.type?.startsWith('image/')) throw new Error('TCGdex returned a non-image asset');
-      const file = new File([blob], `${safeFileName(item.name)} · ${safeFileName(item.id)}.jpg`, { type: blob.type || 'image/jpeg' });
-      const ids = await addFiles([file], { source: 'tcgdex', tcgdexId: item.id, silent: options.silent });
-      if (ids.length) {
-        if (activeBinderIdRef.current === targetBinderId && activeTab === 'cards') scrollToNextUnplacedCard('[data-tcgdex-results]', 'data-tcgdex-card');
-        if (activeBinderIdRef.current === targetBinderId && activeTab === 'michi') scrollToNextUnplacedCard('[role="listbox"][aria-label*="Custom"]', 'data-local-card');
-        return ids;
+    const sourceCandidates = imageSourceCandidates(source);
+    for (const candidate of sourceCandidates) {
+      try {
+        const response = await fetch(candidate);
+        if (!response.ok) throw new Error(`Image download returned ${response.status}`);
+        const blob = await response.blob();
+        if (!blob.type?.startsWith('image/')) throw new Error('TCGdex returned a non-image asset');
+        const file = new File([blob], `${safeFileName(item.name)} · ${safeFileName(item.id)}.jpg`, { type: blob.type || 'image/jpeg' });
+        const ids = await addFiles([file], { source: 'tcgdex', tcgdexId: item.id, silent: options.silent });
+        if (ids.length) {
+          if (activeBinderIdRef.current === targetBinderId && activeTab === 'cards') scrollToNextUnplacedCard('[data-tcgdex-results]', 'data-tcgdex-card');
+          if (activeBinderIdRef.current === targetBinderId && activeTab === 'michi') scrollToNextUnplacedCard('[role="listbox"][aria-label*="Custom"]', 'data-local-card');
+          return ids;
+        }
+      } catch {
+        // Try the next trusted TCGdex quality before retaining a remote fallback.
       }
-    } catch {
-      // Some privacy extensions block cross-origin blob downloads. The live CDN URL
-      // still remains a valid, persistable source for the binder and print views.
     }
+    // Some privacy extensions block cross-origin blob downloads. The lower-quality
+    // CDN candidate is more widely available and remains a persistable display fallback.
+    const fallbackSource = sourceCandidates.at(-1) || source;
     const id = uid('tcgdex');
-    const poolItem = { id, name: item.name || 'Pokémon card', source: 'tcgdex', src: source, tcgdexId: String(item.id) };
+    const poolItem = { id, name: item.name || 'Pokémon card', source: 'tcgdex', src: fallbackSource, tcgdexId: String(item.id) };
     if (activeBinderIdRef.current === targetBinderId) {
       sessionIdsRef.current.add(id);
       setImages((value) => ({ ...value, [id]: source }));

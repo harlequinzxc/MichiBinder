@@ -93,7 +93,7 @@ Vite serves development on `0.0.0.0:5173` and preview on `0.0.0.0:4173`.
 
 ## Storage and privacy
 
-There is no application backend. Local uploads are stored as binder-scoped blobs in IndexedDB and displayed through local object URLs; layout metadata is saved in `localStorage`. Native Custom Card Vault handles also remain in device-local IndexedDB and are never serialized into portable projects. Pokémon searches send the entered query directly to the free TCGdex API, and result previews load from the TCGdex asset CDN. When a result is added, the app downloads and stores the high-resolution image locally when the browser permits it, using the CDN URL as a fallback if that download is blocked. If IndexedDB is unavailable, image data URLs are stored in the local layout record instead. Reset Binder in Print Setup removes the active binder's local data.
+There is no application backend. Local uploads are stored as binder-scoped blobs in IndexedDB and displayed through local object URLs; layout metadata is saved in `localStorage`. Native Custom Card Vault handles also remain in device-local IndexedDB and are never serialized into portable projects. Pokémon searches send the entered query directly to the free TCGdex API, and result previews load from the TCGdex asset CDN. When a result is added, the app first downloads and stores the high-resolution image locally; if that specific quality is unavailable, it retries the trusted low-resolution image before retaining a CDN display fallback. Save project applies the same high-to-low recovery to older remote-only TCGdex records. If IndexedDB is unavailable, image data URLs are stored in the local layout record instead. Reset Binder in Print Setup removes the active binder's local data.
 
 ## Deployment
 
