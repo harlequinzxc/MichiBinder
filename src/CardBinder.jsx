@@ -1353,7 +1353,7 @@ function AppBar({ isLeftSidebarOpen, setIsLeftSidebarOpen, showBottomTimeline, o
         <div className="flex items-center gap-2 select-none">
           <img src="/icons/icon-192.png" className="w-4 h-4 object-contain select-none pointer-events-none" alt="MichiBinder Logo" />
           <h1 className="bg-gradient-to-r from-white via-neutral-200 to-red-400 bg-clip-text text-xs font-semibold tracking-tight whitespace-nowrap text-transparent">MichiBinder</h1>
-          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.27.2</span>
+          <span className="font-mono text-[9px] font-bold text-neutral-600 bg-neutral-950/60 border border-white/[0.04] px-1.5 py-0.5 rounded-full select-none ml-1.5 tracking-normal">v4.27.3</span>
         </div>
         <SaveStatus isFolderLinked={isFolderLinked} />
       </div>
@@ -2771,13 +2771,21 @@ export default function CardBinder() {
     notify(`${binder.name} restored from legacy JSON. Images not embedded in that backup must be re-added.`, 'success');
   }, [commitAndActivateBinder, notify]);
 
-  const removeUnavailableProjectAsset = useCallback((asset) => {
-    const sourceBinder = bindersRef.current.find((binder) => binder.id === asset?.binderId);
-    if (!sourceBinder) {
-      notify('That binder is no longer available.', 'warn');
+  const removeUnavailableProjectAssets = useCallback((assetList) => {
+    const targets = [...new Map((Array.isArray(assetList) ? assetList : [assetList])
+      .filter((asset) => asset?.binderId && asset?.assetId)
+      .map((asset) => [`${asset.binderId}::${asset.assetId}`, asset])).values()];
+    if (!targets.length) return;
+    const knownBinderIds = new Set(bindersRef.current.map((binder) => binder.id));
+    const availableTargets = targets.filter((asset) => knownBinderIds.has(asset.binderId));
+    if (!availableTargets.length) {
+      notify('Those binder library entries are no longer available.', 'warn');
       return;
     }
-    if (!window.confirm(`Permanently remove the unavailable unplaced card “${asset.name}” from “${sourceBinder.name}”?`)) return;
+    const confirmation = availableTargets.length === 1
+      ? `Permanently remove the unavailable unplaced card “${availableTargets[0].name}” from its binder library?`
+      : `Permanently remove ${plural(availableTargets.length, 'unavailable unplaced card')} from their binder libraries?`;
+    if (!window.confirm(confirmation)) return;
 
     const activeId = activeBinderIdRef.current;
     const liveWorkspace = workspaceStateRef.current;
@@ -2786,67 +2794,87 @@ export default function CardBinder() {
         ? serializeBinderWorkspace(binder, liveWorkspace)
         : binder
     ));
-    const committedTarget = nextBinders.find((binder) => binder.id === asset.binderId);
-    if (!committedTarget?.pool.some((item) => item.id === asset.assetId)) {
-      notify(`“${asset.name}” was already removed from the library.`, 'info');
+    const targetsByBinder = new Map();
+    availableTargets.forEach((asset) => {
+      const binderTargets = targetsByBinder.get(asset.binderId) || new Map();
+      binderTargets.set(asset.assetId, asset);
+      targetsByBinder.set(asset.binderId, binderTargets);
+    });
+    const removed = [];
+    nextBinders = nextBinders.map((binder) => {
+      const requested = targetsByBinder.get(binder.id);
+      if (!requested) return binder;
+      const presentIds = new Set(binder.pool.filter((item) => requested.has(item.id)).map((item) => item.id));
+      if (!presentIds.size) return binder;
+      presentIds.forEach((assetId) => removed.push(requested.get(assetId)));
+      const nextPool = binder.pool.filter((item) => !presentIds.has(item.id));
+      const nextPages = pruneMissingImages(binder.pages, new Set(nextPool.map((item) => item.id)));
+      const nextPrices = { ...binder.cardPrices };
+      presentIds.forEach((assetId) => { delete nextPrices[assetId]; });
+      return {
+        ...binder,
+        updatedAt: new Date().toISOString(),
+        pool: nextPool,
+        pages: nextPages,
+        cardPrices: nextPrices,
+      };
+    });
+    if (!removed.length) {
+      notify('Those unavailable cards were already removed from the binder libraries.', 'info');
       return;
     }
-    const nextPool = committedTarget.pool.filter((item) => item.id !== asset.assetId);
-    const nextPages = pruneMissingImages(committedTarget.pages, new Set(nextPool.map((item) => item.id)));
-    const nextPrices = { ...committedTarget.cardPrices };
-    delete nextPrices[asset.assetId];
-    const nextTarget = {
-      ...committedTarget,
-      updatedAt: new Date().toISOString(),
-      pool: nextPool,
-      pages: nextPages,
-      cardPrices: nextPrices,
-    };
-    nextBinders = nextBinders.map((binder) => binder.id === asset.binderId ? nextTarget : binder);
 
     try {
       persistBinderRepository(nextBinders, activeId);
       localStorage.removeItem(STORAGE_KEY);
     } catch {
-      notify('The unavailable card could not be removed from browser storage.', 'error');
+      notify('The unavailable cards could not be removed from browser storage.', 'error');
       return;
     }
     bindersRef.current = nextBinders;
     setBinders(nextBinders);
 
-    if (asset.binderId === activeId) {
-      setPool(nextPool);
-      pagesRef.current = nextPages;
-      setPages(nextPages);
-      cardPricesRef.current = nextPrices;
-      setCardPrices(nextPrices);
-      setSelectedCardIds((value) => value.filter((id) => id !== asset.assetId));
-      setSelectionAnchorId((value) => value === asset.assetId ? null : value);
+    const activeRemovedIds = new Set(removed.filter((asset) => asset.binderId === activeId).map((asset) => asset.assetId));
+    if (activeRemovedIds.size) {
+      const nextActive = nextBinders.find((binder) => binder.id === activeId);
+      setPool(nextActive.pool);
+      pagesRef.current = nextActive.pages;
+      setPages(nextActive.pages);
+      cardPricesRef.current = nextActive.cardPrices;
+      setCardPrices(nextActive.cardPrices);
+      setSelectedCardIds((value) => value.filter((id) => !activeRemovedIds.has(id)));
+      setSelectionAnchorId((value) => activeRemovedIds.has(value) ? null : value);
       setSelBox(null);
       setSelectionPageId(null);
-      if (editingRef.current?.imgId === asset.assetId) {
+      if (activeRemovedIds.has(editingRef.current?.imgId)) {
         editingRef.current = null;
         setEditing(null);
       }
       setImages((value) => {
         const next = { ...value };
-        const source = next[asset.assetId];
-        if (source?.startsWith('blob:')) {
-          URL.revokeObjectURL(source);
-          objectUrlsRef.current.delete(source);
-        }
-        delete next[asset.assetId];
+        activeRemovedIds.forEach((assetId) => {
+          const source = next[assetId];
+          if (source?.startsWith('blob:')) {
+            URL.revokeObjectURL(source);
+            objectUrlsRef.current.delete(source);
+          }
+          delete next[assetId];
+        });
         return next;
       });
       pastRef.current = [];
       futureRef.current = [];
       setSaveStatus('saved');
     }
-    sessionIdsRef.current.delete(asset.assetId);
-    idbDeleteBinderAssets(asset.binderId, [asset.assetId]).catch(() => {
-      notify('The library entry was removed, but stale image storage could not be cleaned up.', 'warn');
+    removed.forEach((asset) => sessionIdsRef.current.delete(asset.assetId));
+    const removedByBinder = new Map();
+    removed.forEach((asset) => removedByBinder.set(asset.binderId, [...(removedByBinder.get(asset.binderId) || []), asset.assetId]));
+    removedByBinder.forEach((assetIds, binderId) => {
+      idbDeleteBinderAssets(binderId, assetIds).catch(() => {
+        notify('Library entries were removed, but stale image storage could not be cleaned up.', 'warn');
+      });
     });
-    notify(`“${asset.name}” removed from the ${sourceBinder.name} library. Try Save project again.`, 'success');
+    notify(`${plural(removed.length, 'unavailable card')} removed from binder libraries. Try Save project again.`, 'success');
   }, [notify, setPages]);
 
   const handleSaveProject = useCallback(async () => {
@@ -2874,6 +2902,7 @@ export default function CardBinder() {
       });
 
       const portableBinders = [];
+      const unavailableUnplacedAssets = [];
       for (const binder of currentBinders) {
         const seenAssetIds = new Set();
         const assets = [];
@@ -2895,19 +2924,22 @@ export default function CardBinder() {
               placement = { pageId: page.id, pageIndex, key: entry[0] };
               return true;
             });
-            const detail = placement
-              ? 'Open that binder while online or reconnect its Custom Card Vault, then try again.'
-              : 'This is an unplaced library card, so removing a placed copy does not delete it.';
-            const error = new Error(`Could not embed “${item.name}” from “${binder.name}”. ${detail}`);
-            error.code = 'PROJECT_ASSET_UNAVAILABLE';
-            error.projectAsset = {
+            const projectAsset = {
               binderId: binder.id,
+              binderName: binder.name,
               assetId: item.id,
               name: item.name,
               source: item.source,
               tcgdexId: item.tcgdexId || '',
               ...placement,
             };
+            if (!placement) {
+              unavailableUnplacedAssets.push(projectAsset);
+              continue;
+            }
+            const error = new Error(`Could not embed “${item.name}” from “${binder.name}”. Open that binder while online or reconnect its Custom Card Vault, then try again.`);
+            error.code = 'PROJECT_ASSET_UNAVAILABLE';
+            error.projectAsset = projectAsset;
             throw error;
           }
           assets.push({ id: item.id, data });
@@ -2921,6 +2953,17 @@ export default function CardBinder() {
           },
           assets,
         });
+      }
+
+      if (unavailableUnplacedAssets.length) {
+        const first = unavailableUnplacedAssets[0];
+        const message = unavailableUnplacedAssets.length === 1
+          ? `Could not embed “${first.name}” from “${first.binderName}”. This is an unplaced library card, so removing a placed copy does not delete it.`
+          : `Could not embed ${plural(unavailableUnplacedAssets.length, 'unplaced library card')}, including “${first.name}” from “${first.binderName}”. These are separate library records.`;
+        const error = new Error(message);
+        error.code = 'PROJECT_UNPLACED_ASSETS_UNAVAILABLE';
+        error.projectAssets = unavailableUnplacedAssets;
+        throw error;
       }
 
       const payload = {
@@ -2943,16 +2986,20 @@ export default function CardBinder() {
       const imageCount = portableBinders.reduce((total, entry) => total + entry.assets.length, 0);
       notify(`Project saved with ${plural(currentBinders.length, 'binder')} and ${plural(imageCount, 'embedded image')}.`, 'success');
     } catch (error) {
-      const action = error?.code === 'PROJECT_ASSET_UNAVAILABLE' && error.projectAsset
-        ? error.projectAsset.pageId
-          ? { label: 'Show card', onClick: () => setProjectAssetLocator(error.projectAsset) }
-          : { label: 'Remove unused', onClick: () => removeUnavailableProjectAsset(error.projectAsset) }
-        : null;
+      let action = null;
+      if (error?.code === 'PROJECT_ASSET_UNAVAILABLE' && error.projectAsset) {
+        action = { label: 'Show card', onClick: () => setProjectAssetLocator(error.projectAsset) };
+      } else if (error?.code === 'PROJECT_UNPLACED_ASSETS_UNAVAILABLE' && error.projectAssets?.length) {
+        action = {
+          label: error.projectAssets.length === 1 ? 'Remove unused' : `Remove ${error.projectAssets.length} unused`,
+          onClick: () => removeUnavailableProjectAssets(error.projectAssets),
+        };
+      }
       notify(error?.message || 'The project could not be saved.', 'error', action);
     } finally {
       setProjectTransferStatus('');
     }
-  }, [images, notify, projectTransferStatus, removeUnavailableProjectAsset, snapshotActiveBinder]);
+  }, [images, notify, projectTransferStatus, removeUnavailableProjectAssets, snapshotActiveBinder]);
 
   const handleOpenProjectFile = useCallback(async (file) => {
     if (!file || projectTransferStatus) return;
